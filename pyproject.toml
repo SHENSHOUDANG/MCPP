@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mathbased-mcpp"
+version = "0.1.0"
+description = "PPO baseline for boustrophedon-style grid coverage path planning."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Codex" }
+]
+dependencies = [
+  "numpy>=1.24",
+  "torch>=2.0",
+  "tensorboard>=2.10",
+  "matplotlib>=3.7",
+  "tomli>=2.0; python_version < '3.11'"
+]
+
+[project.scripts]
+mathbased-mcpp = "mathbased_mcpp.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

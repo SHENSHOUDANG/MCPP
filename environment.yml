@@ -1,0 +1,12 @@
+name: mathbased-mcpp
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch=2.2
+  - cpuonly
+  - numpy=1.26
+  - matplotlib
+  - pip
+  - tomli

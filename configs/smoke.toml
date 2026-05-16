@@ -1,0 +1,39 @@
+[env]
+width = 6
+height = 6
+max_steps = 48
+seed = 7
+start = [0, 0]
+obstacles = [[2, 2], [3, 2], [4, 4]]
+random_obstacle_count = 0
+random_obstacle_seed = 11
+danger_radius = 1
+
+[reward]
+distance_weight = 1.0
+straight_weight = 1.0
+coverage_weight = 1.0
+time_penalty_weight = 0.3
+repeat_penalty_weight = 0.1
+finish_reward = 80.0
+invalid_move_penalty = -1.0
+
+[ppo]
+total_timesteps = 256
+rollout_steps = 64
+update_epochs = 2
+mini_batch_size = 32
+gamma = 0.98
+gae_lambda = 0.95
+clip_ratio = 0.2
+learning_rate = 0.0003
+value_coef = 0.5
+entropy_coef = 0.01
+max_grad_norm = 0.5
+hidden_dim = 64
+seed = 7
+device = "auto"
+
+[train]
+run_root = "runs"
+log_interval = 1

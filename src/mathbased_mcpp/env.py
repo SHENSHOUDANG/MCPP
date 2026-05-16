@@ -32,8 +32,8 @@ class StepResult:
 class GridCoverageEnv:
     """Grid coverage environment with single-agent compatibility and MAPPO multi-agent mode."""
 
-    observation_channels = 5
-    observation_metadata_dim = 4
+    observation_channels = 7
+    observation_metadata_dim = 12
     state_channels = 5
     state_metadata_dim = 7
 
@@ -52,6 +52,7 @@ class GridCoverageEnv:
         self.teammate_positions: list[GridPosition] = list(config.teammate_positions)
         self.paths: list[list[GridPosition]] = [[config.start]]
         self.path: list[GridPosition] = []
+        self.covered_by_agent: list[set[GridPosition]] = [{config.start}]
         self.path_lengths: list[int] = [0]
         self.path_length = 0
         self.step_count = 0
@@ -89,6 +90,7 @@ class GridCoverageEnv:
         self._configure_orientation(self.positions[0])
         self.teammate_positions = self._valid_teammate_positions(self.config.teammate_positions)
         self.covered = set(self.positions)
+        self.covered_by_agent = [{position} for position in self.positions]
         self.paths = [[position] for position in self.positions]
         self.path_lengths = [0 for _ in self.positions]
         self.step_count = 0
@@ -115,6 +117,7 @@ class GridCoverageEnv:
         last_blocked_cells = set(self.last_blocked_cells)
         last_new_cells = self.last_new_cells
         last_collision_agents = self.last_collision_agents
+        covered_by_agent = [set(cells) for cells in self.covered_by_agent]
         obs = self.reset()
         self.positions = positions
         self.start_position = start_position
@@ -122,6 +125,7 @@ class GridCoverageEnv:
         self._row_flip = row_flip
         self._col_flip = col_flip
         self.covered = covered
+        self.covered_by_agent = covered_by_agent
         self.paths = paths
         self.teammate_positions = teammate_positions
         self.path_lengths = path_lengths
@@ -224,6 +228,18 @@ class GridCoverageEnv:
     def coverage_ratio(self) -> float:
         return len(self.covered) / max(len(self.free_cells), 1)
 
+    def neighbor_mask(self) -> np.ndarray:
+        mask = np.eye(self.num_agents, dtype=bool)
+        radius = max(self.config.communication_radius, 0)
+        if radius <= 0:
+            return mask
+        for first in range(self.num_agents):
+            for second in range(first + 1, self.num_agents):
+                if self._manhattan(self.positions[first], self.positions[second]) <= radius:
+                    mask[first, second] = True
+                    mask[second, first] = True
+        return mask
+
     def _step_single(self, action: int, scalar_action: bool) -> StepResult:
         previous_position = self.position
         previous_covered = set(self.covered)
@@ -237,6 +253,7 @@ class GridCoverageEnv:
             self.positions[0] = target
             self.path_lengths[0] += abs(target[0] - previous_position[0]) + abs(target[1] - previous_position[1])
             self.paths[0].append(target)
+            self.covered_by_agent[0].add(target)
             repeated = target in self.covered
             self.covered.add(target)
             self.last_new_cells = 0 if repeated else 1
@@ -355,6 +372,7 @@ class GridCoverageEnv:
             target = final_positions[index]
             self.path_lengths[index] += abs(target[0] - previous[0]) + abs(target[1] - previous[1])
             self.paths[index].append(target)
+            self.covered_by_agent[index].add(target)
         for index in blocked_agents:
             self.paths[index].append(previous_positions[index])
         self.covered.update(new_cells)
@@ -489,6 +507,10 @@ class GridCoverageEnv:
         self_agent = np.zeros_like(all_agents)
         self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
         other_agents = all_agents - self_agent
+        self_covered = np.zeros_like(all_agents)
+        for cell in self.covered_by_agent[agent_index]:
+            self_covered[self._canonical_position(cell)] = 1.0
+        recent_path = self._recent_path_layer(agent_index)
 
         radius = max(self.config.observation_radius, 0)
         center = self._canonical_position(self.positions[agent_index])
@@ -498,6 +520,8 @@ class GridCoverageEnv:
             self._local_window(uncovered, radius, center),
             self._local_window(team_covered, radius, center),
             self._local_window(obstacles, radius, center),
+            self._local_window(self_covered, radius, center),
+            self._local_window(recent_path, radius, center),
         ]
 
         row = center[0]
@@ -507,10 +531,66 @@ class GridCoverageEnv:
                 self.step_count / max(self.config.max_steps, 1),
                 self.coverage_ratio(),
                 self._agent_density(),
+                *self._communication_metadata(agent_index),
             ],
             dtype=np.float32,
         )
         return np.concatenate([channel.ravel() for channel in channels] + [metadata])
+
+    def _recent_path_layer(self, agent_index: int) -> np.ndarray:
+        layer = np.zeros((self.config.height, self.config.width), dtype=np.float32)
+        memory_length = max(self.config.recent_path_length, 1)
+        recent = self.paths[agent_index][-memory_length:]
+        for age, position in enumerate(reversed(recent)):
+            value = (memory_length - age) / memory_length
+            row, col = self._canonical_position(position)
+            layer[row, col] = max(layer[row, col], float(value))
+        return layer
+
+    def _communication_metadata(self, agent_index: int) -> list[float]:
+        radius = max(self.config.communication_radius, 0)
+        if radius <= 0 or self.num_agents <= 1:
+            return [0.0] * 8
+
+        position = self.positions[agent_index]
+        neighbors: list[int] = []
+        distances: list[int] = []
+        for other_index, other_position in enumerate(self.positions):
+            if other_index == agent_index:
+                continue
+            distance = self._manhattan(position, other_position)
+            if distance <= radius:
+                neighbors.append(other_index)
+                distances.append(distance)
+        if not neighbors:
+            return [0.0] * 8
+
+        row_scale = max(self.config.height - 1, 1)
+        col_scale = max(self.config.width - 1, 1)
+        distance_scale = max(self.config.height + self.config.width - 2, 1)
+        relative_rows = [(self.positions[index][0] - position[0]) / row_scale for index in neighbors]
+        relative_cols = [(self.positions[index][1] - position[1]) / col_scale for index in neighbors]
+        path_progress = [self.path_lengths[index] / max(self.config.max_steps, 1) for index in neighbors]
+        frontier_density = [self._uncovered_neighbor_count(self.positions[index]) / max(len(ACTIONS), 1) for index in neighbors]
+        intents = [self._last_move_vector(index) for index in neighbors]
+        return [
+            len(neighbors) / max(self.num_agents - 1, 1),
+            float(np.mean(relative_rows)),
+            float(np.mean(relative_cols)),
+            min(distances) / distance_scale,
+            float(np.mean(path_progress)),
+            float(np.mean(frontier_density)),
+            float(np.mean([intent[0] for intent in intents])),
+            float(np.mean([intent[1] for intent in intents])),
+        ]
+
+    def _last_move_vector(self, agent_index: int) -> tuple[float, float]:
+        path = self.paths[agent_index]
+        if len(path) < 2:
+            return 0.0, 0.0
+        previous = path[-2]
+        current = path[-1]
+        return float(current[0] - previous[0]), float(current[1] - previous[1])
 
     def _canonical_layers(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         all_agents = np.zeros((self.config.height, self.config.width), dtype=np.float32)
