@@ -31,6 +31,12 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
     observation_dim = int(payload["observation_dim"])
     action_dim = int(payload["action_dim"])
     critic_type = payload.get("critic_type")
+    use_graph_attention = bool(payload.get("use_graph_attention", False))
+    gat_use_edge_features = bool(payload.get("gat_use_edge_features", config.ppo.gat_use_edge_features))
+    gat_edge_dim = int(payload.get("gat_edge_dim", GridCoverageEnv(config.env).neighbor_feature_dim if gat_use_edge_features else 0))
+    gat_num_heads = int(payload.get("gat_num_heads", config.ppo.gat_num_heads))
+    gat_residual = bool(payload.get("gat_residual", config.ppo.gat_residual))
+    gat_attention_dropout = float(payload.get("gat_attention_dropout", config.ppo.gat_attention_dropout))
     if critic_type == "spatial" or "state_shape" in payload:
         model = ActorCritic(
             observation_dim=observation_dim,
@@ -39,7 +45,11 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             state_shape=(config.env.height, config.env.width),
             state_channels=int(payload.get("state_channels", 5)),
             state_metadata_dim=int(payload.get("state_metadata_dim", 7)),
-            use_graph_attention=bool(payload.get("use_graph_attention", False)),
+            use_graph_attention=use_graph_attention,
+            gat_num_heads=gat_num_heads,
+            gat_edge_dim=gat_edge_dim,
+            gat_residual=gat_residual,
+            gat_attention_dropout=gat_attention_dropout,
         )
     else:
         model = ActorCritic(
@@ -47,7 +57,11 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             action_dim=action_dim,
             hidden_dim=hidden_dim,
             state_dim=int(payload.get("state_dim", observation_dim)),
-            use_graph_attention=bool(payload.get("use_graph_attention", False)),
+            use_graph_attention=use_graph_attention,
+            gat_num_heads=gat_num_heads,
+            gat_edge_dim=gat_edge_dim,
+            gat_residual=gat_residual,
+            gat_attention_dropout=gat_attention_dropout,
         )
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
@@ -74,8 +88,19 @@ def evaluate_policy(
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32)
         state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool)
+        edge_features = (
+            torch.as_tensor(env.neighbor_features(), dtype=torch.float32)
+            if model.use_graph_attention and model.gat_edge_dim > 0
+            else None
+        )
         with torch.no_grad():
-            actions, _, _ = model.act_batch(obs_tensor, state_tensor, neighbor_mask=neighbor_mask, deterministic=deterministic)
+            actions, _, _ = model.act_batch(
+                obs_tensor,
+                state_tensor,
+                neighbor_mask=neighbor_mask,
+                edge_features=edge_features,
+                deterministic=deterministic,
+            )
         result = env.step(actions.cpu().numpy().tolist())
         rewards = np.asarray(result.reward, dtype=np.float32)
         total_reward += float(rewards.mean() if rewards.ndim > 0 else rewards)

@@ -36,6 +36,7 @@ class GridCoverageEnv:
     observation_metadata_dim = 12
     state_channels = 5
     state_metadata_dim = 7
+    neighbor_feature_dim = 4
 
     def __init__(self, config: GridCoverageConfig) -> None:
         self.config = config
@@ -56,6 +57,7 @@ class GridCoverageEnv:
         self.path_lengths: list[int] = [0]
         self.path_length = 0
         self.step_count = 0
+        self.reset_count = 0
         self.done = False
         self.last_blocked_cells: set[GridPosition] = set()
         self.last_new_cells = 0
@@ -85,7 +87,9 @@ class GridCoverageEnv:
     def reset(self, seed: int | None = None) -> np.ndarray:
         if seed is not None:
             self.random.seed(seed)
+            self.reset_count = 0
         self._build_map()
+        self.reset_count += 1
         self.positions = self._select_start_positions()
         self._configure_orientation(self.positions[0])
         self.teammate_positions = self._valid_teammate_positions(self.config.teammate_positions)
@@ -113,11 +117,14 @@ class GridCoverageEnv:
         teammate_positions = list(self.teammate_positions)
         path_lengths = list(self.path_lengths)
         step_count = self.step_count
+        reset_count = self.reset_count
         done = self.done
         last_blocked_cells = set(self.last_blocked_cells)
         last_new_cells = self.last_new_cells
         last_collision_agents = self.last_collision_agents
         covered_by_agent = [set(cells) for cells in self.covered_by_agent]
+        obstacles = set(self.obstacles)
+        free_cells = set(self.free_cells)
         obs = self.reset()
         self.positions = positions
         self.start_position = start_position
@@ -130,10 +137,13 @@ class GridCoverageEnv:
         self.teammate_positions = teammate_positions
         self.path_lengths = path_lengths
         self.step_count = step_count
+        self.reset_count = reset_count
         self.done = done
         self.last_blocked_cells = last_blocked_cells
         self.last_new_cells = last_new_cells
         self.last_collision_agents = last_collision_agents
+        self.obstacles = obstacles
+        self.free_cells = free_cells
         self._sync_legacy_aliases()
         return obs
 
@@ -144,14 +154,18 @@ class GridCoverageEnv:
             raise ValueError(f"expected {self.num_agents} actions, got {len(actions)}")
         if self.done:
             reward: float | np.ndarray = 0.0 if scalar_action else np.zeros(self.num_agents, dtype=np.float32)
-            observation = self._observations()
-            return StepResult(observation[0] if scalar_action else observation, self.global_state(), reward, True, self._info({}))
+            layers = self._canonical_layers()
+            observation = self._observations(layers)
+            return StepResult(observation[0] if scalar_action else observation, self._global_state_from_layers(layers), reward, True, self._info({}))
         if self.num_agents == 1:
             return self._step_single(actions[0], scalar_action=scalar_action)
         return self._step_multi(actions)
 
     def global_state(self) -> np.ndarray:
-        all_agents, uncovered, team_covered, obstacles, blocked = self._canonical_layers()
+        return self._global_state_from_layers(self._canonical_layers())
+
+    def _global_state_from_layers(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]) -> np.ndarray:
+        all_agents, uncovered, team_covered, obstacles, blocked = layers
         metadata = np.array(
             [
                 self.coverage_ratio(),
@@ -240,10 +254,27 @@ class GridCoverageEnv:
                     mask[second, first] = True
         return mask
 
+    def neighbor_features(self) -> np.ndarray:
+        features = np.zeros((self.num_agents, self.num_agents, self.neighbor_feature_dim), dtype=np.float32)
+        radius = max(self.config.communication_radius, 0)
+        distance_scale = max(radius, 1)
+        row_scale = max(self.config.height - 1, 1)
+        col_scale = max(self.config.width - 1, 1)
+        for source, source_position in enumerate(self.positions):
+            for target, target_position in enumerate(self.positions):
+                distance = self._manhattan(source_position, target_position)
+                connected = source == target or (radius > 0 and distance <= radius)
+                features[source, target, 0] = min(distance / distance_scale, 1.0)
+                features[source, target, 1] = (target_position[0] - source_position[0]) / row_scale
+                features[source, target, 2] = (target_position[1] - source_position[1]) / col_scale
+                features[source, target, 3] = 1.0 if connected else 0.0
+        return features
+
     def _step_single(self, action: int, scalar_action: bool) -> StepResult:
         previous_position = self.position
         previous_covered = set(self.covered)
-        before_distance = self._distance_to_nearest_uncovered(previous_position, previous_covered)
+        use_frontier_progress = self.config.reward.team_frontier_weight != 0.0
+        before_distance = self._distance_to_nearest_uncovered(previous_position, previous_covered) if use_frontier_progress else None
         target, valid = self.peek(action)
         reward_terms = self._single_reward_terms(previous_position=previous_position, target=target, valid=valid)
 
@@ -281,8 +312,11 @@ class GridCoverageEnv:
         if not valid:
             reward = float(self.config.reward.invalid_move_penalty)
         else:
-            after_distance = self._distance_to_nearest_uncovered(self.positions[0], self.covered)
             frontier_progress = 0.0
+            if use_frontier_progress:
+                after_distance = self._distance_to_nearest_uncovered(self.positions[0], self.covered)
+            else:
+                after_distance = None
             if before_distance is not None and after_distance is not None:
                 frontier_progress = float(
                     np.clip((before_distance - after_distance) / max(self.config.height + self.config.width, 1), -1.0, 1.0)
@@ -312,14 +346,20 @@ class GridCoverageEnv:
             )
         self.last_collision_agents = 0
         self._sync_legacy_aliases()
-        observation = self._observations()
+        layers = self._canonical_layers()
+        observation = self._observations(layers)
         step_reward: float | np.ndarray = reward if scalar_action else np.array([reward], dtype=np.float32)
-        return StepResult(observation[0] if scalar_action else observation, self.global_state(), step_reward, self.done, self._info(reward_terms))
+        return StepResult(observation[0] if scalar_action else observation, self._global_state_from_layers(layers), step_reward, self.done, self._info(reward_terms))
 
     def _step_multi(self, actions: list[int]) -> StepResult:
         previous_positions = list(self.positions)
         previous_covered = set(self.covered)
-        before_distances = [self._distance_to_nearest_uncovered(position, previous_covered) for position in previous_positions]
+        use_frontier_progress = self.config.reward.team_frontier_weight != 0.0
+        before_distances = (
+            self._distances_to_nearest_uncovered(previous_positions, previous_covered)
+            if use_frontier_progress
+            else [None for _ in previous_positions]
+        )
         targets: list[GridPosition] = []
         base_valid: list[bool] = []
         for index, action in enumerate(actions):
@@ -378,13 +418,15 @@ class GridCoverageEnv:
         self.covered.update(new_cells)
         self.last_new_cells = len(new_cells)
         self.last_collision_agents = len(collision_agents)
-        after_distances = [self._distance_to_nearest_uncovered(position, self.covered) for position in final_positions]
-        progress_values = [
-            (before - after) / max(self.config.height + self.config.width, 1)
-            for before, after in zip(before_distances, after_distances)
-            if before is not None and after is not None
-        ]
-        frontier_progress = float(np.clip(np.mean(progress_values), -1.0, 1.0)) if progress_values else 0.0
+        frontier_progress = 0.0
+        if use_frontier_progress:
+            after_distances = self._distances_to_nearest_uncovered(final_positions, self.covered)
+            progress_values = [
+                (before - after) / max(self.config.height + self.config.width, 1)
+                for before, after in zip(before_distances, after_distances)
+                if before is not None and after is not None
+            ]
+            frontier_progress = float(np.clip(np.mean(progress_values), -1.0, 1.0)) if progress_values else 0.0
 
         completed = self.covered >= self.free_cells
         uncovered_ratio = 1.0 - self.coverage_ratio()
@@ -409,8 +451,9 @@ class GridCoverageEnv:
         )
         self.done = completed or self.step_count >= self.config.max_steps
         self._sync_legacy_aliases()
+        layers = self._canonical_layers()
         rewards = np.full(self.num_agents, reward, dtype=np.float32)
-        return StepResult(self._observations(), self.global_state(), rewards, self.done, self._info(reward_terms))
+        return StepResult(self._observations(layers), self._global_state_from_layers(layers), rewards, self.done, self._info(reward_terms))
 
     def _single_reward_terms(self, previous_position: GridPosition, target: GridPosition, valid: bool) -> dict[str, float]:
         terms = {
@@ -477,7 +520,18 @@ class GridCoverageEnv:
         return False
 
     def _distance_to_nearest_uncovered(self, start: GridPosition, covered: set[GridPosition]) -> int | None:
+        return self._distance_to_nearest_uncovered_from_set(start, self.free_cells - covered)
+
+    def _distances_to_nearest_uncovered(self, starts: Sequence[GridPosition], covered: set[GridPosition]) -> list[int | None]:
         uncovered = self.free_cells - covered
+        if not uncovered:
+            return [0 for _ in starts]
+        if len(uncovered) <= 1 and len(starts) > 1:
+            distance_field = self._distance_field_to_uncovered(covered)
+            return [self._distance_from_field(distance_field, position) for position in starts]
+        return [self._distance_to_nearest_uncovered_from_set(position, uncovered) for position in starts]
+
+    def _distance_to_nearest_uncovered_from_set(self, start: GridPosition, uncovered: set[GridPosition]) -> int | None:
         if not uncovered:
             return 0
         if start in uncovered:
@@ -496,14 +550,42 @@ class GridCoverageEnv:
                 queue.append((neighbor, distance + 1))
         return None
 
+    def _distance_field_to_uncovered(self, covered: set[GridPosition]) -> np.ndarray:
+        uncovered = self.free_cells - covered
+        if not uncovered:
+            return np.zeros((self.config.height, self.config.width), dtype=np.int32)
+        distances = np.full((self.config.height, self.config.width), -1, dtype=np.int32)
+        queue: deque[GridPosition] = deque()
+        for row, col in uncovered:
+            distances[row, col] = 0
+            queue.append((row, col))
+        while queue:
+            position = queue.popleft()
+            distance = int(distances[position[0], position[1]])
+            for delta in ACTIONS.values():
+                neighbor = (position[0] + delta[0], position[1] + delta[1])
+                if not self.is_free(neighbor) or distances[neighbor[0], neighbor[1]] >= 0:
+                    continue
+                distances[neighbor[0], neighbor[1]] = distance + 1
+                queue.append(neighbor)
+        return distances
+
+    def _distance_from_field(self, distance_field: np.ndarray, position: GridPosition) -> int | None:
+        distance = int(distance_field[position[0], position[1]])
+        return None if distance < 0 else distance
+
     def _manhattan(self, first: GridPosition, second: GridPosition) -> int:
         return abs(first[0] - second[0]) + abs(first[1] - second[1])
 
-    def _observations(self) -> np.ndarray:
-        return np.stack([self._observation(index) for index in range(self.num_agents)]).astype(np.float32)
+    def _observations(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
+        if layers is None:
+            layers = self._canonical_layers()
+        return np.stack([self._observation(index, layers) for index in range(self.num_agents)]).astype(np.float32)
 
-    def _observation(self, agent_index: int = 0) -> np.ndarray:
-        all_agents, uncovered, team_covered, obstacles, _ = self._canonical_layers()
+    def _observation(self, agent_index: int = 0, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
+        if layers is None:
+            layers = self._canonical_layers()
+        all_agents, uncovered, team_covered, obstacles, _ = layers
         self_agent = np.zeros_like(all_agents)
         self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
         other_agents = all_agents - self_agent
@@ -648,7 +730,7 @@ class GridCoverageEnv:
             raise ValueError("free cells must form a connected region")
 
     def _sample_connected_random_obstacles(self, base_obstacles: set[GridPosition], random_count: int) -> set[GridPosition]:
-        rng = random.Random(self.config.random_obstacle_seed)
+        rng = random.Random(self._current_random_obstacle_seed())
         all_cells = {(row, col) for row in range(self.config.height) for col in range(self.config.width)}
         corner_positions = set(self._corner_positions()) if self.config.random_corner_start else set()
         protected = {self.config.start, *self.config.start_positions, *corner_positions}
@@ -672,6 +754,14 @@ class GridCoverageEnv:
                 f"placed {len(selected)}"
             )
         return selected
+
+    def _current_random_obstacle_seed(self) -> int:
+        seeds = self.config.random_obstacle_seeds
+        if not seeds:
+            return self.config.random_obstacle_seed
+        refresh_episodes = max(self.config.map_refresh_episodes, 1)
+        seed_index = (self.reset_count // refresh_episodes) % len(seeds)
+        return seeds[seed_index]
 
     def _free_cells_are_connected(self, free_cells: set[GridPosition]) -> bool:
         if not free_cells:

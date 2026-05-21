@@ -44,14 +44,14 @@ max_grad_norm = 0.5
 hidden_dim = 96
 seed = 20260428
 device = "auto"
-use_graph_attention = true
+use_graph_attention = false
 gat_num_heads = 4
 gat_use_edge_features = true
 gat_residual = true
 gat_attention_dropout = 0.0
 
 [train]
-run_root = "E:\\test plot"
+run_root = "E:\\test plot\\ablation_gat_off"
 log_interval = 1
 eval_interval = 10
 checkpoint_interval = 10

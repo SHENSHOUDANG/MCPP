@@ -115,6 +115,10 @@ def _train_single_course(
         state_channels=env.state_channels,
         state_metadata_dim=env.state_metadata_dim,
         use_graph_attention=config.ppo.use_graph_attention,
+        gat_num_heads=config.ppo.gat_num_heads,
+        gat_edge_dim=env.neighbor_feature_dim if config.ppo.gat_use_edge_features else 0,
+        gat_residual=config.ppo.gat_residual,
+        gat_attention_dropout=config.ppo.gat_attention_dropout,
     ).to(device)
     if checkpoint_path is not None:
         _load_checkpoint_weights(model, checkpoint_path)
@@ -131,6 +135,8 @@ def _train_single_course(
     best_score: tuple[float, int, float, float] | None = None
     best_checkpoint_path = run_path / "best_policy.pt"
     last_checkpoint_path = run_path / "last_policy.pt"
+    eval_interval = max(config.train.eval_interval or config.train.log_interval, 1)
+    checkpoint_interval = max(config.train.checkpoint_interval or config.train.log_interval, 1)
 
     try:
         while timestep < config.ppo.total_timesteps:
@@ -161,8 +167,10 @@ def _train_single_course(
                     write_tensorboard_rows(writer, "train", metric_rows)
                 metric_rows.clear()
 
-            if update_index % max(config.train.log_interval, 1) == 0:
+            if update_index % checkpoint_interval == 0:
                 torch.save(_checkpoint_payload(config, model), last_checkpoint_path)
+
+            if update_index % eval_interval == 0:
                 eval_row = _evaluate_model(config, model, update_index)
                 append_metrics(run_path / "eval_metrics.csv", [eval_row])
                 if writer is not None:
@@ -269,8 +277,15 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
         state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32, device=device)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool, device=device)
+        edge_features = _edge_features_tensor(env, model, device)
         with torch.no_grad():
-            actions, _, _ = model.act_batch(obs_tensor, state_tensor, neighbor_mask=neighbor_mask, deterministic=True)
+            actions, _, _ = model.act_batch(
+                obs_tensor,
+                state_tensor,
+                neighbor_mask=neighbor_mask,
+                edge_features=edge_features,
+                deterministic=True,
+            )
         result = env.step(actions.cpu().numpy().tolist())
         rewards = _agent_rewards(env, result.reward)
         total_reward += float(np.mean(rewards))
@@ -320,6 +335,7 @@ def _collect_rollout(
     dones: list[np.ndarray] = []
     values: list[np.ndarray] = []
     neighbor_masks: list[np.ndarray] = []
+    edge_features: list[np.ndarray] = []
     metric_rows: list[dict[str, float | int]] = []
     device = _model_device(model)
 
@@ -329,8 +345,17 @@ def _collect_rollout(
         state_tensor = torch.as_tensor(state_batch, dtype=torch.float32, device=device)
         neighbor_mask = env.neighbor_mask()
         neighbor_mask_tensor = torch.as_tensor(neighbor_mask, dtype=torch.bool, device=device)
+        edge_feature_array = env.neighbor_features() if _uses_edge_features(model) else None
+        edge_feature_tensor = (
+            torch.as_tensor(edge_feature_array, dtype=torch.float32, device=device) if edge_feature_array is not None else None
+        )
         with torch.no_grad():
-            action_tensor, log_prob_tensor, value_tensor = model.act_batch(obs_tensor, state_tensor, neighbor_mask=neighbor_mask_tensor)
+            action_tensor, log_prob_tensor, value_tensor = model.act_batch(
+                obs_tensor,
+                state_tensor,
+                neighbor_mask=neighbor_mask_tensor,
+                edge_features=edge_feature_tensor,
+            )
 
         result = env.step(action_tensor.cpu().numpy().tolist())
         reward_array = _agent_rewards(env, result.reward)
@@ -342,6 +367,8 @@ def _collect_rollout(
         dones.append(np.full(env.num_agents, float(result.done), dtype=np.float32))
         values.append(value_tensor.cpu().numpy())
         neighbor_masks.append(neighbor_mask)
+        if edge_feature_array is not None:
+            edge_features.append(edge_feature_array)
         episode_reward += float(np.mean(reward_array))
         observation = _agent_observations(env, result.observation)
         state = result.state
@@ -393,6 +420,11 @@ def _collect_rollout(
         advantages=torch.as_tensor(advantages, dtype=torch.float32, device=device),
         values=torch.as_tensor(value_array, dtype=torch.float32, device=device),
         neighbor_masks=torch.as_tensor(np.asarray(neighbor_masks, dtype=bool), dtype=torch.bool, device=device),
+        edge_features=(
+            torch.as_tensor(np.asarray(edge_features, dtype=np.float32), dtype=torch.float32, device=device)
+            if edge_features
+            else None
+        ),
     )
     metrics = {
         "episode_index": episode_index,
@@ -484,11 +516,13 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
             mb = indices[start : start + mini_batch_steps]
             mb_tensor = torch.as_tensor(mb, dtype=torch.long, device=batch.actions.device)
             neighbor_mask = batch.neighbor_masks[mb_tensor] if batch.neighbor_masks is not None else None
+            edge_features = batch.edge_features[mb_tensor] if batch.edge_features is not None else None
             log_probs, entropy, values = model.evaluate_actions(
                 batch.observations[mb_tensor],
                 batch.states[mb_tensor],
                 batch.actions[mb_tensor],
                 neighbor_mask=neighbor_mask,
+                edge_features=edge_features,
             )
             ratio = torch.exp(log_probs - batch.log_probs[mb_tensor])
             clipped = torch.clamp(ratio, 1.0 - config.ppo.clip_ratio, 1.0 + config.ppo.clip_ratio) * advantages[mb_tensor]
@@ -516,7 +550,22 @@ def _checkpoint_payload(config: ExperimentConfig, model: ActorCritic) -> dict[st
         "state_metadata_dim": model.state_metadata_dim,
         "num_agents": config.env.num_agents,
         "use_graph_attention": model.use_graph_attention,
+        "gat_num_heads": model.gat_num_heads,
+        "gat_edge_dim": model.gat_edge_dim,
+        "gat_use_edge_features": model.gat_edge_dim > 0,
+        "gat_residual": model.gat_residual,
+        "gat_attention_dropout": model.gat_attention_dropout,
     }
+
+
+def _edge_features_tensor(env: GridCoverageEnv, model: ActorCritic, device: torch.device) -> torch.Tensor | None:
+    if not _uses_edge_features(model):
+        return None
+    return torch.as_tensor(env.neighbor_features(), dtype=torch.float32, device=device)
+
+
+def _uses_edge_features(model: ActorCritic) -> bool:
+    return model.use_graph_attention and model.gat_edge_dim > 0
 
 
 def _slugify(text: str) -> str:

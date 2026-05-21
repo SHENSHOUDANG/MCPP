@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from pathlib import Path
 
+from .benchmark import benchmark_policy
 from .config import load_config
 from .env import GridCoverageEnv
 from .evaluation import evaluate_policy, resolve_runtime_config
@@ -14,16 +16,66 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="mathbased_mcpp")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for name in ("doctor", "train", "evaluate", "render"):
+    for name in ("doctor", "train", "evaluate", "render", "benchmark"):
         subparser = subparsers.add_parser(name)
         subparser.add_argument("--config", default="configs/smoke.toml")
-        if name in {"evaluate", "render"}:
+        if name in {"evaluate", "render", "benchmark"}:
             subparser.add_argument("--checkpoint", required=True)
         if name == "train":
             subparser.add_argument("--course", default=None)
             subparser.add_argument("--previous-checkpoint", default=None)
+        if name == "benchmark":
+            subparser.add_argument("--seeds", default="20260501,20260502,20260503,20260504,20260505")
+            subparser.add_argument("--obstacle-ratios", default=None)
+            subparser.add_argument("--output", default=None)
+
+    ablation = subparsers.add_parser("gat-ablation")
+    ablation.add_argument("--gat-on-config", default="configs/ablation_gat_on.toml")
+    ablation.add_argument("--gat-on-checkpoint", required=True)
+    ablation.add_argument("--gat-off-config", default="configs/ablation_gat_off.toml")
+    ablation.add_argument("--gat-off-checkpoint", required=True)
+    ablation.add_argument("--seeds", default="20260501,20260502,20260503,20260504,20260505")
+    ablation.add_argument("--obstacle-ratios", default="0.05,0.10,0.15,0.20")
+    ablation.add_argument("--output", default=None)
 
     args = parser.parse_args()
+
+    if args.command == "gat-ablation":
+        seeds = _parse_int_csv(args.seeds)
+        if not seeds:
+            parser.error("--seeds must contain at least one integer seed")
+        obstacle_ratios = _parse_float_csv(args.obstacle_ratios)
+        output_path = Path(args.output) if args.output else Path("outputs") / "gat_ablation" / "summary.csv"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        on_detail = output_path.with_name(f"{output_path.stem}_gat_on.csv")
+        off_detail = output_path.with_name(f"{output_path.stem}_gat_off.csv")
+        gat_on = benchmark_policy(
+            load_config(args.gat_on_config),
+            args.gat_on_checkpoint,
+            seeds=seeds,
+            obstacle_ratios=obstacle_ratios,
+            output_path=on_detail,
+        )
+        gat_off = benchmark_policy(
+            load_config(args.gat_off_config),
+            args.gat_off_checkpoint,
+            seeds=seeds,
+            obstacle_ratios=obstacle_ratios,
+            output_path=off_detail,
+        )
+        rows = _ablation_summary_rows(gat_on, gat_off)
+        _write_ablation_summary(output_path, rows)
+        for row in rows:
+            print(
+                f"{row['arm']}: coverage_mean={row['coverage_ratio_mean']:.4f}, "
+                f"completion_rate={row['completion_rate']:.4f}, repeat_mean={row['repeat_ratio_mean']:.4f}, "
+                f"path_length_mean={row['path_length_mean']:.1f}"
+            )
+        print(f"summary={output_path}")
+        print(f"gat_on_rows={on_detail}")
+        print(f"gat_off_rows={off_detail}")
+        return
+
     config = load_config(args.config)
 
     if args.command == "doctor":
@@ -41,6 +93,10 @@ def main() -> None:
         print(f"state_shape={config.env.height}x{config.env.width}")
         print(f"action_dim={env.action_dim}")
         print(f"total_timesteps={config.ppo.total_timesteps}")
+        print(f"use_graph_attention={str(config.ppo.use_graph_attention).lower()}")
+        print(f"gat_num_heads={config.ppo.gat_num_heads}")
+        print(f"gat_use_edge_features={str(config.ppo.gat_use_edge_features).lower()}")
+        print(f"gat_residual={str(config.ppo.gat_residual).lower()}")
         if config.curriculum and config.curriculum.courses:
             print(f"curriculum_courses={len(config.curriculum.courses)}")
             for index, course in enumerate(config.curriculum.courses, start=1):
@@ -58,6 +114,31 @@ def main() -> None:
         return
 
     checkpoint_path = Path(args.checkpoint)
+
+    if args.command == "benchmark":
+        seeds = _parse_int_csv(args.seeds)
+        if not seeds:
+            parser.error("--seeds must contain at least one integer seed")
+        obstacle_ratios = _parse_float_csv(args.obstacle_ratios) if args.obstacle_ratios else None
+        output_path = Path(args.output) if args.output else checkpoint_path.parent / "benchmark.csv"
+        summary = benchmark_policy(
+            config,
+            checkpoint_path,
+            seeds=seeds,
+            obstacle_ratios=obstacle_ratios,
+            output_path=output_path,
+        )
+        print(f"episodes={summary['episodes']}")
+        print(f"coverage_ratio_mean={summary['coverage_ratio_mean']:.4f}")
+        print(f"coverage_ratio_min={summary['coverage_ratio_min']:.4f}")
+        print(f"completion_rate={summary['completion_rate']:.4f}")
+        print(f"path_length_mean={summary['path_length_mean']:.1f}")
+        print(f"steps_mean={summary['steps_mean']:.1f}")
+        print(f"repeat_ratio_mean={summary['repeat_ratio_mean']:.4f}")
+        print(f"total_reward_mean={summary['total_reward_mean']:.4f}")
+        print(f"benchmark={output_path}")
+        return
+
     run_dir = checkpoint_path.parent
     trajectory_path = run_dir / "trajectory.json"
     runtime_config = resolve_runtime_config(config, checkpoint_path)
@@ -75,3 +156,53 @@ def main() -> None:
         print(f"trajectory={trajectory_path}")
         print(f"render={output}")
         return
+
+
+def _parse_int_csv(value: str) -> list[int]:
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+
+def _parse_float_csv(value: str) -> list[float]:
+    return [float(item.strip()) for item in value.split(",") if item.strip()]
+
+
+def _ablation_summary_rows(gat_on: dict[str, object], gat_off: dict[str, object]) -> list[dict[str, float | int | str]]:
+    fields = [
+        "episodes",
+        "coverage_ratio_mean",
+        "coverage_ratio_min",
+        "completion_rate",
+        "path_length_mean",
+        "steps_mean",
+        "repeat_ratio_mean",
+        "total_reward_mean",
+    ]
+    rows: list[dict[str, float | int | str]] = []
+    for arm, summary in (("gat_on", gat_on), ("gat_off", gat_off)):
+        row: dict[str, float | int | str] = {"arm": arm}
+        for field in fields:
+            row[field] = summary[field]  # type: ignore[index]
+        rows.append(row)
+    delta: dict[str, float | int | str] = {"arm": "delta_on_minus_off"}
+    for field in fields:
+        delta[field] = float(gat_on[field]) - float(gat_off[field])  # type: ignore[index]
+    rows.append(delta)
+    return rows
+
+
+def _write_ablation_summary(output_path: Path, rows: list[dict[str, float | int | str]]) -> None:
+    fieldnames = [
+        "arm",
+        "episodes",
+        "coverage_ratio_mean",
+        "coverage_ratio_min",
+        "completion_rate",
+        "path_length_mean",
+        "steps_mean",
+        "repeat_ratio_mean",
+        "total_reward_mean",
+    ]
+    with output_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)

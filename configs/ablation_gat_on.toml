@@ -51,7 +51,7 @@ gat_residual = true
 gat_attention_dropout = 0.0
 
 [train]
-run_root = "E:\\test plot"
+run_root = "E:\\test plot\\ablation_gat_on"
 log_interval = 1
 eval_interval = 10
 checkpoint_interval = 10

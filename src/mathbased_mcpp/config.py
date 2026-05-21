@@ -49,6 +49,8 @@ class GridCoverageConfig:
     obstacle_ratio: float | None = None
     random_obstacle_count: int = 0
     random_obstacle_seed: int = 0
+    random_obstacle_seeds: list[int] = field(default_factory=list)
+    map_refresh_episodes: int = 0
     danger_radius: int = 1
     reward: RewardConfig = field(default_factory=RewardConfig)
 
@@ -58,6 +60,7 @@ class CurriculumCourseConfig:
     name: str
     env: GridCoverageConfig
     total_timesteps: int = 500_000
+    rollout_steps: int | None = None
     load_previous: bool = True
 
 
@@ -83,12 +86,18 @@ class PPOConfig:
     seed: int = 0
     device: str = "auto"
     use_graph_attention: bool = False
+    gat_num_heads: int = 1
+    gat_use_edge_features: bool = False
+    gat_residual: bool = False
+    gat_attention_dropout: float = 0.0
 
 
 @dataclass(slots=True)
 class TrainConfig:
     run_root: str = "runs"
     log_interval: int = 10
+    eval_interval: int = 0
+    checkpoint_interval: int = 0
     use_tensorboard: bool = True
     tensorboard_dir: str = "tensorboard"
 
@@ -128,6 +137,8 @@ def default_max_steps(width: int, height: int) -> int:
 def build_course_config(base_config: ExperimentConfig, course: CurriculumCourseConfig) -> ExperimentConfig:
     ppo_raw = asdict(base_config.ppo)
     ppo_raw["total_timesteps"] = int(course.total_timesteps)
+    if course.rollout_steps is not None:
+        ppo_raw["rollout_steps"] = int(course.rollout_steps)
     return ExperimentConfig(
         env=course.env,
         ppo=PPOConfig(**ppo_raw),
@@ -176,7 +187,7 @@ def _experiment_config_from_raw(raw: dict[str, Any]) -> ExperimentConfig:
     env = _grid_config_from_raw(env_raw, reward)
     ppo = PPOConfig(**raw.get("ppo", {}))
     train = TrainConfig(**raw.get("train", {}))
-    curriculum = _curriculum_from_raw(raw, reward, ppo.total_timesteps)
+    curriculum = _curriculum_from_raw(raw, reward, ppo.total_timesteps, env_raw)
     return ExperimentConfig(env=env, ppo=ppo, train=train, curriculum=curriculum)
 
 
@@ -221,6 +232,8 @@ def _grid_config_from_raw(env_raw: dict[str, Any], reward: RewardConfig) -> Grid
     raw["obstacle_ratio"] = None if raw.get("obstacle_ratio") is None else float(raw.get("obstacle_ratio"))
     raw["random_obstacle_count"] = int(raw.get("random_obstacle_count", 0))
     raw["random_obstacle_seed"] = int(raw.get("random_obstacle_seed", 0))
+    raw["random_obstacle_seeds"] = [int(item) for item in raw.get("random_obstacle_seeds", [])]
+    raw["map_refresh_episodes"] = max(int(raw.get("map_refresh_episodes", 0)), 0)
     raw["observation_radius"] = int(raw.get("observation_radius", 1))
     raw["recent_path_length"] = int(raw.get("recent_path_length", 8))
     raw["communication_radius"] = int(raw.get("communication_radius", 0))
@@ -233,6 +246,7 @@ def _curriculum_from_raw(
     raw: dict[str, Any],
     reward: RewardConfig,
     default_total_timesteps: int,
+    base_env_raw: dict[str, Any] | None = None,
 ) -> CurriculumConfig | None:
     curriculum_raw = dict(raw.get("curriculum") or {})
     course_rows = curriculum_raw.get("courses", [])
@@ -241,10 +255,13 @@ def _curriculum_from_raw(
 
     courses: list[CurriculumCourseConfig] = []
     for index, course_raw in enumerate(course_rows):
-        course_data = dict(course_raw)
+        course_data = dict(base_env_raw or {})
+        course_data.update(course_raw)
         name = str(course_data.pop("name", f"tier-{index + 1}"))
         course_reward = _reward_from_raw(dict(course_data.pop("reward", {})), reward)
         total_timesteps = int(course_data.pop("total_timesteps", default_total_timesteps))
+        rollout_steps_raw = course_data.pop("rollout_steps", None)
+        rollout_steps = None if rollout_steps_raw is None else int(rollout_steps_raw)
         load_previous = bool(course_data.pop("load_previous", index > 0))
         env = _grid_config_from_raw(course_data, course_reward)
         courses.append(
@@ -252,6 +269,7 @@ def _curriculum_from_raw(
                 name=name,
                 env=env,
                 total_timesteps=total_timesteps,
+                rollout_steps=rollout_steps,
                 load_previous=load_previous,
             )
         )

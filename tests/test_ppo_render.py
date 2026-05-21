@@ -8,6 +8,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from mathbased_mcpp.benchmark import benchmark_policy
 from mathbased_mcpp.config import GridCoverageConfig, PPOConfig, TrainConfig, ExperimentConfig, load_config
 from mathbased_mcpp.evaluation import evaluate_policy
 from mathbased_mcpp.rendering import render_trajectory
@@ -40,6 +41,11 @@ class PpoRenderTests(unittest.TestCase):
             image = render_trajectory(config, summary["trajectory"], run_dir / "trajectory.png")
             self.assertTrue(image.exists())
             self.assertGreater(image.stat().st_size, 0)
+
+            benchmark = benchmark_policy(config, checkpoint, seeds=[101, 102], output_path=run_dir / "benchmark.csv")
+            self.assertEqual(benchmark["episodes"], 2)
+            self.assertTrue((run_dir / "benchmark.csv").exists())
+            self.assertIn("coverage_ratio_mean", benchmark)
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
 
