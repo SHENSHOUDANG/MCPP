@@ -60,10 +60,16 @@
 - 生成 GAT 消融实验 Word 记录：
   - `reports/gat_ablation_comparison_2026-05-24.docx`
   - 该文档用于周报整理和实验归档，包含公平性设置、主要指标、轨迹示例、结论与后续改进方向。
+- 新增 map-intent GAT 公平消融基线实现，正式课程训练尚未开始：
+  - 保留已有 `ablation_gat_on.toml` / `ablation_gat_off.toml` 及其结果，不改写历史 baseline。
+  - 新增 `configs/ablation_mapmsg_gat_on.toml` 与 `configs/ablation_mapmsg_gat_off.toml`；两臂共同开启去中心化显式地图记忆、通信范围内地图融合和覆盖意图消息，仅在 `use_graph_attention` 上形成核心对照。
+  - 每个 agent 独立维护已知自由区、已知障碍区、自己覆盖区与已知团队覆盖区；显式记忆 actor 观测不再直接使用环境构造的真实全局 `team_covered` 局部裁剪。
+  - 节点消息加入覆盖状态摘要、近期新增/重复/停滞摘要，以及由自身记忆导出的下一探索方向、目标方向距离和 `3 x 3` 目标探索区域意图。
+  - 现有多头距离 masked GAT 结构保持不变：GAT-off 仅编码自身覆盖消息，GAT-on 额外聚合通信范围内邻居覆盖消息。
+  - 补充配置、地图隐私/融合、意图消息、消息化 GAT 与训练加载 smoke tests。
 
 ## Pending Work
 
-- 实现真正的去中心化显式地图记忆：每个 agent 自主更新已知自由区、障碍区、覆盖区与未知区。
-- 在通信范围内进行条件地图共享与融合，避免环境全局真值直接进入 actor。
-- 设计具有覆盖任务语义的通信输入，例如地图信息互补、覆盖冲突或覆盖意图。
+- 依次训练 `ablation_mapmsg_gat_on` 与 `ablation_mapmsg_gat_off` 的四级课程，并在相同未见地图 seed 集上完成公平比较。
+- 根据 map-intent 消融结果判断覆盖意图消息是否降低 `RepeatRatioAfter90` 与 `InterAgentOverlapRatio`，而不是提前引入更多通信结构。
 - 参考官方 MAPPO，逐步补入终止/截断 mask、value normalization 和更稳定的 value loss，并单独验证其效果。

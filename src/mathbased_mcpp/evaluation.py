@@ -37,6 +37,7 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
     gat_num_heads = int(payload.get("gat_num_heads", config.ppo.gat_num_heads))
     gat_residual = bool(payload.get("gat_residual", config.ppo.gat_residual))
     gat_attention_dropout = float(payload.get("gat_attention_dropout", config.ppo.gat_attention_dropout))
+    node_message_dim = int(payload.get("node_message_dim", 0))
     if critic_type == "spatial" or "state_shape" in payload:
         model = ActorCritic(
             observation_dim=observation_dim,
@@ -50,6 +51,7 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             gat_edge_dim=gat_edge_dim,
             gat_residual=gat_residual,
             gat_attention_dropout=gat_attention_dropout,
+            node_message_dim=node_message_dim,
         )
     else:
         model = ActorCritic(
@@ -62,6 +64,7 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             gat_edge_dim=gat_edge_dim,
             gat_residual=gat_residual,
             gat_attention_dropout=gat_attention_dropout,
+            node_message_dim=node_message_dim,
         )
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
@@ -96,12 +99,18 @@ def evaluate_policy(
             if model.use_graph_attention and model.gat_edge_dim > 0
             else None
         )
+        node_messages = (
+            torch.as_tensor(env.node_messages(), dtype=torch.float32)
+            if model.node_message_dim > 0
+            else None
+        )
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
                 state_tensor,
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
+                node_messages=node_messages,
                 deterministic=deterministic,
             )
         result = env.step(actions.cpu().numpy().tolist())

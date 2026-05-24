@@ -88,12 +88,18 @@ def _evaluate_trial(
             if getattr(model, "use_graph_attention", False) and getattr(model, "gat_edge_dim", 0) > 0
             else None
         )
+        node_messages = (
+            torch.as_tensor(env.node_messages(), dtype=torch.float32, device=device)
+            if getattr(model, "node_message_dim", 0) > 0
+            else None
+        )
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
                 state_tensor,
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
+                node_messages=node_messages,
                 deterministic=deterministic,
             )
         result = env.step(actions.cpu().numpy().tolist())

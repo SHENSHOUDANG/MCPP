@@ -101,6 +101,8 @@ def _train_single_course(
 ) -> Path:
     set_seed(config.ppo.seed)
     env = env or GridCoverageEnv(config.env)
+    if config.ppo.use_coverage_messages and not env.config.use_explicit_map_memory:
+        raise ValueError("use_coverage_messages requires use_explicit_map_memory=true")
     run_path = Path(run_dir) if run_dir is not None else make_run_dir(config.train.run_root)
     run_path.mkdir(parents=True, exist_ok=True)
     _write_config_snapshot(config, run_path)
@@ -119,6 +121,7 @@ def _train_single_course(
         gat_edge_dim=env.neighbor_feature_dim if config.ppo.gat_use_edge_features else 0,
         gat_residual=config.ppo.gat_residual,
         gat_attention_dropout=config.ppo.gat_attention_dropout,
+        node_message_dim=env.node_message_dim if config.ppo.use_coverage_messages else 0,
     ).to(device)
     if checkpoint_path is not None:
         _load_checkpoint_weights(model, checkpoint_path)
@@ -278,12 +281,14 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
         state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32, device=device)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool, device=device)
         edge_features = _edge_features_tensor(env, model, device)
+        node_messages = _node_messages_tensor(env, model, device)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
                 state_tensor,
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
+                node_messages=node_messages,
                 deterministic=True,
             )
         result = env.step(actions.cpu().numpy().tolist())
@@ -336,6 +341,7 @@ def _collect_rollout(
     values: list[np.ndarray] = []
     neighbor_masks: list[np.ndarray] = []
     edge_features: list[np.ndarray] = []
+    node_messages: list[np.ndarray] = []
     metric_rows: list[dict[str, float | int]] = []
     device = _model_device(model)
 
@@ -349,12 +355,17 @@ def _collect_rollout(
         edge_feature_tensor = (
             torch.as_tensor(edge_feature_array, dtype=torch.float32, device=device) if edge_feature_array is not None else None
         )
+        node_message_array = env.node_messages() if model.node_message_dim > 0 else None
+        node_message_tensor = (
+            torch.as_tensor(node_message_array, dtype=torch.float32, device=device) if node_message_array is not None else None
+        )
         with torch.no_grad():
             action_tensor, log_prob_tensor, value_tensor = model.act_batch(
                 obs_tensor,
                 state_tensor,
                 neighbor_mask=neighbor_mask_tensor,
                 edge_features=edge_feature_tensor,
+                node_messages=node_message_tensor,
             )
 
         result = env.step(action_tensor.cpu().numpy().tolist())
@@ -369,6 +380,8 @@ def _collect_rollout(
         neighbor_masks.append(neighbor_mask)
         if edge_feature_array is not None:
             edge_features.append(edge_feature_array)
+        if node_message_array is not None:
+            node_messages.append(node_message_array)
         episode_reward += float(np.mean(reward_array))
         observation = _agent_observations(env, result.observation)
         state = result.state
@@ -423,6 +436,11 @@ def _collect_rollout(
         edge_features=(
             torch.as_tensor(np.asarray(edge_features, dtype=np.float32), dtype=torch.float32, device=device)
             if edge_features
+            else None
+        ),
+        node_messages=(
+            torch.as_tensor(np.asarray(node_messages, dtype=np.float32), dtype=torch.float32, device=device)
+            if node_messages
             else None
         ),
     )
@@ -517,12 +535,14 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
             mb_tensor = torch.as_tensor(mb, dtype=torch.long, device=batch.actions.device)
             neighbor_mask = batch.neighbor_masks[mb_tensor] if batch.neighbor_masks is not None else None
             edge_features = batch.edge_features[mb_tensor] if batch.edge_features is not None else None
+            node_messages = batch.node_messages[mb_tensor] if batch.node_messages is not None else None
             log_probs, entropy, values = model.evaluate_actions(
                 batch.observations[mb_tensor],
                 batch.states[mb_tensor],
                 batch.actions[mb_tensor],
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
+                node_messages=node_messages,
             )
             ratio = torch.exp(log_probs - batch.log_probs[mb_tensor])
             clipped = torch.clamp(ratio, 1.0 - config.ppo.clip_ratio, 1.0 + config.ppo.clip_ratio) * advantages[mb_tensor]
@@ -555,6 +575,8 @@ def _checkpoint_payload(config: ExperimentConfig, model: ActorCritic) -> dict[st
         "gat_use_edge_features": model.gat_edge_dim > 0,
         "gat_residual": model.gat_residual,
         "gat_attention_dropout": model.gat_attention_dropout,
+        "node_message_dim": model.node_message_dim,
+        "use_coverage_messages": model.node_message_dim > 0,
     }
 
 
@@ -566,6 +588,12 @@ def _edge_features_tensor(env: GridCoverageEnv, model: ActorCritic, device: torc
 
 def _uses_edge_features(model: ActorCritic) -> bool:
     return model.use_graph_attention and model.gat_edge_dim > 0
+
+
+def _node_messages_tensor(env: GridCoverageEnv, model: ActorCritic, device: torch.device) -> torch.Tensor | None:
+    if model.node_message_dim <= 0:
+        return None
+    return torch.as_tensor(env.node_messages(), dtype=torch.float32, device=device)
 
 
 def _slugify(text: str) -> str:

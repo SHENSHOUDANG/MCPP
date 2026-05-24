@@ -1,0 +1,155 @@
+[env]
+width = 8
+height = 8
+max_steps = 100
+seed = 20260428
+start = [0, 0]
+num_agents = 1
+random_corner_start = false
+obstacles = []
+obstacle_ratio = 0.05
+random_obstacle_seed = 20260428
+danger_radius = 0
+observation_radius = 2
+recent_path_length = 8
+communication_radius = 4
+use_explicit_map_memory = true
+share_map_memory = true
+intent_grid_size = 3
+
+[reward]
+distance_weight = 1.0
+straight_weight = 1.0
+coverage_weight = 1.0
+time_penalty_weight = 0.5
+repeat_penalty_weight = 0.1
+finish_reward = 120.0
+invalid_move_penalty = -1.0
+team_new_cell_weight = 1.0
+team_frontier_weight = 0.0
+team_repeat_weight = 0.5
+team_invalid_weight = 0.8
+team_collision_weight = 1.2
+team_time_weight = 0.02
+
+[ppo]
+total_timesteps = 500000
+rollout_steps = 256
+update_epochs = 4
+mini_batch_size = 256
+gamma = 0.98
+gae_lambda = 0.95
+clip_ratio = 0.2
+learning_rate = 0.0003
+value_coef = 0.5
+entropy_coef = 0.002
+max_grad_norm = 0.5
+hidden_dim = 96
+seed = 20260428
+device = "auto"
+use_graph_attention = false
+gat_num_heads = 4
+gat_use_edge_features = true
+gat_residual = true
+gat_attention_dropout = 0.0
+use_coverage_messages = true
+
+[train]
+run_root = "E:\\test plot\\ablation_mapmsg_gat_off"
+log_interval = 1
+eval_interval = 10
+checkpoint_interval = 10
+
+[curriculum]
+[[curriculum.courses]]
+name = "tier-1-8x8-1agent"
+width = 8
+height = 8
+max_steps = 100
+seed = 20260428
+start = [0, 0]
+random_corner_start = false
+obstacles = []
+obstacle_ratio = 0.05
+random_obstacle_seed = 20260428
+danger_radius = 0
+num_agents = 1
+observation_radius = 2
+recent_path_length = 8
+communication_radius = 4
+total_timesteps = 500000
+rollout_steps = 256
+load_previous = false
+
+[[curriculum.courses]]
+name = "tier-2-13x13-2agents"
+width = 13
+height = 13
+max_steps = 180
+seed = 20260429
+start = [0, 0]
+random_corner_start = true
+obstacles = []
+obstacle_ratio = 0.05
+random_obstacle_seed = 20260429
+danger_radius = 1
+num_agents = 2
+observation_radius = 2
+recent_path_length = 8
+communication_radius = 4
+total_timesteps = 1000000
+rollout_steps = 640
+load_previous = true
+
+[[curriculum.courses]]
+name = "tier-3-18x18-3agents"
+width = 18
+height = 18
+max_steps = 300
+seed = 20260430
+start = [0, 0]
+random_corner_start = true
+obstacles = []
+obstacle_ratio = 0.05
+random_obstacle_seed = 20260430
+random_obstacle_seeds = [20260430, 20260431, 20260432, 20260433]
+map_refresh_episodes = 5
+danger_radius = 1
+num_agents = 3
+observation_radius = 2
+recent_path_length = 8
+communication_radius = 4
+total_timesteps = 1800000
+rollout_steps = 1152
+load_previous = true
+
+[[curriculum.courses]]
+name = "tier-4-20x20-4agents"
+width = 20
+height = 20
+max_steps = 500
+seed = 20260431
+start = [0, 0]
+random_corner_start = true
+obstacles = []
+obstacle_ratio = 0.05
+random_obstacle_seed = 20260431
+random_obstacle_seeds = [
+  20260440,
+  20260441,
+  20260442,
+  20260443,
+  20260444,
+  20260445,
+  20260446,
+  20260447,
+]
+map_refresh_episodes = 3
+danger_radius = 1
+num_agents = 4
+observation_radius = 2
+recent_path_length = 8
+communication_radius = 4
+total_timesteps = 3200000
+rollout_steps = 2048
+load_previous = true

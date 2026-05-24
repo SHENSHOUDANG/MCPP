@@ -132,6 +132,34 @@ The current GAT implementation is a lightweight multi-head masked attention laye
 - The formal config uses residual GAT output, so the actor keeps its own feature and adds neighbor-aggregated context.
 - The latest attention tensor is cached inside the policy as `[batch, head, source_agent, target_agent]`, which can be used later for visualization or debugging.
 
+### Map-Intent Communication Baseline
+
+A new opt-in ablation baseline implements the next memory design without changing the completed legacy GAT experiment:
+
+- `configs/ablation_mapmsg_gat_on.toml`
+- `configs/ablation_mapmsg_gat_off.toml`
+
+In these configs, every agent maintains its own full-map memory of known free cells, known obstacles, self-covered cells, and known team-covered cells. Memory is updated from that agent's local observation and movement history. When agents enter `communication_radius`, their remembered map facts are merged. The actor reads a fixed-size local crop from this memory, so curriculum transfer from 8x8 to 20x20 keeps a fixed actor input size.
+
+Explicit-memory observations add `unknown` and `frontier` map channels. The policy also receives a fixed-size coverage message generated from the agent's own memory:
+
+- known team coverage, self coverage, unknown-space, and frontier summaries;
+- recent new-cell, repeat, and stall summaries;
+- a memory-derived proposed exploration direction;
+- a normalized target direction and distance;
+- a one-hot `3 x 3` target exploration region and an intent-valid flag.
+
+The target region is a compact coverage intent proposal derived only from remembered free/uncovered/frontier cells. It is not an oracle path plan and does not read unseen environment truth.
+
+The two new ablation arms share the same explicit memory, map-fusion rule, coverage message, curriculum, seeds, rewards, and evaluation settings. Their substantive model difference remains:
+
+```toml
+use_graph_attention = true   # mapmsg_gat_on
+use_graph_attention = false  # mapmsg_gat_off
+```
+
+`mapmsg_gat_off` encodes each agent's own coverage message. `mapmsg_gat_on` additionally applies the existing range-masked multi-head attention module to neighboring coverage messages. This isolates whether attention over coverage intent helps after both policies receive the same decentralized map-memory foundation.
+
 ## Configuration Fields
 
 The formal config uses:
@@ -503,6 +531,15 @@ gat-ablation --gat-on-config configs/ablation_gat_on.toml --gat-on-checkpoint "E
 ```
 
 The summary CSV contains `gat_on`, `gat_off`, and `delta_on_minus_off`. The primary fields are `coverage_at_<budget>_mean`, `coverage_auc_mean`, `t90/t95/t99_mean_reached`, `t90/t95/t99_reach_rate`, and `stall_termination_coverage_mean`. Use `repeat_ratio_after_90_mean`, `inter_agent_overlap_ratio_mean`, `completion_rate`, and `path_length_mean` as supporting diagnostics. A useful communication mechanism should improve budgeted coverage efficiency on held-out seeds, not merely produce a visually tidy path or overfit completion on its training seed pool.
+
+The map-intent ablation follows the same workflow with new configs and separate output roots:
+
+```text
+train --config configs/ablation_mapmsg_gat_on.toml --course tier-1-8x8-1agent
+train --config configs/ablation_mapmsg_gat_off.toml --course tier-1-8x8-1agent
+```
+
+Continue courses 2 through 4 using the matching arm's preceding `best_policy.pt`, then invoke `gat-ablation` with `--gat-on-config configs/ablation_mapmsg_gat_on.toml` and `--gat-off-config configs/ablation_mapmsg_gat_off.toml`. Do not compare a legacy GAT checkpoint directly against a map-intent checkpoint as though only attention differed; their observation and message semantics are different.
 
 ## PyCharm Configuration
 

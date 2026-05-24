@@ -110,6 +110,46 @@ class PpoRenderTests(unittest.TestCase):
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
 
+    def test_train_mapmsg_gat_smoke(self) -> None:
+        config = ExperimentConfig(
+            env=GridCoverageConfig(
+                width=4,
+                height=4,
+                max_steps=8,
+                seed=17,
+                num_agents=2,
+                start_positions=[(0, 0), (3, 3)],
+                observation_radius=1,
+                communication_radius=4,
+                use_explicit_map_memory=True,
+                share_map_memory=True,
+            ),
+            ppo=PPOConfig(
+                total_timesteps=32,
+                rollout_steps=8,
+                update_epochs=1,
+                mini_batch_size=8,
+                hidden_dim=32,
+                seed=17,
+                use_graph_attention=True,
+                gat_num_heads=4,
+                gat_use_edge_features=True,
+                gat_residual=True,
+                use_coverage_messages=True,
+            ),
+            train=TrainConfig(run_root="runs", log_interval=1),
+        )
+        run_dir = ROOT / ".tmp_tests" / "ppo-mapmsg-gat"
+        shutil.rmtree(run_dir, ignore_errors=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            checkpoint = train_ppo(config, run_dir=run_dir)
+            self.assertTrue(checkpoint.exists())
+            summary = evaluate_policy(config, checkpoint, output_path=run_dir / "trajectory.json")
+            self.assertEqual(len(summary["trajectories"]), 2)
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

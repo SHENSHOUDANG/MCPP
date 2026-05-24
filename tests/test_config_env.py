@@ -134,6 +134,22 @@ class ConfigEnvTests(unittest.TestCase):
             [(course.env.width, course.env.height, course.env.num_agents, course.env.obstacle_ratio) for course in gat_off.curriculum.courses],
         )
 
+    def test_mapmsg_ablation_configs_share_memory_and_message_design(self) -> None:
+        gat_on = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
+        gat_off = load_config(ROOT / "configs" / "ablation_mapmsg_gat_off.toml")
+
+        self.assertTrue(gat_on.env.use_explicit_map_memory)
+        self.assertTrue(gat_on.env.share_map_memory)
+        self.assertTrue(gat_on.ppo.use_coverage_messages)
+        self.assertTrue(gat_on.ppo.use_graph_attention)
+        self.assertFalse(gat_off.ppo.use_graph_attention)
+        self.assertEqual(gat_on.env.intent_grid_size, gat_off.env.intent_grid_size)
+        self.assertEqual(gat_on.ppo.use_coverage_messages, gat_off.ppo.use_coverage_messages)
+        self.assertEqual(
+            [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_on.curriculum.courses],
+            [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_off.curriculum.courses],
+        )
+
     def test_select_curriculum_course_by_name(self) -> None:
         config = load_config(ROOT / "configs" / "formal_v1.toml")
         index, course = select_curriculum_course(config, course_name="tier-2-13x13-2agents")
@@ -344,6 +360,50 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(recent_path[1, 1], 1.0)
         self.assertGreater(recent_path[1, 1], recent_path[1, 0])
 
+    def test_explicit_map_memory_stays_private_until_agents_communicate(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=4,
+                height=1,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 3)],
+                observation_radius=0,
+                communication_radius=1,
+                use_explicit_map_memory=True,
+                share_map_memory=True,
+            )
+        )
+        observation = env.reset()
+
+        self.assertEqual(observation.shape, (2, env.observation_dim))
+        self.assertEqual(env.observation_dim, 21)
+        self.assertEqual(env.known_team_covered_by_agent[0], {(0, 0)})
+        self.assertEqual(env.known_team_covered_by_agent[1], {(0, 3)})
+
+        env.step([3, 2])
+        expected_covered = {(0, 0), (0, 1), (0, 2), (0, 3)}
+        self.assertEqual(env.known_team_covered_by_agent[0], expected_covered)
+        self.assertEqual(env.known_team_covered_by_agent[1], expected_covered)
+
+    def test_coverage_message_contains_memory_derived_intent(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=3,
+                height=3,
+                start=(1, 1),
+                observation_radius=1,
+                use_explicit_map_memory=True,
+                intent_grid_size=3,
+            )
+        )
+        env.reset()
+        messages = env.node_messages()
+
+        self.assertEqual(messages.shape, (1, 24))
+        self.assertEqual(messages[0, -1], 1.0)
+        self.assertTrue(np.array_equal(messages[0, 7:11], np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)))
+        self.assertEqual(messages[0, 15], 1.0)
+
     def test_neighbor_mask_uses_communication_radius(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(
@@ -422,6 +482,46 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(attention.shape, (1, 4, 3, 3))
         mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool)
         self.assertTrue(torch.all(attention[:, :, ~mask] == 0.0).item())
+
+    def test_graph_attention_policy_consumes_coverage_messages(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=5,
+                height=5,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 2)],
+                observation_radius=1,
+                communication_radius=3,
+                use_explicit_map_memory=True,
+                share_map_memory=True,
+            )
+        )
+        observation = env.reset()
+        state = np.repeat(env.global_state()[None, :], env.num_agents, axis=0)
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+            use_graph_attention=True,
+            gat_num_heads=4,
+            gat_edge_dim=env.neighbor_feature_dim,
+            gat_residual=True,
+            node_message_dim=env.node_message_dim,
+        )
+        actions, log_probs, values = model.act_batch(
+            torch.as_tensor(observation, dtype=torch.float32),
+            torch.as_tensor(state, dtype=torch.float32),
+            neighbor_mask=torch.as_tensor(env.neighbor_mask(), dtype=torch.bool),
+            edge_features=torch.as_tensor(env.neighbor_features(), dtype=torch.float32),
+            node_messages=torch.as_tensor(env.node_messages(), dtype=torch.float32),
+        )
+
+        self.assertEqual(actions.shape, (2,))
+        self.assertEqual(log_probs.shape, (2,))
+        self.assertEqual(values.shape, (2,))
+        self.assertEqual(model.node_message_dim, 24)
+        self.assertIsNotNone(model.latest_attention_weights())
 
     def test_multi_agent_rewards_are_shared(self) -> None:
         env = GridCoverageEnv(

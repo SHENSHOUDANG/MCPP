@@ -107,6 +107,10 @@ def main() -> None:
         print(f"gat_num_heads={config.ppo.gat_num_heads}")
         print(f"gat_use_edge_features={str(config.ppo.gat_use_edge_features).lower()}")
         print(f"gat_residual={str(config.ppo.gat_residual).lower()}")
+        print(f"use_explicit_map_memory={str(config.env.use_explicit_map_memory).lower()}")
+        print(f"share_map_memory={str(config.env.share_map_memory).lower()}")
+        print(f"use_coverage_messages={str(config.ppo.use_coverage_messages).lower()}")
+        print(f"node_message_dim={env.node_message_dim if config.ppo.use_coverage_messages else 0}")
         if config.curriculum and config.curriculum.courses:
             print(f"curriculum_courses={len(config.curriculum.courses)}")
             for index, course in enumerate(config.curriculum.courses, start=1):

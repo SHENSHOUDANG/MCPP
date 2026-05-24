@@ -93,6 +93,7 @@ class ActorCritic(nn.Module):
         gat_edge_dim: int = 0,
         gat_residual: bool = False,
         gat_attention_dropout: float = 0.0,
+        node_message_dim: int = 0,
     ) -> None:
         super().__init__()
         self.observation_dim = observation_dim
@@ -106,12 +107,31 @@ class ActorCritic(nn.Module):
         self.gat_edge_dim = max(int(gat_edge_dim), 0)
         self.gat_residual = bool(gat_residual)
         self.gat_attention_dropout = float(gat_attention_dropout)
+        self.node_message_dim = max(int(node_message_dim), 0)
         self._uses_spatial_state = state_shape is not None
         self.actor_body = nn.Sequential(
             nn.Linear(observation_dim, hidden_dim),
             nn.Tanh(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
+        )
+        self.message_body = (
+            nn.Sequential(
+                nn.Linear(self.node_message_dim, hidden_dim),
+                nn.Tanh(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.Tanh(),
+            )
+            if self.node_message_dim > 0
+            else None
+        )
+        self.actor_message_fusion = (
+            nn.Sequential(
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.Tanh(),
+            )
+            if self.node_message_dim > 0
+            else None
         )
         self.graph_attention = (
             GraphAttentionBlock(
@@ -122,6 +142,14 @@ class ActorCritic(nn.Module):
                 attention_dropout=self.gat_attention_dropout,
             )
             if use_graph_attention
+            else None
+        )
+        self.actor_communication_fusion = (
+            nn.Sequential(
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.Tanh(),
+            )
+            if use_graph_attention and self.node_message_dim > 0
             else None
         )
         if self._uses_spatial_state:
@@ -164,11 +192,25 @@ class ActorCritic(nn.Module):
         observations: torch.Tensor,
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
+        node_messages: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if observations.ndim == 1:
             observations = observations.unsqueeze(0)
         if observations.ndim == 2:
             features = self.actor_body(observations)
+            if self.message_body is not None:
+                if node_messages is None:
+                    raise ValueError("node_messages are required when node_message_dim is enabled")
+                if node_messages.ndim == 1:
+                    node_messages = node_messages.unsqueeze(0)
+                messages = self.message_body(node_messages)
+                assert self.actor_message_fusion is not None
+                features = self.actor_message_fusion(torch.cat([features, messages], dim=-1))
+                if self.graph_attention is not None and neighbor_mask is not None:
+                    communicated = self.graph_attention(messages.unsqueeze(0), neighbor_mask, edge_features=edge_features).squeeze(0)
+                    assert self.actor_communication_fusion is not None
+                    return self.actor_communication_fusion(torch.cat([features, communicated], dim=-1))
+                return features
             if self.graph_attention is not None and neighbor_mask is not None:
                 grouped = features.unsqueeze(0)
                 return self.graph_attention(grouped, neighbor_mask, edge_features=edge_features).squeeze(0)
@@ -176,6 +218,19 @@ class ActorCritic(nn.Module):
         if observations.ndim == 3:
             batch_size, num_agents, observation_dim = observations.shape
             features = self.actor_body(observations.reshape(-1, observation_dim)).reshape(batch_size, num_agents, -1)
+            if self.message_body is not None:
+                if node_messages is None:
+                    raise ValueError("node_messages are required when node_message_dim is enabled")
+                if node_messages.ndim == 2:
+                    node_messages = node_messages.unsqueeze(0)
+                messages = self.message_body(node_messages.reshape(-1, node_messages.shape[-1])).reshape(batch_size, num_agents, -1)
+                assert self.actor_message_fusion is not None
+                features = self.actor_message_fusion(torch.cat([features, messages], dim=-1))
+                if self.graph_attention is not None and neighbor_mask is not None:
+                    communicated = self.graph_attention(messages, neighbor_mask, edge_features=edge_features)
+                    assert self.actor_communication_fusion is not None
+                    features = self.actor_communication_fusion(torch.cat([features, communicated], dim=-1))
+                return features
             if self.graph_attention is not None and neighbor_mask is not None:
                 features = self.graph_attention(features, neighbor_mask, edge_features=edge_features)
             return features
@@ -221,12 +276,18 @@ class ActorCritic(nn.Module):
         states: torch.Tensor | None = None,
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
+        node_messages: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if states is None:
             if self._uses_spatial_state:
                 raise ValueError("state tensor is required when using the spatial critic")
             states = observations
-        actor_features = self._actor_features(observations, neighbor_mask=neighbor_mask, edge_features=edge_features)
+        actor_features = self._actor_features(
+            observations,
+            neighbor_mask=neighbor_mask,
+            edge_features=edge_features,
+            node_messages=node_messages,
+        )
         critic_features = self._critic_features(states)
         return self.actor(actor_features), self.critic(critic_features).squeeze(-1)
 
@@ -235,8 +296,16 @@ class ActorCritic(nn.Module):
         observations: torch.Tensor,
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
+        node_messages: torch.Tensor | None = None,
     ) -> Categorical:
-        logits = self.actor(self._actor_features(observations, neighbor_mask=neighbor_mask, edge_features=edge_features))
+        logits = self.actor(
+            self._actor_features(
+                observations,
+                neighbor_mask=neighbor_mask,
+                edge_features=edge_features,
+                node_messages=node_messages,
+            )
+        )
         return Categorical(logits=logits)
 
     def value(self, states: torch.Tensor) -> torch.Tensor:
@@ -250,6 +319,7 @@ class ActorCritic(nn.Module):
         state: torch.Tensor | None = None,
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
+        node_messages: torch.Tensor | None = None,
         deterministic: bool = False,
     ) -> tuple[int, torch.Tensor, torch.Tensor]:
         actions, log_probs, values = self.act_batch(
@@ -257,6 +327,7 @@ class ActorCritic(nn.Module):
             state,
             neighbor_mask=neighbor_mask,
             edge_features=edge_features,
+            node_messages=node_messages,
             deterministic=deterministic,
         )
         return int(actions[0].item()), log_probs[0], values[0]
@@ -267,13 +338,20 @@ class ActorCritic(nn.Module):
         state: torch.Tensor | None = None,
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
+        node_messages: torch.Tensor | None = None,
         deterministic: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if observation.ndim == 1:
             observation = observation.unsqueeze(0)
         if state is not None and state.ndim == 1:
             state = state.unsqueeze(0)
-        logits, values = self.forward(observation, state, neighbor_mask=neighbor_mask, edge_features=edge_features)
+        logits, values = self.forward(
+            observation,
+            state,
+            neighbor_mask=neighbor_mask,
+            edge_features=edge_features,
+            node_messages=node_messages,
+        )
         dist = Categorical(logits=logits)
         action = torch.argmax(logits, dim=-1) if deterministic else dist.sample()
         log_prob = dist.log_prob(action)
@@ -286,8 +364,15 @@ class ActorCritic(nn.Module):
         actions: torch.Tensor,
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
+        node_messages: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        logits, values = self.forward(observations, states, neighbor_mask=neighbor_mask, edge_features=edge_features)
+        logits, values = self.forward(
+            observations,
+            states,
+            neighbor_mask=neighbor_mask,
+            edge_features=edge_features,
+            node_messages=node_messages,
+        )
         dist = Categorical(logits=logits)
         return dist.log_prob(actions), dist.entropy(), values
 
@@ -306,3 +391,4 @@ class RolloutBatch:
     values: torch.Tensor
     neighbor_masks: torch.Tensor | None = None
     edge_features: torch.Tensor | None = None
+    node_messages: torch.Tensor | None = None

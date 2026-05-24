@@ -33,10 +33,12 @@ class GridCoverageEnv:
     """Grid coverage environment with single-agent compatibility and MAPPO multi-agent mode."""
 
     observation_channels = 7
+    explicit_observation_channels = 9
     observation_metadata_dim = 12
     state_channels = 5
     state_metadata_dim = 7
     neighbor_feature_dim = 4
+    coverage_message_base_dim = 15
 
     def __init__(self, config: GridCoverageConfig) -> None:
         self.config = config
@@ -54,6 +56,10 @@ class GridCoverageEnv:
         self.paths: list[list[GridPosition]] = [[config.start]]
         self.path: list[GridPosition] = []
         self.covered_by_agent: list[set[GridPosition]] = [{config.start}]
+        self.known_free_by_agent: list[set[GridPosition]] = [set()]
+        self.known_obstacles_by_agent: list[set[GridPosition]] = [set()]
+        self.known_team_covered_by_agent: list[set[GridPosition]] = [{config.start}]
+        self.last_novel_step_by_agent: list[int] = [0]
         self.path_lengths: list[int] = [0]
         self.path_length = 0
         self.step_count = 0
@@ -77,8 +83,16 @@ class GridCoverageEnv:
     def observation_dim(self) -> int:
         radius = max(self.config.observation_radius, 0)
         window_size = radius * 2 + 1
-        channel_dim = window_size * window_size * self.observation_channels
+        channel_dim = window_size * window_size * self.active_observation_channels
         return channel_dim + self.observation_metadata_dim
+
+    @property
+    def active_observation_channels(self) -> int:
+        return self.explicit_observation_channels if self.config.use_explicit_map_memory else self.observation_channels
+
+    @property
+    def node_message_dim(self) -> int:
+        return self.coverage_message_base_dim + max(self.config.intent_grid_size, 1) ** 2
 
     @property
     def state_dim(self) -> int:
@@ -95,6 +109,10 @@ class GridCoverageEnv:
         self.teammate_positions = self._valid_teammate_positions(self.config.teammate_positions)
         self.covered = set(self.positions)
         self.covered_by_agent = [{position} for position in self.positions]
+        self.known_free_by_agent = [set() for _ in self.positions]
+        self.known_obstacles_by_agent = [set() for _ in self.positions]
+        self.known_team_covered_by_agent = [{position} for position in self.positions]
+        self.last_novel_step_by_agent = [0 for _ in self.positions]
         self.paths = [[position] for position in self.positions]
         self.path_lengths = [0 for _ in self.positions]
         self.step_count = 0
@@ -103,6 +121,7 @@ class GridCoverageEnv:
         self.last_new_cells = 0
         self.last_collision_agents = 0
         self._sync_legacy_aliases()
+        self._refresh_explicit_map_memory()
         observations = self._observations()
         return observations[0] if self.num_agents == 1 else observations
 
@@ -123,6 +142,10 @@ class GridCoverageEnv:
         last_new_cells = self.last_new_cells
         last_collision_agents = self.last_collision_agents
         covered_by_agent = [set(cells) for cells in self.covered_by_agent]
+        known_free_by_agent = [set(cells) for cells in self.known_free_by_agent]
+        known_obstacles_by_agent = [set(cells) for cells in self.known_obstacles_by_agent]
+        known_team_covered_by_agent = [set(cells) for cells in self.known_team_covered_by_agent]
+        last_novel_step_by_agent = list(self.last_novel_step_by_agent)
         obstacles = set(self.obstacles)
         free_cells = set(self.free_cells)
         obs = self.reset()
@@ -133,6 +156,10 @@ class GridCoverageEnv:
         self._col_flip = col_flip
         self.covered = covered
         self.covered_by_agent = covered_by_agent
+        self.known_free_by_agent = known_free_by_agent
+        self.known_obstacles_by_agent = known_obstacles_by_agent
+        self.known_team_covered_by_agent = known_team_covered_by_agent
+        self.last_novel_step_by_agent = last_novel_step_by_agent
         self.paths = paths
         self.teammate_positions = teammate_positions
         self.path_lengths = path_lengths
@@ -281,10 +308,13 @@ class GridCoverageEnv:
         self.step_count += 1
         repeated = False
         if valid:
+            self_novel = target not in self.covered_by_agent[0]
             self.positions[0] = target
             self.path_lengths[0] += abs(target[0] - previous_position[0]) + abs(target[1] - previous_position[1])
             self.paths[0].append(target)
             self.covered_by_agent[0].add(target)
+            if self_novel:
+                self.last_novel_step_by_agent[0] = self.step_count
             repeated = target in self.covered
             self.covered.add(target)
             self.last_new_cells = 0 if repeated else 1
@@ -346,6 +376,7 @@ class GridCoverageEnv:
             )
         self.last_collision_agents = 0
         self._sync_legacy_aliases()
+        self._refresh_explicit_map_memory()
         layers = self._canonical_layers()
         observation = self._observations(layers)
         step_reward: float | np.ndarray = reward if scalar_action else np.array([reward], dtype=np.float32)
@@ -412,6 +443,8 @@ class GridCoverageEnv:
             target = final_positions[index]
             self.path_lengths[index] += abs(target[0] - previous[0]) + abs(target[1] - previous[1])
             self.paths[index].append(target)
+            if target not in self.covered_by_agent[index]:
+                self.last_novel_step_by_agent[index] = self.step_count
             self.covered_by_agent[index].add(target)
         for index in blocked_agents:
             self.paths[index].append(previous_positions[index])
@@ -451,6 +484,7 @@ class GridCoverageEnv:
         )
         self.done = completed or self.step_count >= self.config.max_steps
         self._sync_legacy_aliases()
+        self._refresh_explicit_map_memory()
         layers = self._canonical_layers()
         rewards = np.full(self.num_agents, reward, dtype=np.float32)
         return StepResult(self._observations(layers), self._global_state_from_layers(layers), rewards, self.done, self._info(reward_terms))
@@ -577,6 +611,11 @@ class GridCoverageEnv:
     def _manhattan(self, first: GridPosition, second: GridPosition) -> int:
         return abs(first[0] - second[0]) + abs(first[1] - second[1])
 
+    def node_messages(self) -> np.ndarray:
+        if not self.config.use_explicit_map_memory:
+            return np.zeros((self.num_agents, self.node_message_dim), dtype=np.float32)
+        return np.stack([self._coverage_message(index) for index in range(self.num_agents)]).astype(np.float32)
+
     def _observations(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
         if layers is None:
             layers = self._canonical_layers()
@@ -585,6 +624,8 @@ class GridCoverageEnv:
     def _observation(self, agent_index: int = 0, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
         if layers is None:
             layers = self._canonical_layers()
+        if self.config.use_explicit_map_memory:
+            return self._explicit_memory_observation(agent_index, layers)
         all_agents, uncovered, team_covered, obstacles, _ = layers
         self_agent = np.zeros_like(all_agents)
         self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
@@ -618,6 +659,208 @@ class GridCoverageEnv:
             dtype=np.float32,
         )
         return np.concatenate([channel.ravel() for channel in channels] + [metadata])
+
+    def _explicit_memory_observation(
+        self,
+        agent_index: int,
+        layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    ) -> np.ndarray:
+        all_agents, _, _, _, _ = layers
+        self_agent = np.zeros_like(all_agents)
+        self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
+        other_agents = all_agents - self_agent
+        known_free = self.known_free_by_agent[agent_index]
+        known_team_covered = self.known_team_covered_by_agent[agent_index]
+        known_uncovered = known_free - known_team_covered
+        known_obstacles = self.known_obstacles_by_agent[agent_index]
+        unknown = self._memory_unknown(agent_index)
+        frontier = self._memory_frontiers(agent_index)
+        self_covered = self.covered_by_agent[agent_index]
+
+        radius = max(self.config.observation_radius, 0)
+        center = self._canonical_position(self.positions[agent_index])
+        channels = [
+            self._local_window(self_agent, radius, center),
+            self._local_window(other_agents, radius, center),
+            self._local_window(self._cells_layer(known_uncovered), radius, center),
+            self._local_window(self._cells_layer(known_team_covered), radius, center),
+            self._local_window(self._cells_layer(known_obstacles), radius, center),
+            self._local_window(self._cells_layer(self_covered), radius, center),
+            self._local_window(self._recent_path_layer(agent_index), radius, center),
+            self._local_window(self._cells_layer(unknown), radius, center),
+            self._local_window(self._cells_layer(frontier), radius, center),
+        ]
+        message = self._coverage_message(agent_index)
+        metadata = np.array(
+            [
+                float(self.row_direction(center[0])),
+                self.step_count / max(self.config.max_steps, 1),
+                self._known_coverage_ratio(agent_index),
+                len(known_free) / max(self.config.height * self.config.width, 1),
+                *message[:8],
+            ],
+            dtype=np.float32,
+        )
+        return np.concatenate([channel.ravel() for channel in channels] + [metadata])
+
+    def _refresh_explicit_map_memory(self) -> None:
+        if not self.config.use_explicit_map_memory:
+            return
+        radius = max(self.config.observation_radius, 0)
+        for agent_index, position in enumerate(self.positions):
+            visible_cells = {
+                (row, col)
+                for row in range(max(position[0] - radius, 0), min(position[0] + radius + 1, self.config.height))
+                for col in range(max(position[1] - radius, 0), min(position[1] + radius + 1, self.config.width))
+            }
+            # Global sets are sampled only through this local sensor window.
+            self.known_obstacles_by_agent[agent_index].update(visible_cells & self.obstacles)
+            self.known_free_by_agent[agent_index].update(visible_cells - self.obstacles)
+            self.known_free_by_agent[agent_index].update(self.covered_by_agent[agent_index])
+            self.known_team_covered_by_agent[agent_index].update(visible_cells & self.covered)
+            self.known_team_covered_by_agent[agent_index].update(self.covered_by_agent[agent_index])
+
+        if not self.config.share_map_memory:
+            return
+        mask = self.neighbor_mask()
+        source_free = [set(cells) for cells in self.known_free_by_agent]
+        source_obstacles = [set(cells) for cells in self.known_obstacles_by_agent]
+        source_covered = [set(cells) for cells in self.known_team_covered_by_agent]
+        for source in range(self.num_agents):
+            for target in range(source + 1, self.num_agents):
+                if not mask[source, target]:
+                    continue
+                merged_free = source_free[source] | source_free[target]
+                merged_obstacles = source_obstacles[source] | source_obstacles[target]
+                merged_covered = source_covered[source] | source_covered[target]
+                self.known_free_by_agent[source].update(merged_free)
+                self.known_free_by_agent[target].update(merged_free)
+                self.known_obstacles_by_agent[source].update(merged_obstacles)
+                self.known_obstacles_by_agent[target].update(merged_obstacles)
+                self.known_team_covered_by_agent[source].update(merged_covered)
+                self.known_team_covered_by_agent[target].update(merged_covered)
+
+    def _coverage_message(self, agent_index: int) -> np.ndarray:
+        known_free = self.known_free_by_agent[agent_index]
+        known_team_covered = self.known_team_covered_by_agent[agent_index] & known_free
+        self_covered = self.covered_by_agent[agent_index] & known_free
+        unknown = self._memory_unknown(agent_index)
+        frontier = self._memory_frontiers(agent_index)
+        map_area = max(self.config.width * self.config.height, 1)
+        known_free_count = max(len(known_free), 1)
+        recent_new_ratio, recent_repeat_ratio = self._recent_self_coverage_rates(agent_index)
+        stall_ratio = min(
+            (self.step_count - self.last_novel_step_by_agent[agent_index]) / max(self.config.recent_path_length, 1),
+            1.0,
+        )
+        target = self._intent_target(agent_index, frontier)
+        direction = np.zeros(len(ACTIONS), dtype=np.float32)
+        relative_target = np.zeros(2, dtype=np.float32)
+        target_distance = 0.0
+        regions = np.zeros(max(self.config.intent_grid_size, 1) ** 2, dtype=np.float32)
+        intent_valid = 0.0
+        if target is not None:
+            source_position = self._canonical_position(self.positions[agent_index])
+            target_position = self._canonical_position(target)
+            delta_row = target_position[0] - source_position[0]
+            delta_col = target_position[1] - source_position[1]
+            if abs(delta_row) >= abs(delta_col) and delta_row != 0:
+                direction[1 if delta_row > 0 else 0] = 1.0
+            elif delta_col != 0:
+                direction[3 if delta_col > 0 else 2] = 1.0
+            relative_target[:] = [
+                delta_row / max(self.config.height - 1, 1),
+                delta_col / max(self.config.width - 1, 1),
+            ]
+            target_distance = self._manhattan(source_position, target_position) / max(
+                self.config.height + self.config.width - 2, 1
+            )
+            region_index = self._intent_region_index(target_position)
+            regions[region_index] = 1.0
+            intent_valid = 1.0
+        return np.concatenate(
+            [
+                np.asarray(
+                    [
+                        len(known_team_covered) / known_free_count,
+                        len(self_covered) / known_free_count,
+                        len(unknown) / map_area,
+                        len(frontier) / known_free_count,
+                        recent_new_ratio,
+                        recent_repeat_ratio,
+                        stall_ratio,
+                    ],
+                    dtype=np.float32,
+                ),
+                direction,
+                relative_target,
+                np.asarray([target_distance], dtype=np.float32),
+                regions,
+                np.asarray([intent_valid], dtype=np.float32),
+            ]
+        )
+
+    def _recent_self_coverage_rates(self, agent_index: int) -> tuple[float, float]:
+        path = self.paths[agent_index]
+        horizon = max(self.config.recent_path_length, 1)
+        start = max(len(path) - horizon, 1)
+        recent_moves = path[start:]
+        if not recent_moves:
+            return 0.0, 0.0
+        seen = set(path[:start])
+        novel = 0
+        for cell in recent_moves:
+            if cell not in seen:
+                novel += 1
+            seen.add(cell)
+        repeat = len(recent_moves) - novel
+        return novel / len(recent_moves), repeat / len(recent_moves)
+
+    def _intent_target(self, agent_index: int, frontier: set[GridPosition]) -> GridPosition | None:
+        uncovered = self.known_free_by_agent[agent_index] - self.known_team_covered_by_agent[agent_index]
+        candidates = uncovered if uncovered else frontier
+        if not candidates:
+            return None
+        position = self.positions[agent_index]
+        return min(
+            candidates,
+            key=lambda cell: (self._manhattan(position, cell), self._canonical_position(cell)),
+        )
+
+    def _intent_region_index(self, canonical_position: GridPosition) -> int:
+        bins = max(self.config.intent_grid_size, 1)
+        row = min(canonical_position[0] * bins // max(self.config.height, 1), bins - 1)
+        col = min(canonical_position[1] * bins // max(self.config.width, 1), bins - 1)
+        return row * bins + col
+
+    def _known_coverage_ratio(self, agent_index: int) -> float:
+        known_free = self.known_free_by_agent[agent_index]
+        if not known_free:
+            return 0.0
+        return len(self.known_team_covered_by_agent[agent_index] & known_free) / len(known_free)
+
+    def _memory_unknown(self, agent_index: int) -> set[GridPosition]:
+        known = self.known_free_by_agent[agent_index] | self.known_obstacles_by_agent[agent_index]
+        return {
+            (row, col)
+            for row in range(self.config.height)
+            for col in range(self.config.width)
+            if (row, col) not in known
+        }
+
+    def _memory_frontiers(self, agent_index: int) -> set[GridPosition]:
+        unknown = self._memory_unknown(agent_index)
+        return {
+            cell
+            for cell in self.known_free_by_agent[agent_index]
+            if any((cell[0] + delta[0], cell[1] + delta[1]) in unknown for delta in ACTIONS.values())
+        }
+
+    def _cells_layer(self, cells: set[GridPosition]) -> np.ndarray:
+        layer = np.zeros((self.config.height, self.config.width), dtype=np.float32)
+        for cell in cells:
+            layer[self._canonical_position(cell)] = 1.0
+        return layer
 
     def _recent_path_layer(self, agent_index: int) -> np.ndarray:
         layer = np.zeros((self.config.height, self.config.width), dtype=np.float32)
