@@ -21,7 +21,7 @@ from mathbased_mcpp.config import (
     load_config,
     select_curriculum_course,
 )
-from mathbased_mcpp.evaluation import load_policy
+from mathbased_mcpp.evaluation import load_policy, resolve_runtime_config
 from mathbased_mcpp.env import GridCoverageEnv
 from mathbased_mcpp.ppo import ActorCritic
 
@@ -64,6 +64,7 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.curriculum.courses[3].env.map_refresh_episodes, 3)
         self.assertEqual(config.curriculum.courses[3].env.recent_path_length, 8)
         self.assertEqual(config.curriculum.courses[3].env.communication_radius, 4)
+        self.assertFalse(config.env.use_legacy_truth_coverage_observation)
         self.assertTrue(config.ppo.use_graph_attention)
         self.assertEqual(config.ppo.gat_num_heads, 4)
         self.assertTrue(config.ppo.gat_use_edge_features)
@@ -178,7 +179,7 @@ class ConfigEnvTests(unittest.TestCase):
         env = GridCoverageEnv(GridCoverageConfig(width=6, height=6, start=(0, 0)))
         observation = env.reset()
         self.assertEqual(observation.shape[0], env.observation_dim)
-        self.assertEqual(env.observation_dim, 75)
+        self.assertEqual(env.observation_dim, 66)
 
     def test_global_state_shape_and_map_layers(self) -> None:
         env = GridCoverageEnv(
@@ -341,24 +342,68 @@ class ConfigEnvTests(unittest.TestCase):
         )
         observation = env.reset()
         self.assertEqual(observation.shape, (2, env.observation_dim))
-        self.assertEqual(env.observation_dim, 75)
+        self.assertEqual(env.observation_dim, 66)
         self.assertEqual(env.state_dim, 5 * 5 * 5 + 7)
 
-    def test_observation_includes_self_memory_channels(self) -> None:
+    def test_private_observation_includes_self_memory_channels(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(width=3, height=3, start=(1, 1), observation_radius=1, recent_path_length=4)
         )
         env.reset()
         result = env.step(3)
         window_area = (env.config.observation_radius * 2 + 1) ** 2
-        self_covered = result.observation[5 * window_area : 6 * window_area].reshape(3, 3)
-        recent_path = result.observation[6 * window_area : 7 * window_area].reshape(3, 3)
+        self_covered = result.observation[4 * window_area : 5 * window_area].reshape(3, 3)
+        recent_path = result.observation[5 * window_area : 6 * window_area].reshape(3, 3)
 
         self.assertEqual(float(self_covered.sum()), 2.0)
         self.assertEqual(self_covered[1, 1], 1.0)
         self.assertEqual(self_covered[1, 0], 1.0)
         self.assertEqual(recent_path[1, 1], 1.0)
         self.assertGreater(recent_path[1, 1], recent_path[1, 0])
+
+    def test_private_observation_does_not_reveal_teammate_coverage(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=4,
+                height=1,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 3)],
+                observation_radius=3,
+                communication_radius=0,
+            )
+        )
+        env.reset()
+        result = env.step([0, 2])
+        window_area = (env.config.observation_radius * 2 + 1) ** 2
+        first_agent = result.observation[0]
+        self_uncovered = first_agent[2 * window_area : 3 * window_area].reshape(7, 7)
+        metadata = first_agent[6 * window_area :]
+
+        self.assertEqual(self_uncovered[3, 5], 1.0)
+        self.assertAlmostEqual(float(metadata[2]), 0.25)
+        self.assertAlmostEqual(env.coverage_ratio(), 0.75)
+
+    def test_private_observation_is_invariant_to_teammate_coverage_history(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=5,
+                height=1,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 4)],
+                observation_radius=4,
+                communication_radius=0,
+            )
+        )
+        env.reset()
+        before = env._observations()[0].copy()
+
+        hidden_teammate_history = {(0, 2), (0, 3)}
+        env.covered.update(hidden_teammate_history)
+        env.covered_by_agent[1].update(hidden_teammate_history)
+        after = env._observations()[0]
+
+        self.assertTrue(np.array_equal(before, after))
+        self.assertNotAlmostEqual(env.coverage_ratio(), 2 / 5)
 
     def test_explicit_map_memory_stays_private_until_agents_communicate(self) -> None:
         env = GridCoverageEnv(
@@ -384,6 +429,54 @@ class ConfigEnvTests(unittest.TestCase):
         expected_covered = {(0, 0), (0, 1), (0, 2), (0, 3)}
         self.assertEqual(env.known_team_covered_by_agent[0], expected_covered)
         self.assertEqual(env.known_team_covered_by_agent[1], expected_covered)
+
+    def test_explicit_memory_does_not_read_visible_teammate_coverage_without_communication(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=4,
+                height=1,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 3)],
+                observation_radius=3,
+                communication_radius=0,
+                use_explicit_map_memory=True,
+                share_map_memory=True,
+            )
+        )
+        env.reset()
+        env.step([0, 2])
+
+        self.assertEqual(env.known_team_covered_by_agent[0], {(0, 0)})
+        self.assertEqual(env.known_team_covered_by_agent[1], {(0, 2), (0, 3)})
+
+    def test_explicit_actor_inputs_are_invariant_to_uncommunicated_teammate_history(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=5,
+                height=1,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 4)],
+                observation_radius=4,
+                communication_radius=0,
+                use_explicit_map_memory=True,
+                share_map_memory=True,
+            )
+        )
+        env.reset()
+        before_observation = env._observations()[0].copy()
+        before_message = env.node_messages()[0].copy()
+
+        hidden_teammate_history = {(0, 2), (0, 3)}
+        env.covered.update(hidden_teammate_history)
+        env.covered_by_agent[1].update(hidden_teammate_history)
+        env._refresh_explicit_map_memory()
+        after_observation = env._observations()[0]
+        after_message = env.node_messages()[0]
+
+        self.assertTrue(np.array_equal(before_observation, after_observation))
+        self.assertTrue(np.array_equal(before_message, after_message))
+        self.assertEqual(env.known_team_covered_by_agent[0], {(0, 0)})
+        self.assertNotAlmostEqual(env.coverage_ratio(), 2 / 5)
 
     def test_coverage_message_contains_memory_derived_intent(self) -> None:
         env = GridCoverageEnv(
@@ -597,6 +690,23 @@ class ConfigEnvTests(unittest.TestCase):
             self.assertEqual(model.state_shape, (8, 8))
             self.assertIn(action, range(target_env.action_dim))
             self.assertTrue(torch.isfinite(value).item())
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_legacy_snapshot_replays_truth_coverage_observation_explicitly(self) -> None:
+        run_dir = ROOT / ".tmp_tests" / "legacy-runtime-config"
+        shutil.rmtree(run_dir, ignore_errors=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            checkpoint = run_dir / "policy.pt"
+            checkpoint.write_bytes(b"placeholder")
+            (run_dir / "course_config.json").write_text(
+                json.dumps({"env": {"width": 4, "height": 4}, "ppo": {}, "train": {}}),
+                encoding="utf-8",
+            )
+            runtime = resolve_runtime_config(load_config(ROOT / "configs" / "smoke.toml"), checkpoint)
+            self.assertTrue(runtime.env.use_legacy_truth_coverage_observation)
+            self.assertEqual(GridCoverageEnv(runtime.env).observation_dim, 75)
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
 

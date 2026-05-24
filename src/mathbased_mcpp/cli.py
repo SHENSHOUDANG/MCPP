@@ -107,6 +107,7 @@ def main() -> None:
         print(f"gat_num_heads={config.ppo.gat_num_heads}")
         print(f"gat_use_edge_features={str(config.ppo.gat_use_edge_features).lower()}")
         print(f"gat_residual={str(config.ppo.gat_residual).lower()}")
+        print(f"use_legacy_truth_coverage_observation={str(config.env.use_legacy_truth_coverage_observation).lower()}")
         print(f"use_explicit_map_memory={str(config.env.use_explicit_map_memory).lower()}")
         print(f"share_map_memory={str(config.env.share_map_memory).lower()}")
         print(f"use_coverage_messages={str(config.ppo.use_coverage_messages).lower()}")

@@ -20,7 +20,15 @@ def resolve_runtime_config(config: ExperimentConfig, checkpoint_path: str | Path
     checkpoint_path = Path(checkpoint_path)
     manifest_path = checkpoint_path.parent / "course_config.json"
     if manifest_path.exists():
-        return load_config(manifest_path)
+        runtime_config = load_config(manifest_path)
+        raw_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        env_manifest = raw_manifest.get("env", {})
+        if (
+            "use_legacy_truth_coverage_observation" not in env_manifest
+            and not runtime_config.env.use_explicit_map_memory
+        ):
+            runtime_config.env.use_legacy_truth_coverage_observation = True
+        return runtime_config
     return config
 
 

@@ -13,6 +13,7 @@ danger_radius = 0
 observation_radius = 2
 recent_path_length = 8
 communication_radius = 4
+use_legacy_truth_coverage_observation = false
 use_explicit_map_memory = true
 share_map_memory = true
 intent_grid_size = 3

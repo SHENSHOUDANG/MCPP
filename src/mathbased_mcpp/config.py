@@ -45,6 +45,7 @@ class GridCoverageConfig:
     observation_radius: int = 1
     recent_path_length: int = 8
     communication_radius: int = 0
+    use_legacy_truth_coverage_observation: bool = False
     use_explicit_map_memory: bool = False
     share_map_memory: bool = False
     intent_grid_size: int = 3
@@ -241,6 +242,7 @@ def _grid_config_from_raw(env_raw: dict[str, Any], reward: RewardConfig) -> Grid
     raw["observation_radius"] = int(raw.get("observation_radius", 1))
     raw["recent_path_length"] = int(raw.get("recent_path_length", 8))
     raw["communication_radius"] = int(raw.get("communication_radius", 0))
+    raw["use_legacy_truth_coverage_observation"] = bool(raw.get("use_legacy_truth_coverage_observation", False))
     raw["use_explicit_map_memory"] = bool(raw.get("use_explicit_map_memory", False))
     raw["share_map_memory"] = bool(raw.get("share_map_memory", False))
     raw["intent_grid_size"] = max(int(raw.get("intent_grid_size", 3)), 1)

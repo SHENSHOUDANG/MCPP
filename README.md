@@ -71,29 +71,27 @@ The formal curriculum output root defaults to `E:\test plot`.
 
 ## Memory And Communication
 
-The actor uses explicit observation memory. It does not use an RNN, GRU, or LSTM.
+The actor does not use an RNN, GRU, or LSTM. New training paths enforce decentralized actor information: global coverage truth belongs to the centralized critic, reward, metrics, and rendering only.
 
-The local actor observation has seven map channels:
+The private local-memory actor observation has six map channels:
 
 - `self_agent`
 - `other_agents`
-- `uncovered`
-- `team_covered`
+- `self_uncovered`
 - `obstacles`
 - `self_covered`
 - `recent_path`
 
-`self_covered` records cells visited by the current agent. `recent_path` records the current agent's latest path cells, with larger values for more recent positions.
+`self_uncovered` means locally visible free cells not yet covered by that agent itself. It does not claim to know whether a teammate visited them. `self_covered` records cells visited by the current agent. `recent_path` records the current agent's latest path cells, with larger values for more recent positions.
 
-Important implementation status: the current code should be named `local-memory GAT-MAPPO baseline`, not decentralized map-memory GAT-MAPPO.
+The completed May 2026 legacy GAT-on/GAT-off run used a different seven-channel observation containing locally cropped environment-truth `team_covered` and a global-team-derived `uncovered` signal. That run is retained for audit and historical comparison, but it is not a valid decentralized-actor baseline. Loading its saved `course_config.json` enables an explicit legacy replay mode so its artifacts remain reproducible; new training does not enable that mode.
 
-The current implementation has:
+The current private local baseline has:
 
 - local explicit memory channels, mainly `self_covered` and `recent_path`;
-- a local crop of `team_covered`;
 - range-limited GAT feature communication between neighboring agents.
 
-The current implementation does not yet have:
+The private local baseline does not have:
 
 - a full-map memory owned by each individual robot;
 - per-agent map updates based only on that robot's own local observation and movement history;
@@ -101,11 +99,7 @@ The current implementation does not yet have:
 - map fusion between neighboring robots;
 - actor observations generated from each robot's own fused memory map.
 
-This distinction is important. In the current implementation, the environment maintains the ground-truth coverage state for reward, evaluation, rendering, and observation construction, then the actor receives only a local crop. `team_covered` should therefore be read as a local team-coverage observation channel, not as a decentralized map that each robot has built and fused by itself.
-
-The current GAT ablation can still be used as a baseline for local explicit memory plus hidden-feature communication. It should not be described as the final explicit-map-memory method.
-
-The intended next memory design is decentralized explicit map memory:
+The map-intent baseline implements decentralized explicit map memory:
 
 - Each agent owns a full-map belief/coverage memory, such as `agent_known_covered[i]`, `agent_self_covered[i]`, `agent_known_obstacles[i]`, `agent_known_free[i]`, and `agent_unknown[i]`.
 - At every step, an agent updates its own memory only from what it can locally observe and from its own movement history.
@@ -114,7 +108,7 @@ The intended next memory design is decentralized explicit map memory:
 - The environment's global truth remains internal and is used only for reward, termination, metrics, and visualization. It should not be directly leaked to every policy as a global `team_covered` map.
 - Actor observations should then be generated from each agent's own memory, usually as a local crop plus optional compact global summaries such as known coverage ratio, nearest known uncovered direction, or known frontier count.
 
-This planned design matches the robotics assumption more closely: local sensing, persistent per-robot mapping, and conditional map sharing when agents become neighbors. It is not implemented in the current training run. Existing runs can still serve as the baseline for local explicit memory plus GAT communication; a later switch to decentralized full-map memory will likely change observation semantics and may require a new curriculum run or a dedicated fine-tuning curriculum.
+The implementation deliberately does not add a pheromone channel. A pheromone/heuristic coverage field would be a distinct communication mechanism and must be introduced only as its own explicit ablation, not as a hidden replacement for team-coverage truth.
 
 Graph attention communication is optional in code and enabled in the formal PPO config. Each agent is one graph node. For the current homogeneous-agent setting, two agents are neighbors when:
 
@@ -134,12 +128,12 @@ The current GAT implementation is a lightweight multi-head masked attention laye
 
 ### Map-Intent Communication Baseline
 
-A new opt-in ablation baseline implements the next memory design without changing the completed legacy GAT experiment:
+A new opt-in ablation baseline implements this memory design without changing the completed legacy GAT experiment artifacts:
 
 - `configs/ablation_mapmsg_gat_on.toml`
 - `configs/ablation_mapmsg_gat_off.toml`
 
-In these configs, every agent maintains its own full-map memory of known free cells, known obstacles, self-covered cells, and known team-covered cells. Memory is updated from that agent's local observation and movement history. When agents enter `communication_radius`, their remembered map facts are merged. The actor reads a fixed-size local crop from this memory, so curriculum transfer from 8x8 to 20x20 keeps a fixed actor input size.
+In these configs, every agent maintains its own full-map memory of known free cells, known obstacles, self-covered cells, and communicated known-team-covered cells. A teammate's historical coverage is not visible merely because that cell lies inside the local sensor window. Memory is updated from the agent's own movement and local map sensing; teammate coverage enters only through map exchange within `communication_radius`. The actor reads a fixed-size local crop from this memory, so curriculum transfer from 8x8 to 20x20 keeps a fixed actor input size.
 
 Explicit-memory observations add `unknown` and `frontier` map channels. The policy also receives a fixed-size coverage message generated from the agent's own memory:
 
@@ -499,12 +493,14 @@ Minimum tests before enabling multiprocessing by default:
 
 ## GAT Ablation
 
-The GAT ablation uses two matched configs:
+The archived May 2026 GAT comparison used two matched arms but also used the now-rejected legacy actor coverage observation. Its checkpoints and reported metrics remain a historical diagnostic only.
+
+The source configs below now explicitly disable legacy truth-coverage observation for any new run:
 
 - `configs/ablation_gat_on.toml`: same curriculum, `use_graph_attention = true`.
 - `configs/ablation_gat_off.toml`: same curriculum, `use_graph_attention = false`.
 
-Both configs keep the same GAT hyperparameters, but the off arm does not instantiate the attention module. The two arms should be trained separately from course 1. Do not initialize the GAT-off arm from a GAT-on checkpoint, because the actor architecture and checkpoint keys differ.
+Both configs keep the same GAT hyperparameters, but the off arm does not instantiate the attention module. Any new run from these configs starts a corrected private-local baseline and is not directly the same model family as the archived trained checkpoints. Do not initialize a corrected run from an archived legacy checkpoint.
 
 Train the GAT-on arm:
 
@@ -530,7 +526,7 @@ After both arms finish, compare them on the same held-out seeds and obstacle rat
 gat-ablation --gat-on-config configs/ablation_gat_on.toml --gat-on-checkpoint "E:\test plot\ablation_gat_on\<run>\04-tier-4-20x20-4agents\best_policy.pt" --gat-off-config configs/ablation_gat_off.toml --gat-off-checkpoint "E:\test plot\ablation_gat_off\<run>\04-tier-4-20x20-4agents\best_policy.pt" --seeds 20260601,20260602,20260603,20260604,20260605 --obstacle-ratios 0.05,0.10,0.15,0.20 --output "E:\test plot\gat_ablation_summary.csv"
 ```
 
-The summary CSV contains `gat_on`, `gat_off`, and `delta_on_minus_off`. The primary fields are `coverage_at_<budget>_mean`, `coverage_auc_mean`, `t90/t95/t99_mean_reached`, `t90/t95/t99_reach_rate`, and `stall_termination_coverage_mean`. Use `repeat_ratio_after_90_mean`, `inter_agent_overlap_ratio_mean`, `completion_rate`, and `path_length_mean` as supporting diagnostics. A useful communication mechanism should improve budgeted coverage efficiency on held-out seeds, not merely produce a visually tidy path or overfit completion on its training seed pool.
+The summary CSV contains `gat_on`, `gat_off`, and `delta_on_minus_off`. The primary fields are `coverage_at_<budget>_mean`, `coverage_auc_mean`, `t90/t95/t99_mean_reached`, `t90/t95/t99_reach_rate`, and `stall_termination_coverage_mean`. Use `repeat_ratio_after_90_mean`, `inter_agent_overlap_ratio_mean`, `completion_rate`, and `path_length_mean` as supporting diagnostics. Results from archived legacy checkpoints must be labeled as legacy truth-observation results, not decentralized baseline results.
 
 The map-intent ablation follows the same workflow with new configs and separate output roots:
 

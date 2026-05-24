@@ -32,7 +32,8 @@ class StepResult:
 class GridCoverageEnv:
     """Grid coverage environment with single-agent compatibility and MAPPO multi-agent mode."""
 
-    observation_channels = 7
+    observation_channels = 6
+    legacy_observation_channels = 7
     explicit_observation_channels = 9
     observation_metadata_dim = 12
     state_channels = 5
@@ -88,7 +89,11 @@ class GridCoverageEnv:
 
     @property
     def active_observation_channels(self) -> int:
-        return self.explicit_observation_channels if self.config.use_explicit_map_memory else self.observation_channels
+        if self.config.use_explicit_map_memory:
+            return self.explicit_observation_channels
+        if self.config.use_legacy_truth_coverage_observation:
+            return self.legacy_observation_channels
+        return self.observation_channels
 
     @property
     def node_message_dim(self) -> int:
@@ -626,6 +631,8 @@ class GridCoverageEnv:
             layers = self._canonical_layers()
         if self.config.use_explicit_map_memory:
             return self._explicit_memory_observation(agent_index, layers)
+        if not self.config.use_legacy_truth_coverage_observation:
+            return self._private_local_observation(agent_index, layers)
         all_agents, uncovered, team_covered, obstacles, _ = layers
         self_agent = np.zeros_like(all_agents)
         self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
@@ -655,6 +662,40 @@ class GridCoverageEnv:
                 self.coverage_ratio(),
                 self._agent_density(),
                 *self._communication_metadata(agent_index),
+            ],
+            dtype=np.float32,
+        )
+        return np.concatenate([channel.ravel() for channel in channels] + [metadata])
+
+    def _private_local_observation(
+        self,
+        agent_index: int,
+        layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    ) -> np.ndarray:
+        all_agents, _, _, obstacles, _ = layers
+        self_agent = np.zeros_like(all_agents)
+        self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
+        other_agents = all_agents - self_agent
+        self_covered = self._cells_layer(self.covered_by_agent[agent_index])
+        observed_free = np.ones_like(obstacles) - obstacles
+        self_uncovered = np.clip(observed_free - self_covered, 0.0, 1.0)
+        radius = max(self.config.observation_radius, 0)
+        center = self._canonical_position(self.positions[agent_index])
+        channels = [
+            self._local_window(self_agent, radius, center),
+            self._local_window(other_agents, radius, center),
+            self._local_window(self_uncovered, radius, center),
+            self._local_window(obstacles, radius, center),
+            self._local_window(self_covered, radius, center),
+            self._local_window(self._recent_path_layer(agent_index), radius, center),
+        ]
+        metadata = np.array(
+            [
+                float(self.row_direction(center[0])),
+                self.step_count / max(self.config.max_steps, 1),
+                len(self.covered_by_agent[agent_index]) / max(self.config.width * self.config.height, 1),
+                self.num_agents / max(self.config.width * self.config.height, 1),
+                *([0.0] * 8),
             ],
             dtype=np.float32,
         )
@@ -717,7 +758,6 @@ class GridCoverageEnv:
             self.known_obstacles_by_agent[agent_index].update(visible_cells & self.obstacles)
             self.known_free_by_agent[agent_index].update(visible_cells - self.obstacles)
             self.known_free_by_agent[agent_index].update(self.covered_by_agent[agent_index])
-            self.known_team_covered_by_agent[agent_index].update(visible_cells & self.covered)
             self.known_team_covered_by_agent[agent_index].update(self.covered_by_agent[agent_index])
 
         if not self.config.share_map_memory:
