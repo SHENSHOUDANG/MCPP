@@ -10,7 +10,7 @@ if str(SRC) not in sys.path:
 
 from mathbased_mcpp.benchmark import benchmark_policy
 from mathbased_mcpp.config import GridCoverageConfig, PPOConfig, TrainConfig, ExperimentConfig, load_config
-from mathbased_mcpp.evaluation import evaluate_policy
+from mathbased_mcpp.evaluation import coverage_efficiency_metrics, evaluate_policy
 from mathbased_mcpp.rendering import render_trajectory
 from mathbased_mcpp.training import train_ppo
 
@@ -36,6 +36,8 @@ class PpoRenderTests(unittest.TestCase):
 
             summary = evaluate_policy(config, checkpoint, output_path=run_dir / "trajectory.json")
             self.assertIn("coverage_ratio", summary)
+            self.assertIn("coverage_auc", summary)
+            self.assertIn("repeat_ratio_after_90", summary)
             self.assertTrue((run_dir / "trajectory.json").exists())
 
             image = render_trajectory(config, summary["trajectory"], run_dir / "trajectory.png")
@@ -46,8 +48,31 @@ class PpoRenderTests(unittest.TestCase):
             self.assertEqual(benchmark["episodes"], 2)
             self.assertTrue((run_dir / "benchmark.csv").exists())
             self.assertIn("coverage_ratio_mean", benchmark)
+            self.assertIn("coverage_auc_mean", benchmark)
+            self.assertIn("stall_termination_coverage_mean", benchmark)
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_coverage_efficiency_metrics(self) -> None:
+        metrics = coverage_efficiency_metrics(
+            trajectories=[
+                [(0, 0), (0, 1), (0, 1), (0, 2)],
+                [(1, 0), (1, 1), (1, 1), (0, 2)],
+            ],
+            coverage_curve=[0.2, 0.5, 0.5, 0.9],
+            max_steps=4,
+            budgets=[1, 3, 4],
+            stall_steps=1,
+        )
+        self.assertAlmostEqual(metrics["coverage_at_1"], 0.5)
+        self.assertAlmostEqual(metrics["coverage_at_3"], 0.9)
+        self.assertAlmostEqual(metrics["coverage_at_4"], 0.9)
+        self.assertAlmostEqual(metrics["coverage_auc"], 0.7)
+        self.assertEqual(metrics["t90"], 3)
+        self.assertIsNone(metrics["t95"])
+        self.assertEqual(metrics["stalled"], 1)
+        self.assertAlmostEqual(metrics["stall_termination_coverage"], 0.5)
+        self.assertAlmostEqual(metrics["inter_agent_overlap_ratio"], 0.2)
 
     def test_train_two_agent_smoke(self) -> None:
         config = ExperimentConfig(

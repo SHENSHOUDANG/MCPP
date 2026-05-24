@@ -146,6 +146,6 @@ num_agents = 4
 observation_radius = 2
 recent_path_length = 8
 communication_radius = 4
-total_timesteps = 4400000
+total_timesteps = 3200000
 rollout_steps = 2048
 load_previous = true

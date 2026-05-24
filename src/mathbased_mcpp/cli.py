@@ -27,6 +27,8 @@ def main() -> None:
         if name == "benchmark":
             subparser.add_argument("--seeds", default="20260501,20260502,20260503,20260504,20260505")
             subparser.add_argument("--obstacle-ratios", default=None)
+            subparser.add_argument("--budgets", default=None)
+            subparser.add_argument("--stall-steps", type=int, default=50)
             subparser.add_argument("--output", default=None)
 
     ablation = subparsers.add_parser("gat-ablation")
@@ -36,6 +38,8 @@ def main() -> None:
     ablation.add_argument("--gat-off-checkpoint", required=True)
     ablation.add_argument("--seeds", default="20260501,20260502,20260503,20260504,20260505")
     ablation.add_argument("--obstacle-ratios", default="0.05,0.10,0.15,0.20")
+    ablation.add_argument("--budgets", default=None)
+    ablation.add_argument("--stall-steps", type=int, default=50)
     ablation.add_argument("--output", default=None)
 
     args = parser.parse_args()
@@ -45,6 +49,7 @@ def main() -> None:
         if not seeds:
             parser.error("--seeds must contain at least one integer seed")
         obstacle_ratios = _parse_float_csv(args.obstacle_ratios)
+        budgets = _parse_int_csv(args.budgets) if args.budgets else None
         output_path = Path(args.output) if args.output else Path("outputs") / "gat_ablation" / "summary.csv"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         on_detail = output_path.with_name(f"{output_path.stem}_gat_on.csv")
@@ -55,6 +60,8 @@ def main() -> None:
             seeds=seeds,
             obstacle_ratios=obstacle_ratios,
             output_path=on_detail,
+            budgets=budgets,
+            stall_steps=args.stall_steps,
         )
         gat_off = benchmark_policy(
             load_config(args.gat_off_config),
@@ -62,13 +69,16 @@ def main() -> None:
             seeds=seeds,
             obstacle_ratios=obstacle_ratios,
             output_path=off_detail,
+            budgets=budgets,
+            stall_steps=args.stall_steps,
         )
         rows = _ablation_summary_rows(gat_on, gat_off)
         _write_ablation_summary(output_path, rows)
         for row in rows:
             print(
                 f"{row['arm']}: coverage_mean={row['coverage_ratio_mean']:.4f}, "
-                f"completion_rate={row['completion_rate']:.4f}, repeat_mean={row['repeat_ratio_mean']:.4f}, "
+                f"auc={row['coverage_auc_mean']:.4f}, completion_rate={row['completion_rate']:.4f}, "
+                f"repeat_after90={row['repeat_ratio_after_90_mean']:.4f}, "
                 f"path_length_mean={row['path_length_mean']:.1f}"
             )
         print(f"summary={output_path}")
@@ -120,6 +130,7 @@ def main() -> None:
         if not seeds:
             parser.error("--seeds must contain at least one integer seed")
         obstacle_ratios = _parse_float_csv(args.obstacle_ratios) if args.obstacle_ratios else None
+        budgets = _parse_int_csv(args.budgets) if args.budgets else None
         output_path = Path(args.output) if args.output else checkpoint_path.parent / "benchmark.csv"
         summary = benchmark_policy(
             config,
@@ -127,6 +138,8 @@ def main() -> None:
             seeds=seeds,
             obstacle_ratios=obstacle_ratios,
             output_path=output_path,
+            budgets=budgets,
+            stall_steps=args.stall_steps,
         )
         print(f"episodes={summary['episodes']}")
         print(f"coverage_ratio_mean={summary['coverage_ratio_mean']:.4f}")
@@ -135,6 +148,14 @@ def main() -> None:
         print(f"path_length_mean={summary['path_length_mean']:.1f}")
         print(f"steps_mean={summary['steps_mean']:.1f}")
         print(f"repeat_ratio_mean={summary['repeat_ratio_mean']:.4f}")
+        print(f"repeat_ratio_after_90_mean={summary['repeat_ratio_after_90_mean']:.4f}")
+        print(f"coverage_auc_mean={summary['coverage_auc_mean']:.4f}")
+        print(f"t90_mean_reached={summary['t90_mean_reached']:.1f}")
+        print(f"t95_mean_reached={summary['t95_mean_reached']:.1f}")
+        print(f"t99_mean_reached={summary['t99_mean_reached']:.1f}")
+        print(f"stall_termination_coverage_mean={summary['stall_termination_coverage_mean']:.4f}")
+        for key in sorted(field for field in summary if field.startswith("coverage_at_")):
+            print(f"{key}={summary[key]:.4f}")
         print(f"total_reward_mean={summary['total_reward_mean']:.4f}")
         print(f"benchmark={output_path}")
         return
@@ -148,6 +169,12 @@ def main() -> None:
         print(f"coverage_ratio={summary['coverage_ratio']:.3f}")
         print(f"path_length={summary['path_length']}")
         print(f"completed={str(summary['completed']).lower()}")
+        print(f"coverage_auc={summary['coverage_auc']:.4f}")
+        print(f"t90={summary['t90']}")
+        print(f"t95={summary['t95']}")
+        print(f"t99={summary['t99']}")
+        print(f"repeat_ratio_after_90={summary['repeat_ratio_after_90']:.4f}")
+        print(f"stall_termination_coverage={summary['stall_termination_coverage']:.4f}")
         print(f"trajectory={trajectory_path}")
         return
 
@@ -175,8 +202,20 @@ def _ablation_summary_rows(gat_on: dict[str, object], gat_off: dict[str, object]
         "path_length_mean",
         "steps_mean",
         "repeat_ratio_mean",
+        "coverage_auc_mean",
+        "repeat_ratio_after_90_mean",
+        "inter_agent_overlap_ratio_mean",
+        "stall_rate",
+        "stall_termination_coverage_mean",
+        "t90_mean_reached",
+        "t90_reach_rate",
+        "t95_mean_reached",
+        "t95_reach_rate",
+        "t99_mean_reached",
+        "t99_reach_rate",
         "total_reward_mean",
     ]
+    fields.extend(sorted(key for key in gat_on if key.startswith("coverage_at_")))
     rows: list[dict[str, float | int | str]] = []
     for arm, summary in (("gat_on", gat_on), ("gat_off", gat_off)):
         row: dict[str, float | int | str] = {"arm": arm}
@@ -191,17 +230,7 @@ def _ablation_summary_rows(gat_on: dict[str, object], gat_off: dict[str, object]
 
 
 def _write_ablation_summary(output_path: Path, rows: list[dict[str, float | int | str]]) -> None:
-    fieldnames = [
-        "arm",
-        "episodes",
-        "coverage_ratio_mean",
-        "coverage_ratio_min",
-        "completion_rate",
-        "path_length_mean",
-        "steps_mean",
-        "repeat_ratio_mean",
-        "total_reward_mean",
-    ]
+    fieldnames = list(rows[0]) if rows else ["arm"]
     with output_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
