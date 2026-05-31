@@ -448,6 +448,18 @@ This mode keeps the actor map tensor size fixed with respect to environment widt
 
 The CNN actor encoder is optional and checkpoint-compatible. Older checkpoints default to the historical MLP actor. New CNN checkpoints store the actor map shape and metadata split, so the same actor can be loaded on larger maps as long as `centered_map_size` and the observation channels are unchanged.
 
+Two matched centered-memory CNN configs are available for the next ablation:
+
+- `configs/ablation_centered_cnn_gat_on.toml`
+- `configs/ablation_centered_cnn_gat_off.toml`
+
+They keep the current curriculum and reward settings but switch the actor to a `15 x 15` centered compressed memory tensor with the CNN actor encoder. Their only intended substantive difference is still `use_graph_attention = true` versus `false`.
+
+```powershell
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/ablation_centered_cnn_gat_on.toml --course tier-1-8x8-1agent
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/ablation_centered_cnn_gat_off.toml --course tier-1-8x8-1agent
+```
+
 Recommended map-size experiment stages:
 
 | Stage | Training maps | Test maps | Purpose |

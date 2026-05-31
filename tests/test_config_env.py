@@ -180,6 +180,25 @@ class ConfigEnvTests(unittest.TestCase):
             [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_off.curriculum.courses],
         )
 
+    def test_centered_cnn_ablation_configs_use_fixed_actor_map(self) -> None:
+        gat_on = load_config(ROOT / "configs" / "ablation_centered_cnn_gat_on.toml")
+        gat_off = load_config(ROOT / "configs" / "ablation_centered_cnn_gat_off.toml")
+
+        self.assertEqual(gat_on.env.observation_mode, "centered_compressed_memory")
+        self.assertEqual(gat_on.env.centered_map_size, 15)
+        self.assertEqual(gat_on.ppo.actor_encoder, "cnn")
+        self.assertTrue(gat_on.ppo.use_graph_attention)
+        self.assertFalse(gat_off.ppo.use_graph_attention)
+        self.assertEqual(gat_on.ppo.actor_encoder, gat_off.ppo.actor_encoder)
+        self.assertEqual(gat_on.env.centered_map_size, gat_off.env.centered_map_size)
+        self.assertEqual(gat_on.env.observation_mode, gat_off.env.observation_mode)
+        assert gat_on.curriculum is not None
+        for course in gat_on.curriculum.courses:
+            env = GridCoverageEnv(course.env)
+            self.assertEqual(course.env.observation_mode, "centered_compressed_memory")
+            self.assertEqual(env.actor_map_shape, (9, 15, 15))
+            self.assertEqual(env.observation_dim, 9 * 15 * 15 + env.observation_metadata_dim)
+
     def test_select_curriculum_course_by_name(self) -> None:
         config = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
         index, course = select_curriculum_course(config, course_name="tier-2-13x13-2agents")
