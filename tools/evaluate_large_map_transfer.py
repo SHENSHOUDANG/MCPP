@@ -49,7 +49,7 @@ class Scenario:
         return f"{self.size}x{self.size}"
 
 
-SCENARIOS = (
+DEFAULT_SCENARIOS = (
     Scenario(30, 1125),
     Scenario(40, 2000),
     Scenario(50, 3125),
@@ -63,6 +63,10 @@ def main() -> None:
     parser.add_argument("--output-dir", default=str(ROOT / "reports" / "large_map_transfer_2026-05-29"))
     parser.add_argument("--seeds", default="20260530,20260531,20260532")
     parser.add_argument("--obstacle-ratio", type=float, default=0.05)
+    parser.add_argument("--sizes", default="30,40,50,60")
+    parser.add_argument("--max-steps", default="")
+    parser.add_argument("--step-area-scale", type=float, default=1.25)
+    parser.add_argument("--num-agents", type=int, default=4)
     parser.add_argument("--skip-existing", action="store_true")
     args = parser.parse_args()
 
@@ -77,6 +81,7 @@ def main() -> None:
     seeds = [int(item.strip()) for item in args.seeds.split(",") if item.strip()]
     if not seeds:
         raise ValueError("--seeds must contain at least one seed")
+    scenarios = parse_scenarios(args.sizes, args.max_steps, args.step_area_scale)
 
     rows_path = output_dir / "detail_rows.csv"
     if args.skip_existing and rows_path.exists():
@@ -84,9 +89,10 @@ def main() -> None:
     else:
         rows = run_trials(
             checkpoint=checkpoint,
-            scenarios=SCENARIOS,
+            scenarios=scenarios,
             seeds=seeds,
             obstacle_ratio=args.obstacle_ratio,
+            num_agents=max(int(args.num_agents), 1),
             trajectories_dir=trajectories_dir,
             figures_dir=figures_dir,
         )
@@ -112,13 +118,14 @@ def run_trials(
     scenarios: tuple[Scenario, ...],
     seeds: list[int],
     obstacle_ratio: float,
+    num_agents: int,
     trajectories_dir: Path,
     figures_dir: Path,
 ) -> list[dict[str, Any]]:
     base_config = load_config(checkpoint.parent / "course_config.json")
     rows: list[dict[str, Any]] = []
     for scenario in scenarios:
-        config_template = scenario_config(base_config, scenario, obstacle_ratio)
+        config_template = scenario_config(base_config, scenario, obstacle_ratio, num_agents)
         model = load_policy_for_shape(checkpoint, config_template)
         for seed in seeds:
             trial_config = copy.deepcopy(config_template)
@@ -142,12 +149,26 @@ def run_trials(
     return rows
 
 
-def scenario_config(base_config: ExperimentConfig, scenario: Scenario, obstacle_ratio: float) -> ExperimentConfig:
+def parse_scenarios(sizes_arg: str, max_steps_arg: str, step_area_scale: float) -> tuple[Scenario, ...]:
+    sizes = [int(item.strip()) for item in sizes_arg.split(",") if item.strip()]
+    if not sizes:
+        return DEFAULT_SCENARIOS
+    max_steps = [int(item.strip()) for item in max_steps_arg.split(",") if item.strip()]
+    if max_steps and len(max_steps) != len(sizes):
+        raise ValueError("--max-steps must be empty or have the same number of entries as --sizes")
+    scenarios: list[Scenario] = []
+    for index, size in enumerate(sizes):
+        budget = max_steps[index] if max_steps else int(round(size * size * step_area_scale))
+        scenarios.append(Scenario(size=size, max_steps=max(budget, 1)))
+    return tuple(scenarios)
+
+
+def scenario_config(base_config: ExperimentConfig, scenario: Scenario, obstacle_ratio: float, num_agents: int) -> ExperimentConfig:
     config = copy.deepcopy(base_config)
     config.env.width = scenario.size
     config.env.height = scenario.size
     config.env.max_steps = scenario.max_steps
-    config.env.num_agents = 4
+    config.env.num_agents = max(int(num_agents), 1)
     config.env.random_corner_start = True
     config.env.start_positions = []
     config.env.teammate_positions = []
@@ -434,10 +455,10 @@ def build_report(
         "# Large-map zero-shot transfer report",
         "",
         f"- Checkpoint: `{checkpoint}`",
-        "- Training reference: 20x20, 4 agents, max_steps=500.",
-        "- Evaluation maps: 30x30, 40x40, 50x50, 60x60.",
-        "- Step budgets scale with map area: 1125, 2000, 3125, 4500.",
-        f"- Episodes: {len(rows)} total, {len(rows) // max(len(summary_rows), 1)} seeds per size, 5% random obstacles.",
+        f"- Evaluation maps: {', '.join(str(row['scenario']) for row in summary_rows)}.",
+        f"- Step budgets: {', '.join(str(int(row['max_steps'])) for row in summary_rows)}.",
+        f"- Agent counts: {', '.join(str(int(row['num_agents'])) for row in summary_rows)}.",
+        f"- Episodes: {len(rows)} total, {len(rows) // max(len(summary_rows), 1)} seeds per size.",
         "",
         f"![summary]({summary_figure.relative_to(output_dir).as_posix()})",
         "",

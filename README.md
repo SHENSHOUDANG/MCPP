@@ -460,6 +460,12 @@ E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config co
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/ablation_centered_cnn_gat_off.toml --course tier-1-8x8-1agent
 ```
 
+After a centered-CNN course-4 checkpoint is trained, the large-map transfer script can evaluate arbitrary square map sizes without changing the actor input shape:
+
+```powershell
+E:\miniconda3\envs\two-stage-mcpp\python.exe tools\evaluate_large_map_transfer.py --checkpoint "E:\test plot\ablation_centered_cnn_gat_on\<run>\04-tier-4-20x20-4agents\best_policy.pt" --sizes 24,30,40,60 --step-area-scale 1.25 --num-agents 4 --obstacle-ratio 0.05 --output-dir reports\centered_cnn_large_map_transfer
+```
+
 Recommended map-size experiment stages:
 
 | Stage | Training maps | Test maps | Purpose |
