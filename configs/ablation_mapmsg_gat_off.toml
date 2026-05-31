@@ -19,19 +19,15 @@ share_map_memory = true
 intent_grid_size = 3
 
 [reward]
-distance_weight = 1.0
-straight_weight = 1.0
-coverage_weight = 1.0
-time_penalty_weight = 0.5
-repeat_penalty_weight = 0.1
-finish_reward = 120.0
-invalid_move_penalty = -1.0
+finish_reward = 10.0
+normalize_team_finish_reward = true
 team_new_cell_weight = 1.0
-team_frontier_weight = 0.0
+team_straight_weight = 0.01
 team_repeat_weight = 0.5
 team_invalid_weight = 0.8
-team_collision_weight = 1.2
-team_time_weight = 0.02
+team_time_weight = 0.05
+scale_time_cost_by_uncovered = false
+
 
 [ppo]
 total_timesteps = 500000
@@ -54,6 +50,7 @@ gat_use_edge_features = true
 gat_residual = true
 gat_attention_dropout = 0.0
 use_coverage_messages = true
+use_action_mask = true
 
 [train]
 run_root = "E:\\test plot\\ablation_mapmsg_gat_off"

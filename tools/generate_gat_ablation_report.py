@@ -1,3 +1,9 @@
+"""从既有 GAT 消融 CSV 与轨迹图片生成实验归档 Word 文档。
+
+这是离线报告工具，不参与训练。脚本直接写入 DOCX 所需的 XML/ZIP 结构，
+便于在没有重量级文档依赖时复现实验总结文件。
+"""
+
 from __future__ import annotations
 
 import csv
@@ -26,25 +32,35 @@ EMU_PER_INCH = 914400
 
 
 def load_rows(path: Path) -> dict[str, dict[str, str]]:
+    """按消融 arm 名称读取一张汇总 CSV。"""
+
     with path.open("r", newline="", encoding="utf-8") as handle:
         return {row["arm"]: row for row in csv.DictReader(handle)}
 
 
 def pct(value: str) -> str:
+    """将 0 到 1 的比例格式化为百分数文本。"""
+
     return f"{float(value) * 100:.2f}%"
 
 
 def num(value: str, digits: int = 2) -> str:
+    """以固定小数位格式化指标。"""
+
     return f"{float(value):.{digits}f}"
 
 
 def delta(value: str, percent: bool = False) -> str:
+    """格式化带正负号的 on-minus-off 差值。"""
+
     parsed = float(value) * (100 if percent else 1)
     suffix = " pp" if percent else ""
     return f"{parsed:+.{2}f}{suffix}"
 
 
 def run(text: str, bold: bool = False, size: int = 21) -> str:
+    """创建 WordprocessingML 文本 run 片段。"""
+
     weight = "<w:b/>" if bold else ""
     return (
         "<w:r><w:rPr>"
@@ -56,12 +72,16 @@ def run(text: str, bold: bool = False, size: int = 21) -> str:
 
 
 def paragraph(text: str = "", bold: bool = False, size: int = 21, align: str | None = None, spacing_after: int = 100) -> str:
+    """创建一个带基础样式的 Word 段落 XML 片段。"""
+
     alignment = f'<w:jc w:val="{align}"/>' if align else ""
     props = f"<w:pPr>{alignment}<w:spacing w:after=\"{spacing_after}\"/></w:pPr>"
     return f"<w:p>{props}{run(text, bold=bold, size=size) if text else ''}</w:p>"
 
 
 def heading(text: str, level: int = 1) -> str:
+    """创建报告标题段落。"""
+
     size = 30 if level == 1 else 25
     before = 260 if level == 1 else 180
     return (
@@ -73,6 +93,8 @@ def heading(text: str, level: int = 1) -> str:
 
 
 def cell(text: str, bold: bool = False, shaded: bool = False) -> str:
+    """创建表格单元格 XML。"""
+
     shade = '<w:shd w:fill="D9EAF7"/>' if shaded else ""
     return (
         "<w:tc><w:tcPr>"
@@ -83,6 +105,8 @@ def cell(text: str, bold: bool = False, shaded: bool = False) -> str:
 
 
 def table(rows: list[list[str]]) -> str:
+    """将二维文本行组装成 Word 表格 XML。"""
+
     table_rows = []
     for index, values in enumerate(rows):
         table_rows.append("<w:tr>" + "".join(cell(value, bold=index == 0, shaded=index == 0) for value in values) + "</w:tr>")
@@ -100,12 +124,16 @@ def table(rows: list[list[str]]) -> str:
 
 
 def png_dimensions(path: Path) -> tuple[int, int]:
+    """读取 PNG 文件头中的像素宽高。"""
+
     with path.open("rb") as handle:
         data = handle.read(24)
     return struct.unpack(">II", data[16:24])
 
 
 def image_paragraph(rel_id: str, image_id: int, path: Path, width_inches: float = 5.8) -> str:
+    """创建引用已嵌入 PNG 的 Word 图片段落。"""
+
     pixel_width, pixel_height = png_dimensions(path)
     cx = int(width_inches * EMU_PER_INCH)
     cy = int(cx * pixel_height / pixel_width)
@@ -124,6 +152,8 @@ def image_paragraph(rel_id: str, image_id: int, path: Path, width_inches: float 
 
 
 def heldout_table(rows: dict[str, dict[str, str]]) -> list[list[str]]:
+    """组织未见地图评估结果表。"""
+
     on, off, diff = rows["gat_on"], rows["gat_off"], rows["delta_on_minus_off"]
     fields = [
         ("Coverage@100", "coverage_at_100_mean", True),
@@ -148,6 +178,8 @@ def heldout_table(rows: dict[str, dict[str, str]]) -> list[list[str]]:
 
 
 def train_pool_table(rows: dict[str, dict[str, str]]) -> list[list[str]]:
+    """组织训练 seed 池回放结果表。"""
+
     on, off = rows["gat_on"], rows["gat_off"]
     return [
         ["指标", "GAT-on", "GAT-off"],
@@ -161,6 +193,8 @@ def train_pool_table(rows: dict[str, dict[str, str]]) -> list[list[str]]:
 
 
 def document_xml(train_rows: dict[str, dict[str, str]], heldout_rows: dict[str, dict[str, str]]) -> str:
+    """构造报告主体的完整 WordprocessingML 文本。"""
+
     body: list[str] = []
     body.append(paragraph("GAT 消融实验对比报告", bold=True, size=38, align="center", spacing_after=80))
     body.append(paragraph("课程四：20x20 未知障碍地图、4 智能体、5% 障碍率", size=24, align="center"))
@@ -239,6 +273,8 @@ def document_xml(train_rows: dict[str, dict[str, str]], heldout_rows: dict[str, 
 
 
 def build_report() -> Path:
+    """打包 XML 与图片资源，写出最终 DOCX 报告文件。"""
+
     train_rows = load_rows(TRAIN_CSV)
     heldout_rows = load_rows(HELDOUT_CSV)
     REPORT_DIR.mkdir(parents=True, exist_ok=True)

@@ -1,3 +1,5 @@
+"""训练和日志记录所需的小型通用工具。"""
+
 from __future__ import annotations
 
 import csv
@@ -19,12 +21,16 @@ import torch
 
 
 def set_seed(seed: int) -> None:
+    """同时固定 Python、NumPy 与 PyTorch 的伪随机序列。"""
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
 
 
 def make_run_dir(run_root: str | Path) -> Path:
+    """用时间戳创建不会覆盖既有结果的运行目录。"""
+
     root = Path(run_root)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = root / timestamp
@@ -37,6 +43,8 @@ def make_run_dir(run_root: str | Path) -> Path:
 
 
 def append_metrics(path: str | Path, rows: Iterable[dict[str, float | int]]) -> None:
+    """将若干指标行追加到 CSV，并在首次写入时补上表头。"""
+
     path = Path(path)
     rows = list(rows)
     if not rows:
@@ -50,6 +58,8 @@ def append_metrics(path: str | Path, rows: Iterable[dict[str, float | int]]) -> 
 
 
 def make_tensorboard_writer(run_path: str | Path, subdir: str = "tensorboard"):
+    """创建只记录标量的 TensorBoard writer。"""
+
     try:
         from tensorboard.compat.proto import event_pb2, summary_pb2
     except ImportError as exc:  # pragma: no cover - depends on optional runtime package
@@ -60,6 +70,8 @@ def make_tensorboard_writer(run_path: str | Path, subdir: str = "tensorboard"):
 
 
 def write_tensorboard_rows(writer: object, prefix: str, rows: Iterable[dict[str, float | int]]) -> None:
+    """将字典形式的一组指标写到 TensorBoard 的命名空间下。"""
+
     for row in rows:
         step = int(row.get("episode", row.get("steps", 0)))
         for key, value in row.items():
@@ -71,7 +83,11 @@ def write_tensorboard_rows(writer: object, prefix: str, rows: Iterable[dict[str,
 
 
 class _SimpleTensorBoardWriter:
-    """Small scalar-only TensorBoard event writer that uses Python file IO."""
+    """只依赖文件 IO 的轻量标量 TensorBoard event writer。
+
+    使用这个小实现可以避免引入额外训练框架，同时生成 TensorBoard 能读取
+    的标准 event 文件。
+    """
 
     def __init__(self, log_dir: Path, event_pb2: object, summary_pb2: object) -> None:
         self._event_pb2 = event_pb2
@@ -93,6 +109,8 @@ class _SimpleTensorBoardWriter:
         self._handle.close()
 
     def _write_event(self, event: object) -> None:
+        """按 TensorBoard TFRecord 格式写入长度、校验值和序列化内容。"""
+
         payload = event.SerializeToString()
         header = struct.pack("<Q", len(payload))
         self._handle.write(header)
@@ -105,11 +123,15 @@ _CRC32C_TABLE: list[int] | None = None
 
 
 def _masked_crc32c(data: bytes) -> int:
+    """生成 TFRecord 要求的 masked CRC32C 校验值。"""
+
     crc = _crc32c(data)
     return (((crc >> 15) | (crc << 17)) + 0xA282EAD8) & 0xFFFFFFFF
 
 
 def _crc32c(data: bytes) -> int:
+    """计算 CRC32C；查找表首次调用时才生成并缓存。"""
+
     global _CRC32C_TABLE
     if _CRC32C_TABLE is None:
         table = []
@@ -127,4 +149,3 @@ def _crc32c(data: bytes) -> int:
     for byte in data:
         crc = _CRC32C_TABLE[(crc ^ byte) & 0xFF] ^ (crc >> 8)
     return (~crc) & 0xFFFFFFFF
-
