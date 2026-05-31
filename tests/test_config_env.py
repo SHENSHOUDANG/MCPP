@@ -1,3 +1,9 @@
+"""配置、环境观测与通信信息边界的回归测试。
+
+阅读核心环境代码后，可以用本文件确认设计约束是否真的成立，尤其是
+“未通信时 actor 不能知道队友覆盖历史”这一去中心化要求。
+"""
+
 from pathlib import Path
 from collections import deque
 import sys
@@ -29,17 +35,22 @@ import torch
 
 
 class ConfigEnvTests(unittest.TestCase):
+    """验证配置解析、地图生成、观测隐私、GAT 输入与兼容加载路径。"""
+
     def test_load_smoke_config(self) -> None:
         config = load_config(ROOT / "configs" / "smoke.toml")
         self.assertEqual(config.env.width, 6)
         self.assertEqual(config.env.height, 6)
-        self.assertEqual(config.env.reward.finish_reward, 80.0)
-        self.assertEqual(config.env.reward.time_penalty_weight, 0.3)
-        self.assertEqual(config.env.reward.repeat_penalty_weight, 0.1)
+        self.assertEqual(config.env.reward.finish_reward, 10.0)
+        self.assertFalse(config.env.reward.scale_time_cost_by_uncovered)
+        self.assertEqual(config.env.reward.team_straight_weight, 0.01)
+        self.assertEqual(config.env.reward.team_repeat_weight, 0.3)
+        self.assertEqual(config.env.reward.team_invalid_weight, 1.0)
         self.assertEqual(config.ppo.rollout_steps, 64)
+        self.assertTrue(config.ppo.use_action_mask)
 
-    def test_load_curriculum_config(self) -> None:
-        config = load_config(ROOT / "configs" / "formal_v1.toml")
+    def test_load_current_curriculum_config(self) -> None:
+        config = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
         self.assertIsNotNone(config.curriculum)
         self.assertEqual(len(config.curriculum.courses), 4)
         self.assertEqual(config.curriculum.courses[0].name, "tier-1-8x8-1agent")
@@ -65,7 +76,11 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.curriculum.courses[3].env.recent_path_length, 8)
         self.assertEqual(config.curriculum.courses[3].env.communication_radius, 4)
         self.assertFalse(config.env.use_legacy_truth_coverage_observation)
+        self.assertTrue(config.env.use_explicit_map_memory)
+        self.assertTrue(config.env.share_map_memory)
         self.assertTrue(config.ppo.use_graph_attention)
+        self.assertTrue(config.ppo.use_coverage_messages)
+        self.assertTrue(config.ppo.use_action_mask)
         self.assertEqual(config.ppo.gat_num_heads, 4)
         self.assertTrue(config.ppo.gat_use_edge_features)
         self.assertTrue(config.ppo.gat_residual)
@@ -75,7 +90,7 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.curriculum.courses[2].rollout_steps, 1152)
         self.assertEqual(config.curriculum.courses[3].rollout_steps, 2048)
         self.assertEqual(config.curriculum.courses[2].total_timesteps, 1800000)
-        self.assertEqual(config.curriculum.courses[3].total_timesteps, 4400000)
+        self.assertEqual(config.curriculum.courses[3].total_timesteps, 3200000)
         self.assertEqual(config.ppo.mini_batch_size, 256)
         self.assertEqual(config.train.eval_interval, 10)
         self.assertEqual(config.train.checkpoint_interval, 10)
@@ -117,7 +132,7 @@ class ConfigEnvTests(unittest.TestCase):
         finally:
             shutil.rmtree(config_path.parent, ignore_errors=True)
 
-    def test_gat_ablation_configs_only_differ_by_attention_arm(self) -> None:
+    def test_archived_gat_configs_only_differ_by_attention_arm(self) -> None:
         gat_on = load_config(ROOT / "configs" / "ablation_gat_on.toml")
         gat_off = load_config(ROOT / "configs" / "ablation_gat_off.toml")
 
@@ -144,6 +159,20 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertTrue(gat_on.ppo.use_coverage_messages)
         self.assertTrue(gat_on.ppo.use_graph_attention)
         self.assertFalse(gat_off.ppo.use_graph_attention)
+        self.assertEqual(gat_on.env.reward.finish_reward, 10.0)
+        self.assertTrue(gat_on.env.reward.normalize_team_finish_reward)
+        self.assertFalse(gat_on.env.reward.scale_time_cost_by_uncovered)
+        self.assertTrue(gat_on.ppo.use_action_mask)
+        self.assertEqual(gat_on.env.reward.finish_reward, gat_off.env.reward.finish_reward)
+        self.assertEqual(
+            gat_on.env.reward.normalize_team_finish_reward,
+            gat_off.env.reward.normalize_team_finish_reward,
+        )
+        self.assertEqual(
+            gat_on.env.reward.scale_time_cost_by_uncovered,
+            gat_off.env.reward.scale_time_cost_by_uncovered,
+        )
+        self.assertEqual(gat_on.ppo.use_action_mask, gat_off.ppo.use_action_mask)
         self.assertEqual(gat_on.env.intent_grid_size, gat_off.env.intent_grid_size)
         self.assertEqual(gat_on.ppo.use_coverage_messages, gat_off.ppo.use_coverage_messages)
         self.assertEqual(
@@ -152,13 +181,13 @@ class ConfigEnvTests(unittest.TestCase):
         )
 
     def test_select_curriculum_course_by_name(self) -> None:
-        config = load_config(ROOT / "configs" / "formal_v1.toml")
+        config = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
         index, course = select_curriculum_course(config, course_name="tier-2-13x13-2agents")
         self.assertEqual(index, 1)
         self.assertEqual(course.name, "tier-2-13x13-2agents")
 
     def test_course_config_snapshot_roundtrip(self) -> None:
-        config = load_config(ROOT / "configs" / "formal_v1.toml")
+        config = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
         _, course = select_curriculum_course(config, course_name="tier-1-8x8-1agent")
         course_config = build_course_config(config, course)
         run_dir = ROOT / ".tmp_tests" / "course-config-roundtrip"
@@ -169,7 +198,7 @@ class ConfigEnvTests(unittest.TestCase):
             snapshot.write_text(json.dumps(asdict(course_config)), encoding="utf-8")
             loaded = load_config(snapshot)
             self.assertEqual(loaded.env.width, course_config.env.width)
-            self.assertEqual(loaded.env.reward.time_penalty_weight, course_config.env.reward.time_penalty_weight)
+            self.assertEqual(loaded.env.reward.team_straight_weight, course_config.env.reward.team_straight_weight)
             self.assertEqual(loaded.ppo.total_timesteps, course_config.ppo.total_timesteps)
             self.assertEqual(loaded.ppo.rollout_steps, course_config.ppo.rollout_steps)
         finally:
@@ -180,6 +209,18 @@ class ConfigEnvTests(unittest.TestCase):
         observation = env.reset()
         self.assertEqual(observation.shape[0], env.observation_dim)
         self.assertEqual(env.observation_dim, 66)
+
+    def test_local_window_matches_zero_padded_slice(self) -> None:
+        env = GridCoverageEnv(GridCoverageConfig(width=4, height=3, start=(0, 0)))
+        grid = np.arange(12, dtype=np.float32).reshape(3, 4)
+        for radius in (0, 1, 2, 4):
+            for center in ((0, 0), (1, 2), (2, 3)):
+                with self.subTest(radius=radius, center=center):
+                    expected = np.pad(grid, radius, mode="constant")[
+                        center[0] : center[0] + radius * 2 + 1,
+                        center[1] : center[1] + radius * 2 + 1,
+                    ]
+                    self.assertTrue(np.array_equal(env._local_window(grid, radius, center), expected))
 
     def test_global_state_shape_and_map_layers(self) -> None:
         env = GridCoverageEnv(
@@ -361,6 +402,28 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(recent_path[1, 1], 1.0)
         self.assertGreater(recent_path[1, 1], recent_path[1, 0])
 
+    def test_new_actor_observations_expose_last_effective_move_direction(self) -> None:
+        for use_explicit_map_memory in (False, True):
+            with self.subTest(use_explicit_map_memory=use_explicit_map_memory):
+                env = GridCoverageEnv(
+                    GridCoverageConfig(
+                        width=3,
+                        height=2,
+                        start=(0, 0),
+                        observation_radius=1,
+                        use_explicit_map_memory=use_explicit_map_memory,
+                    )
+                )
+                env.reset()
+                env.step(3)
+                moved = env.step(3)
+                blocked = env.step(3)
+                moved_metadata = moved.observation[-env.observation_metadata_dim :]
+                blocked_metadata = blocked.observation[-env.observation_metadata_dim :]
+
+                self.assertTrue(np.array_equal(moved_metadata[4:6], np.array([0.0, 1.0], dtype=np.float32)))
+                self.assertTrue(np.array_equal(blocked_metadata[4:6], np.array([0.0, 1.0], dtype=np.float32)))
+
     def test_private_observation_does_not_reveal_teammate_coverage(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(
@@ -430,6 +493,69 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(env.known_team_covered_by_agent[0], expected_covered)
         self.assertEqual(env.known_team_covered_by_agent[1], expected_covered)
 
+    def test_centered_memory_observation_shape_is_map_size_invariant(self) -> None:
+        base_kwargs = dict(
+            start=(3, 3),
+            observation_radius=1,
+            use_explicit_map_memory=True,
+            observation_mode="centered_compressed_memory",
+            centered_map_size=7,
+        )
+        small_env = GridCoverageEnv(GridCoverageConfig(width=8, height=8, **base_kwargs))
+        large_env = GridCoverageEnv(GridCoverageConfig(width=30, height=30, **base_kwargs))
+
+        self.assertEqual(small_env.observation_dim, large_env.observation_dim)
+        self.assertEqual(small_env.observation_dim, 7 * 7 * small_env.explicit_observation_channels + 12)
+        self.assertEqual(small_env.reset().shape[0], small_env.observation_dim)
+        self.assertEqual(large_env.reset().shape[0], large_env.observation_dim)
+
+    def test_centered_memory_compresses_known_remote_cells_into_border(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=5,
+                height=5,
+                start=(2, 2),
+                observation_radius=0,
+                use_explicit_map_memory=True,
+                observation_mode="centered_compressed_memory",
+                centered_map_size=5,
+            )
+        )
+        env.reset()
+        env.known_obstacles_by_agent[0].add((0, 2))
+        observation = env._observations()[0]
+        area = env.config.centered_map_size**2
+        obstacle_channel = observation[4 * area : 5 * area].reshape(5, 5)
+
+        self.assertGreater(obstacle_channel[0, 2], 0.0)
+        self.assertEqual(obstacle_channel[2, 2], 0.0)
+
+    def test_centered_memory_observation_ignores_uncommunicated_team_coverage(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=7,
+                height=1,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 6)],
+                observation_radius=0,
+                communication_radius=0,
+                use_explicit_map_memory=True,
+                share_map_memory=True,
+                observation_mode="centered_compressed_memory",
+                centered_map_size=5,
+            )
+        )
+        env.reset()
+        before = env._observations()[0].copy()
+        hidden_teammate_history = {(0, 4), (0, 5)}
+        env.covered.update(hidden_teammate_history)
+        env.covered_by_agent[1].update(hidden_teammate_history)
+        env._refresh_explicit_map_memory()
+        after = env._observations()[0]
+
+        self.assertTrue(np.array_equal(before, after))
+        self.assertEqual(env.known_team_covered_by_agent[0], {(0, 0)})
+
     def test_explicit_memory_does_not_read_visible_teammate_coverage_without_communication(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(
@@ -497,6 +623,40 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertTrue(np.array_equal(messages[0, 7:11], np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)))
         self.assertEqual(messages[0, 15], 1.0)
 
+    def test_explicit_observation_caches_same_step_coverage_messages(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=4,
+                height=2,
+                num_agents=2,
+                start_positions=[(0, 0), (1, 3)],
+                observation_radius=1,
+                communication_radius=4,
+                use_explicit_map_memory=True,
+                share_map_memory=True,
+            )
+        )
+        env.reset()
+        original = env._coverage_message
+        message_calls = 0
+
+        def tracked_message(*args: object, **kwargs: object) -> np.ndarray:
+            nonlocal message_calls
+            message_calls += 1
+            return original(*args, **kwargs)
+
+        env._coverage_message = tracked_message  # type: ignore[method-assign]
+        env.step([3, 2])
+        first = env.node_messages()
+        second = env.node_messages()
+
+        self.assertEqual(message_calls, env.num_agents)
+        self.assertTrue(np.array_equal(first, second))
+
+        before_preview = first.copy()
+        env.reset_preview()
+        self.assertTrue(np.array_equal(env.node_messages(), before_preview))
+
     def test_neighbor_mask_uses_communication_radius(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(
@@ -537,6 +697,44 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(features[0, 1, 3], 1.0)
         self.assertEqual(features[0, 2, 3], 0.0)
 
+    def test_action_mask_uses_known_obstacles_without_oracle_lookahead(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=3,
+                height=3,
+                start=(1, 1),
+                observation_radius=0,
+                obstacles=[(1, 2)],
+                use_explicit_map_memory=True,
+            )
+        )
+        env.reset()
+        self.assertTrue(env.action_mask()[0, 3])
+
+        env.known_obstacles_by_agent[0].add((1, 2))
+        self.assertFalse(env.action_mask()[0, 3])
+
+    def test_policy_action_mask_removes_infeasible_argmax_action(self) -> None:
+        env = GridCoverageEnv(GridCoverageConfig(width=3, height=3, start=(1, 1)))
+        observation = torch.as_tensor(env.reset(), dtype=torch.float32)
+        state = torch.as_tensor(env.global_state(), dtype=torch.float32)
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+        )
+        with torch.no_grad():
+            model.actor.weight.zero_()
+            model.actor.bias[:] = torch.tensor([100.0, 0.0, 0.0, 0.0])
+        action, _, _ = model.act(
+            observation,
+            state,
+            action_mask=torch.tensor([False, True, False, False]),
+            deterministic=True,
+        )
+        self.assertEqual(action, 1)
+
     def test_graph_attention_policy_preserves_agent_batch_shape(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(
@@ -575,6 +773,43 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(attention.shape, (1, 4, 3, 3))
         mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool)
         self.assertTrue(torch.all(attention[:, :, ~mask] == 0.0).item())
+
+    def test_policy_broadcasts_one_central_state_per_environment_step(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=5,
+                height=5,
+                num_agents=3,
+                start_positions=[(0, 0), (0, 2), (4, 4)],
+                communication_radius=3,
+            )
+        )
+        observation = torch.as_tensor(env.reset(), dtype=torch.float32)
+        state = torch.as_tensor(env.global_state(), dtype=torch.float32)
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+            use_graph_attention=True,
+            gat_num_heads=4,
+        )
+        mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool)
+        repeated_state = state.unsqueeze(0).expand(env.num_agents, -1)
+        batch_observation = observation.unsqueeze(0).expand(2, -1, -1)
+        batch_state = state.unsqueeze(0).expand(2, -1)
+        repeated_batch_state = batch_state.unsqueeze(1).expand(-1, env.num_agents, -1)
+
+        with torch.no_grad():
+            shared_logits, shared_values = model(observation, state, neighbor_mask=mask)
+            repeated_logits, repeated_values = model(observation, repeated_state, neighbor_mask=mask)
+            batch_logits, batch_values = model(batch_observation, batch_state, neighbor_mask=mask)
+            repeated_batch_logits, repeated_batch_values = model(batch_observation, repeated_batch_state, neighbor_mask=mask)
+
+        self.assertTrue(torch.allclose(shared_logits, repeated_logits))
+        self.assertTrue(torch.allclose(shared_values, repeated_values))
+        self.assertTrue(torch.allclose(batch_logits, repeated_batch_logits))
+        self.assertTrue(torch.allclose(batch_values, repeated_batch_values))
 
     def test_graph_attention_policy_consumes_coverage_messages(self) -> None:
         env = GridCoverageEnv(
@@ -634,6 +869,8 @@ class ConfigEnvTests(unittest.TestCase):
         result = env.step([3, 2])
         self.assertEqual(env.positions, [(0, 0), (0, 2)])
         self.assertEqual(result.info["reward_terms"]["collision_agents"], 2.0)
+        self.assertEqual(result.info["reward_terms"]["invalid_moves"], 2.0)
+        self.assertEqual(result.info["reward_terms"]["agent_collision_invalid_moves"], 2.0)
 
     def test_multi_agent_swap_collision_blocks_both(self) -> None:
         env = GridCoverageEnv(
@@ -643,6 +880,7 @@ class ConfigEnvTests(unittest.TestCase):
         result = env.step([3, 2])
         self.assertEqual(env.positions, [(0, 0), (0, 1)])
         self.assertEqual(result.info["reward_terms"]["collision_agents"], 2.0)
+        self.assertEqual(result.info["reward_terms"]["invalid_moves"], 2.0)
 
     def test_spatial_policy_can_load_on_larger_map(self) -> None:
         source_env = GridCoverageEnv(GridCoverageConfig(width=6, height=6, start=(0, 0)))
@@ -733,7 +971,14 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(result.info["path_length"], 0)
 
     def test_finish_reward_uses_terminal_value(self) -> None:
-        reward = RewardConfig(distance_weight=0.0, straight_weight=0.0, coverage_weight=0.0, finish_reward=10.0)
+        reward = RewardConfig(
+            finish_reward=10.0,
+            team_straight_weight=0.0,
+            team_frontier_weight=0.0,
+            team_repeat_weight=0.0,
+            team_invalid_weight=0.0,
+            team_time_weight=0.0,
+        )
         env = GridCoverageEnv(GridCoverageConfig(width=2, height=1, start=(0, 0), reward=reward))
         env.reset()
         result = env.step(3)

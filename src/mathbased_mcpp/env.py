@@ -1,3 +1,15 @@
+"""网格覆盖任务环境。
+
+本模块同时服务单智能体 smoke 测试和多智能体 MAPPO 训练。理解代码时要
+区分两种状态：
+
+* ``covered``、``free_cells`` 等是环境真值，可供奖励、评价和集中式 critic 使用；
+* ``known_*_by_agent`` 是每个 agent 通过局部感知或通信得到的知识，只有
+  这些内容才能构成新的去中心化 actor 观测。
+
+动作编号对应上下左右移动，坐标统一使用 ``(row, column)``。
+"""
+
 from __future__ import annotations
 
 from collections import deque
@@ -22,6 +34,8 @@ ACTION_BY_DELTA: dict[GridPosition, int] = {delta: action for action, delta in A
 
 @dataclass(slots=True)
 class StepResult:
+    """环境执行一步后交给训练/评估代码的完整结果。"""
+
     observation: np.ndarray
     state: np.ndarray
     reward: float | np.ndarray
@@ -30,8 +44,13 @@ class StepResult:
 
 
 class GridCoverageEnv:
-    """Grid coverage environment with single-agent compatibility and MAPPO multi-agent mode."""
+    """支持单 agent 兼容模式与 MAPPO 多 agent 模式的覆盖环境。
 
+    环境内部仍保存全局地图以判断奖励和完成状态，但 actor 的新观测路径
+    通过私有/融合记忆构造，避免直接泄漏团队真实覆盖情况。
+    """
+
+    # 观测由若干局部地图通道展平后再拼接固定长度的标量元数据。
     observation_channels = 6
     legacy_observation_channels = 7
     explicit_observation_channels = 9
@@ -42,6 +61,8 @@ class GridCoverageEnv:
     coverage_message_base_dim = 15
 
     def __init__(self, config: GridCoverageConfig) -> None:
+        """创建环境容器；真正的回合初值在 ``reset`` 中重新建立。"""
+
         self.config = config
         self.random = random.Random(config.seed)
         self.start_position: GridPosition = config.start
@@ -50,16 +71,18 @@ class GridCoverageEnv:
         self._col_flip = 1
         self.obstacles: set[GridPosition] = set()
         self.free_cells: set[GridPosition] = set()
-        self.covered: set[GridPosition] = set()
+        self.covered: set[GridPosition] = set()  # 全团队真实已覆盖格，仅供环境侧使用。
         self.positions: list[GridPosition] = [config.start]
         self.position: GridPosition = config.start
         self.teammate_positions: list[GridPosition] = list(config.teammate_positions)
         self.paths: list[list[GridPosition]] = [[config.start]]
         self.path: list[GridPosition] = []
         self.covered_by_agent: list[set[GridPosition]] = [{config.start}]
+        # 下列三组 known 集合是 actor 允许看到的知识边界。
         self.known_free_by_agent: list[set[GridPosition]] = [set()]
         self.known_obstacles_by_agent: list[set[GridPosition]] = [set()]
         self.known_team_covered_by_agent: list[set[GridPosition]] = [{config.start}]
+        self._node_message_cache: list[np.ndarray | None] = [None]
         self.last_novel_step_by_agent: list[int] = [0]
         self.path_lengths: list[int] = [0]
         self.path_length = 0
@@ -74,21 +97,32 @@ class GridCoverageEnv:
 
     @property
     def num_agents(self) -> int:
+        """返回有效 agent 数量，并保证至少有一个 agent。"""
+
         return max(int(self.config.num_agents), 1)
 
     @property
     def action_dim(self) -> int:
+        """动作空间大小：上下左右四个离散方向。"""
+
         return len(ACTIONS)
 
     @property
     def observation_dim(self) -> int:
-        radius = max(self.config.observation_radius, 0)
-        window_size = radius * 2 + 1
+        """一个 actor 的扁平观测向量长度。"""
+
+        if self._uses_centered_memory_observation():
+            window_size = self._centered_map_size()
+        else:
+            radius = max(self.config.observation_radius, 0)
+            window_size = radius * 2 + 1
         channel_dim = window_size * window_size * self.active_observation_channels
         return channel_dim + self.observation_metadata_dim
 
     @property
     def active_observation_channels(self) -> int:
+        """根据兼容/记忆开关选择 actor 观测的地图通道数量。"""
+
         if self.config.use_explicit_map_memory:
             return self.explicit_observation_channels
         if self.config.use_legacy_truth_coverage_observation:
@@ -97,13 +131,23 @@ class GridCoverageEnv:
 
     @property
     def node_message_dim(self) -> int:
+        """每个 agent 发给 GAT 的覆盖意图消息长度。"""
+
         return self.coverage_message_base_dim + max(self.config.intent_grid_size, 1) ** 2
 
     @property
     def state_dim(self) -> int:
+        """集中式 critic 输入的扁平全局状态长度。"""
+
         return self.config.height * self.config.width * self.state_channels + self.state_metadata_dim
 
     def reset(self, seed: int | None = None) -> np.ndarray:
+        """开始一个新回合，并返回每个 agent 的初始观测。
+
+        提供 ``seed`` 时会从头复现实验地图序列；无 seed 的多次 reset 可按
+        配置的 seed 池轮换地图，以便课程训练接触多种布局。
+        """
+
         if seed is not None:
             self.random.seed(seed)
             self.reset_count = 0
@@ -112,6 +156,7 @@ class GridCoverageEnv:
         self.positions = self._select_start_positions()
         self._configure_orientation(self.positions[0])
         self.teammate_positions = self._valid_teammate_positions(self.config.teammate_positions)
+        # 起始所在格在回合开始时就算已覆盖。
         self.covered = set(self.positions)
         self.covered_by_agent = [{position} for position in self.positions]
         self.known_free_by_agent = [set() for _ in self.positions]
@@ -126,11 +171,14 @@ class GridCoverageEnv:
         self.last_new_cells = 0
         self.last_collision_agents = 0
         self._sync_legacy_aliases()
+        # 首次局部感知发生在返回 actor 观测之前。
         self._refresh_explicit_map_memory()
         observations = self._observations()
         return observations[0] if self.num_agents == 1 else observations
 
     def reset_preview(self) -> np.ndarray:
+        """预览下一次 reset 观测，但在结束后恢复当前回合的全部状态。"""
+
         positions = list(self.positions)
         start_position = self.start_position
         start_positions = list(self.start_positions)
@@ -150,6 +198,7 @@ class GridCoverageEnv:
         known_free_by_agent = [set(cells) for cells in self.known_free_by_agent]
         known_obstacles_by_agent = [set(cells) for cells in self.known_obstacles_by_agent]
         known_team_covered_by_agent = [set(cells) for cells in self.known_team_covered_by_agent]
+        node_message_cache = [None if message is None else message.copy() for message in self._node_message_cache]
         last_novel_step_by_agent = list(self.last_novel_step_by_agent)
         obstacles = set(self.obstacles)
         free_cells = set(self.free_cells)
@@ -164,6 +213,7 @@ class GridCoverageEnv:
         self.known_free_by_agent = known_free_by_agent
         self.known_obstacles_by_agent = known_obstacles_by_agent
         self.known_team_covered_by_agent = known_team_covered_by_agent
+        self._node_message_cache = node_message_cache
         self.last_novel_step_by_agent = last_novel_step_by_agent
         self.paths = paths
         self.teammate_positions = teammate_positions
@@ -180,6 +230,8 @@ class GridCoverageEnv:
         return obs
 
     def step(self, action: int | Sequence[int]) -> StepResult:
+        """执行一个时间步，并在单/多智能体逻辑之间分发。"""
+
         scalar_action = isinstance(action, (int, np.integer))
         actions = [int(action)] if scalar_action else [int(item) for item in action]
         if len(actions) != self.num_agents:
@@ -194,9 +246,13 @@ class GridCoverageEnv:
         return self._step_multi(actions)
 
     def global_state(self) -> np.ndarray:
+        """返回集中式 critic 使用的全局真值状态。"""
+
         return self._global_state_from_layers(self._canonical_layers())
 
     def _global_state_from_layers(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]) -> np.ndarray:
+        """将全局地图层和团队统计量拼接成 critic 输入向量。"""
+
         all_agents, uncovered, team_covered, obstacles, blocked = layers
         metadata = np.array(
             [
@@ -222,9 +278,13 @@ class GridCoverageEnv:
         )
 
     def set_teammate_positions(self, positions: list[GridPosition]) -> None:
+        """设置额外静态队友位置，供兼容旧单 agent 行为使用。"""
+
         self.teammate_positions = self._valid_teammate_positions(positions)
 
     def peek(self, action: int, agent_index: int = 0) -> tuple[GridPosition, bool]:
+        """只检查一个动作的目标与合法性，不真正修改环境。"""
+
         actual_action = self._actual_action(action)
         position = self.positions[agent_index]
         if actual_action is None:
@@ -234,10 +294,14 @@ class GridCoverageEnv:
         return target, self.is_free(target)
 
     def is_free(self, position: GridPosition) -> bool:
+        """判断格子是否在边界内且不是障碍。"""
+
         row, col = position
         return 0 <= row < self.config.height and 0 <= col < self.config.width and position not in self.obstacles
 
     def is_row_complete(self, row: int, extra_cell: GridPosition | None = None) -> bool:
+        """判断规范坐标下的一整行可通行格是否已经覆盖。"""
+
         canonical_row = self._canonical_row(row)
         covered = self._canonical_covered_cells()
         if extra_cell is not None:
@@ -250,12 +314,18 @@ class GridCoverageEnv:
         return bool(row_cells) and row_cells <= covered
 
     def row_direction(self, row: int) -> int:
+        """返回犁式（boustrophedon）扫掠在该行的推荐横向方向。"""
+
         return 1 if self._canonical_row(row) % 2 == 0 else -1
 
     def legal_actions(self, agent_index: int = 0) -> list[int]:
+        """列出不会越界或撞障碍的动作。"""
+
         return [action for action in ACTIONS if self.peek(action, agent_index=agent_index)[1]]
 
     def safe_actions(self, agent_index: int = 0) -> list[int]:
+        """在合法动作中进一步排除过于靠近障碍的动作。"""
+
         actions = []
         for action in self.legal_actions(agent_index=agent_index):
             target, _ = self.peek(action, agent_index=agent_index)
@@ -263,7 +333,39 @@ class GridCoverageEnv:
                 actions.append(action)
         return actions
 
+    def action_mask(self) -> np.ndarray:
+        """Return decentralized feasibility masks for policy action sampling.
+
+        Bounds are always known. Obstacle cells are masked only after an agent
+        has observed them locally or received them through explicit map fusion.
+        The mask deliberately does not predict simultaneous agent collisions.
+        """
+
+        masks = np.ones((self.num_agents, self.action_dim), dtype=bool)
+        radius = max(self.config.observation_radius, 0)
+        for agent_index, position in enumerate(self.positions):
+            if self.config.use_explicit_map_memory:
+                known_obstacles = self.known_obstacles_by_agent[agent_index]
+            else:
+                known_obstacles = {
+                    obstacle
+                    for obstacle in self.obstacles
+                    if abs(obstacle[0] - position[0]) <= radius and abs(obstacle[1] - position[1]) <= radius
+                }
+            for action in ACTIONS:
+                actual_action = self._actual_action(action)
+                if actual_action is None:
+                    masks[agent_index, action] = False
+                    continue
+                delta = ACTIONS[actual_action]
+                target = (position[0] + delta[0], position[1] + delta[1])
+                inside_bounds = 0 <= target[0] < self.config.height and 0 <= target[1] < self.config.width
+                masks[agent_index, action] = inside_bounds and target not in known_obstacles
+        return masks
+
     def is_dangerous(self, position: GridPosition) -> bool:
+        """按曼哈顿距离判断位置是否落在障碍危险半径内。"""
+
         if self.config.danger_radius <= 0:
             return False
         for obstacle in self.obstacles:
@@ -272,9 +374,13 @@ class GridCoverageEnv:
         return False
 
     def coverage_ratio(self) -> float:
+        """团队真实覆盖格数占全部可通行格数的比例。"""
+
         return len(self.covered) / max(len(self.free_cells), 1)
 
     def neighbor_mask(self) -> np.ndarray:
+        """为通信/GAT 生成邻接矩阵；自身节点始终可见。"""
+
         mask = np.eye(self.num_agents, dtype=bool)
         radius = max(self.config.communication_radius, 0)
         if radius <= 0:
@@ -287,6 +393,8 @@ class GridCoverageEnv:
         return mask
 
     def neighbor_features(self) -> np.ndarray:
+        """生成 agent 对之间的归一化距离、相对位移与连通标志。"""
+
         features = np.zeros((self.num_agents, self.num_agents, self.neighbor_feature_dim), dtype=np.float32)
         radius = max(self.config.communication_radius, 0)
         distance_scale = max(radius, 1)
@@ -303,16 +411,20 @@ class GridCoverageEnv:
         return features
 
     def _step_single(self, action: int, scalar_action: bool) -> StepResult:
+        """执行单 agent 动作；奖励是统一团队公式在 ``J = 1`` 时的特例。"""
+
         previous_position = self.position
         previous_covered = set(self.covered)
+        # frontier 权重为零时跳过 BFS 距离搜索，节省训练时的环境开销。
         use_frontier_progress = self.config.reward.team_frontier_weight != 0.0
         before_distance = self._distance_to_nearest_uncovered(previous_position, previous_covered) if use_frontier_progress else None
         target, valid = self.peek(action)
-        reward_terms = self._single_reward_terms(previous_position=previous_position, target=target, valid=valid)
 
         self.step_count += 1
         repeated = False
+        straight_moves = 0
         if valid:
+            straight_moves = int(self._continues_previous_direction(0, previous_position, target))
             self_novel = target not in self.covered_by_agent[0]
             self.positions[0] = target
             self.path_lengths[0] += abs(target[0] - previous_position[0]) + abs(target[1] - previous_position[1])
@@ -327,58 +439,31 @@ class GridCoverageEnv:
         else:
             self.last_new_cells = 0
             self.last_blocked_cells = {target}
+            self.paths[0].append(previous_position)
 
         completed = self.covered >= self.free_cells
-        if valid:
-            base_reward = (
-                self.config.reward.distance_weight * reward_terms["Rd"]
-                + self.config.reward.straight_weight * reward_terms["Rs"]
-                + self.config.reward.coverage_weight * reward_terms["Rb"]
-            )
-            reward_terms["time"] = -self.config.reward.time_penalty_weight * base_reward
-            if repeated:
-                reward_terms["repeat"] = -self.config.reward.repeat_penalty_weight * base_reward
-            if completed:
-                reward_terms["finish"] = self.config.reward.finish_reward
-        else:
-            reward_terms["invalid"] = self.config.reward.invalid_move_penalty
-
         self.done = completed or self.step_count >= self.config.max_steps
-        if not valid:
-            reward = float(self.config.reward.invalid_move_penalty)
+        frontier_progress = 0.0
+        if use_frontier_progress and valid:
+            after_distance = self._distance_to_nearest_uncovered(self.positions[0], self.covered)
         else:
-            frontier_progress = 0.0
-            if use_frontier_progress:
-                after_distance = self._distance_to_nearest_uncovered(self.positions[0], self.covered)
-            else:
-                after_distance = None
-            if before_distance is not None and after_distance is not None:
-                frontier_progress = float(
-                    np.clip((before_distance - after_distance) / max(self.config.height + self.config.width, 1), -1.0, 1.0)
-                )
-            new_cell = 0.0 if repeated else 1.0
-            avoidable_repeat = float(repeated and self._has_uncovered_neighbor(previous_position, previous_covered))
-            uncovered_ratio = 1.0 - self.coverage_ratio()
-            straight_bonus = 0.05 * self.config.reward.straight_weight * reward_terms["Rs"]
-            reward_terms.update(
-                {
-                    "new_cells": new_cell,
-                    "frontier_progress": frontier_progress,
-                    "avoidable_repeats": avoidable_repeat,
-                    "uncovered_ratio": uncovered_ratio,
-                    "straight_bonus": straight_bonus,
-                    "time": -self.config.reward.team_time_weight * uncovered_ratio,
-                    "repeat": -self.config.reward.team_repeat_weight * avoidable_repeat,
-                }
+            after_distance = None
+        if before_distance is not None and after_distance is not None:
+            frontier_progress = float(
+                np.clip((before_distance - after_distance) / max(self.config.height + self.config.width, 1), -1.0, 1.0)
             )
-            reward = float(
-                self.config.reward.team_new_cell_weight * new_cell
-                + self.config.reward.team_frontier_weight * frontier_progress
-                + straight_bonus
-                + reward_terms["time"]
-                + reward_terms["repeat"]
-                + reward_terms["finish"]
-            )
+        new_cells = int(valid and not repeated)
+        avoidable_repeats = int(valid and repeated and self._has_uncovered_neighbor(previous_position, previous_covered))
+        reward, reward_terms = self._team_reward(
+            new_cells=new_cells,
+            straight_moves=straight_moves,
+            frontier_progress=frontier_progress,
+            avoidable_repeats=avoidable_repeats,
+            invalid_moves=int(not valid),
+            obstacle_or_boundary_invalid_moves=int(not valid),
+            agent_collision_invalid_moves=0,
+            completed=completed,
+        )
         self.last_collision_agents = 0
         self._sync_legacy_aliases()
         self._refresh_explicit_map_memory()
@@ -388,6 +473,8 @@ class GridCoverageEnv:
         return StepResult(observation[0] if scalar_action else observation, self._global_state_from_layers(layers), step_reward, self.done, self._info(reward_terms))
 
     def _step_multi(self, actions: list[int]) -> StepResult:
+        """同步执行团队动作，处理冲突后返回共享团队奖励。"""
+
         previous_positions = list(self.positions)
         previous_covered = set(self.covered)
         use_frontier_progress = self.config.reward.team_frontier_weight != 0.0
@@ -403,17 +490,18 @@ class GridCoverageEnv:
             targets.append(target)
             base_valid.append(valid)
 
-        invalid_agents = {index for index, valid in enumerate(base_valid) if not valid}
+        obstacle_or_boundary_invalid_agents = {index for index, valid in enumerate(base_valid) if not valid}
         collision_agents: set[int] = set()
         target_to_agents: dict[GridPosition, list[int]] = {}
         for index, target in enumerate(targets):
-            if index in invalid_agents:
+            if index in obstacle_or_boundary_invalid_agents:
                 continue
             target_to_agents.setdefault(target, []).append(index)
             for other_index, other_position in enumerate(previous_positions):
                 if other_index != index and target == other_position:
                     collision_agents.add(index)
                     collision_agents.add(other_index)
+        # 同一目标格、移入队友当前位置以及两两交换位置都视为碰撞。
         for agents in target_to_agents.values():
             if len(agents) > 1:
                 collision_agents.update(agents)
@@ -423,7 +511,9 @@ class GridCoverageEnv:
                     collision_agents.add(first)
                     collision_agents.add(second)
 
-        blocked_agents = invalid_agents | collision_agents
+        # 撞边界/障碍以及撞队友均为未执行成功的非法动作，使用同一处罚系数。
+        invalid_agents = obstacle_or_boundary_invalid_agents | collision_agents
+        blocked_agents = invalid_agents
         self.last_blocked_cells = {targets[index] for index in blocked_agents}
         final_positions = list(previous_positions)
         moved_agents: list[int] = []
@@ -433,12 +523,17 @@ class GridCoverageEnv:
             final_positions[index] = target
             moved_agents.append(index)
 
+        # 多个 agent 同步踏入同一新格会在前面的碰撞处理中被阻止，因此用集合计数。
         new_cells = {final_positions[index] for index in moved_agents if final_positions[index] not in previous_covered}
         repeated_cells = sum(1 for index in moved_agents if final_positions[index] in previous_covered)
         avoidable_repeats = sum(
             1
             for index in moved_agents
             if final_positions[index] in previous_covered and self._has_uncovered_neighbor(previous_positions[index], previous_covered)
+        )
+        straight_moves = sum(
+            int(self._continues_previous_direction(index, previous_positions[index], final_positions[index]))
+            for index in moved_agents
         )
 
         self.step_count += 1
@@ -465,28 +560,18 @@ class GridCoverageEnv:
                 if before is not None and after is not None
             ]
             frontier_progress = float(np.clip(np.mean(progress_values), -1.0, 1.0)) if progress_values else 0.0
-
         completed = self.covered >= self.free_cells
-        uncovered_ratio = 1.0 - self.coverage_ratio()
-        reward_terms = {
-            "new_cells": float(len(new_cells)),
-            "frontier_progress": frontier_progress,
-            "avoidable_repeats": float(avoidable_repeats),
-            "repeated_cells": float(repeated_cells),
-            "invalid_moves": float(len(invalid_agents)),
-            "collision_agents": float(len(collision_agents)),
-            "uncovered_ratio": uncovered_ratio,
-            "finish": self.config.reward.finish_reward if completed else 0.0,
-        }
-        reward = float(
-            self.config.reward.team_new_cell_weight * len(new_cells) / self.num_agents
-            + self.config.reward.team_frontier_weight * frontier_progress
-            - self.config.reward.team_repeat_weight * avoidable_repeats / self.num_agents
-            - self.config.reward.team_invalid_weight * len(invalid_agents) / self.num_agents
-            - self.config.reward.team_collision_weight * len(collision_agents) / self.num_agents
-            - self.config.reward.team_time_weight * uncovered_ratio
-            + reward_terms["finish"]
+        reward, reward_terms = self._team_reward(
+            new_cells=len(new_cells),
+            straight_moves=straight_moves,
+            frontier_progress=frontier_progress,
+            avoidable_repeats=avoidable_repeats,
+            invalid_moves=len(invalid_agents),
+            obstacle_or_boundary_invalid_moves=len(obstacle_or_boundary_invalid_agents),
+            agent_collision_invalid_moves=len(collision_agents),
+            completed=completed,
         )
+        reward_terms["repeated_cells"] = float(repeated_cells)
         self.done = completed or self.step_count >= self.config.max_steps
         self._sync_legacy_aliases()
         self._refresh_explicit_map_memory()
@@ -494,56 +579,85 @@ class GridCoverageEnv:
         rewards = np.full(self.num_agents, reward, dtype=np.float32)
         return StepResult(self._observations(layers), self._global_state_from_layers(layers), rewards, self.done, self._info(reward_terms))
 
-    def _single_reward_terms(self, previous_position: GridPosition, target: GridPosition, valid: bool) -> dict[str, float]:
-        terms = {
-            "Rd": 0.0,
-            "Rs": 0.0,
-            "Rb": 0.0,
-            "time": 0.0,
-            "repeat": 0.0,
-            "finish": 0.0,
-            "invalid": 0.0,
+    def _team_reward(
+        self,
+        *,
+        new_cells: int,
+        straight_moves: int,
+        frontier_progress: float,
+        avoidable_repeats: int,
+        invalid_moves: int,
+        obstacle_or_boundary_invalid_moves: int,
+        agent_collision_invalid_moves: int,
+        completed: bool,
+    ) -> tuple[float, dict[str, float]]:
+        """根据统一团队公式计算奖励，单 agent 自然对应 ``J = 1``。"""
+
+        uncovered_ratio = 1.0 - self.coverage_ratio()
+        time_cost_scale = uncovered_ratio if self.config.reward.scale_time_cost_by_uncovered else 1.0
+        finish_team_total = self.config.reward.finish_reward if completed else 0.0
+        finish_reward = finish_team_total
+        if completed and self.config.reward.normalize_team_finish_reward:
+            # 将完成看成一次团队事件，避免 agent 增多时同一终止奖金被重复放大。
+            finish_reward = finish_team_total / self.num_agents
+        straight_bonus = self.config.reward.team_straight_weight * straight_moves / self.num_agents
+        reward_terms = {
+            "new_cells": float(new_cells),
+            "straight_moves": float(straight_moves),
+            "straight_bonus": straight_bonus,
+            "frontier_progress": frontier_progress,
+            "avoidable_repeats": float(avoidable_repeats),
+            "invalid_moves": float(invalid_moves),
+            "obstacle_or_boundary_invalid_moves": float(obstacle_or_boundary_invalid_moves),
+            "agent_collision_invalid_moves": float(agent_collision_invalid_moves),
+            "collision_agents": float(agent_collision_invalid_moves),
+            "uncovered_ratio": uncovered_ratio,
+            "time_cost_scale": time_cost_scale,
+            "time": -self.config.reward.team_time_weight * time_cost_scale,
+            "repeat": -self.config.reward.team_repeat_weight * avoidable_repeats / self.num_agents,
+            "invalid": -self.config.reward.team_invalid_weight * invalid_moves / self.num_agents,
+            "finish": finish_reward,
+            "finish_team_total": finish_team_total,
         }
-        if not valid:
-            return terms
+        reward = float(
+            self.config.reward.team_new_cell_weight * new_cells / self.num_agents
+            + straight_bonus
+            + self.config.reward.team_frontier_weight * frontier_progress
+            + reward_terms["repeat"]
+            + reward_terms["invalid"]
+            + reward_terms["time"]
+            + finish_reward
+        )
+        return reward, reward_terms
 
-        legal_targets = [self.peek(action)[0] for action in self.legal_actions()]
-        terms["Rd"] = self._distance_reward(target, legal_targets)
-        terms["Rs"] = self._straight_reward(previous_position, target)
-        terms["Rb"] = self._coverage_reward(target, legal_targets)
-        return terms
+    def _continues_previous_direction(
+        self,
+        agent_index: int,
+        previous_position: GridPosition,
+        target: GridPosition,
+    ) -> bool:
+        """判断一次成功移动是否延续了该 agent 上一次真实位移方向。
 
-    def _distance_reward(self, target: GridPosition, candidate_targets: list[GridPosition]) -> float:
-        if not candidate_targets:
-            return 0.0
-        start = self.start_position
-        target_distance = self._manhattan(target, start)
-        distances = [self._manhattan(candidate, start) for candidate in candidate_targets]
-        d_min = min(distances)
-        d_max = max(distances)
-        if d_max == d_min:
-            return 1.0
-        return (target_distance - d_min) / (d_max - d_min)
+        第一段移动还没有可比较方向，因此不奖励。若之前出现被阻挡导致
+        的原地记录，则向前查找最近一次非零位移，以保持该偏好可学习。
+        """
 
-    def _straight_reward(self, previous_position: GridPosition, target: GridPosition) -> float:
-        if len(self.path) < 2:
-            return 1.0
-        prior_position = self.path[-2]
-        previous_vector = (previous_position[0] - prior_position[0], previous_position[1] - prior_position[1])
         current_vector = (target[0] - previous_position[0], target[1] - previous_position[1])
-        return 1.0 if current_vector == previous_vector else 0.5
-
-    def _coverage_reward(self, target: GridPosition, candidate_targets: list[GridPosition]) -> float:
-        if not candidate_targets:
-            return 0.0
-        counts = [self._uncovered_neighbor_count(candidate) for candidate in candidate_targets]
-        target_count = self._uncovered_neighbor_count(target)
-        n_max = max(counts)
-        if n_max <= 0:
-            return 0.0
-        return (n_max - target_count) / n_max
+        if current_vector == (0, 0):
+            return False
+        path = self.paths[agent_index]
+        for index in range(len(path) - 1, 0, -1):
+            prior_vector = (
+                path[index][0] - path[index - 1][0],
+                path[index][1] - path[index - 1][1],
+            )
+            if prior_vector != (0, 0):
+                return current_vector == prior_vector
+        return False
 
     def _uncovered_neighbor_count(self, position: GridPosition) -> int:
+        """统计指定位置四邻域中仍未被团队覆盖的自由格。"""
+
         count = 0
         for delta in ACTIONS.values():
             neighbor = (position[0] + delta[0], position[1] + delta[1])
@@ -552,6 +666,8 @@ class GridCoverageEnv:
         return count
 
     def _has_uncovered_neighbor(self, position: GridPosition, covered: set[GridPosition]) -> bool:
+        """检查从当前位置是否本可直接前往尚未覆盖的相邻格。"""
+
         for delta in ACTIONS.values():
             neighbor = (position[0] + delta[0], position[1] + delta[1])
             if self.is_free(neighbor) and neighbor not in covered:
@@ -559,9 +675,13 @@ class GridCoverageEnv:
         return False
 
     def _distance_to_nearest_uncovered(self, start: GridPosition, covered: set[GridPosition]) -> int | None:
+        """计算到最近未覆盖格的最短可通行步数。"""
+
         return self._distance_to_nearest_uncovered_from_set(start, self.free_cells - covered)
 
     def _distances_to_nearest_uncovered(self, starts: Sequence[GridPosition], covered: set[GridPosition]) -> list[int | None]:
+        """为多个 agent 计算最近未覆盖距离，必要时复用距离场。"""
+
         uncovered = self.free_cells - covered
         if not uncovered:
             return [0 for _ in starts]
@@ -571,6 +691,8 @@ class GridCoverageEnv:
         return [self._distance_to_nearest_uncovered_from_set(position, uncovered) for position in starts]
 
     def _distance_to_nearest_uncovered_from_set(self, start: GridPosition, uncovered: set[GridPosition]) -> int | None:
+        """从一个起点执行 BFS，首次遇到目标未覆盖格即返回距离。"""
+
         if not uncovered:
             return 0
         if start in uncovered:
@@ -590,6 +712,8 @@ class GridCoverageEnv:
         return None
 
     def _distance_field_to_uncovered(self, covered: set[GridPosition]) -> np.ndarray:
+        """从全部未覆盖格反向 BFS，一次生成整张最近距离场。"""
+
         uncovered = self.free_cells - covered
         if not uncovered:
             return np.zeros((self.config.height, self.config.width), dtype=np.int32)
@@ -610,23 +734,40 @@ class GridCoverageEnv:
         return distances
 
     def _distance_from_field(self, distance_field: np.ndarray, position: GridPosition) -> int | None:
+        """从距离场读取位置距离，负值代表不可达。"""
+
         distance = int(distance_field[position[0], position[1]])
         return None if distance < 0 else distance
 
     def _manhattan(self, first: GridPosition, second: GridPosition) -> int:
+        """网格四连通移动下的曼哈顿距离。"""
+
         return abs(first[0] - second[0]) + abs(first[1] - second[1])
 
     def node_messages(self) -> np.ndarray:
+        """返回 GAT 节点消息；仅显式记忆实验启用有效消息。"""
+
         if not self.config.use_explicit_map_memory:
             return np.zeros((self.num_agents, self.node_message_dim), dtype=np.float32)
-        return np.stack([self._coverage_message(index) for index in range(self.num_agents)]).astype(np.float32)
+        for index in range(self.num_agents):
+            if self._node_message_cache[index] is None:
+                self._node_message_cache[index] = self._coverage_message(index)
+        return np.stack(self._node_message_cache).astype(np.float32)
 
     def _observations(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
+        """批量构建所有 agent 的 actor 观测。"""
+
         if layers is None:
             layers = self._canonical_layers()
         return np.stack([self._observation(index, layers) for index in range(self.num_agents)]).astype(np.float32)
 
     def _observation(self, agent_index: int = 0, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
+        """按实验兼容开关选择一种 actor 观测构造路径。
+
+        legacy 分支显式保留给旧 checkpoint 重放，其中含全局团队覆盖信息；
+        新实验应使用 private 或 explicit-memory 分支。
+        """
+
         if layers is None:
             layers = self._canonical_layers()
         if self.config.use_explicit_map_memory:
@@ -672,6 +813,8 @@ class GridCoverageEnv:
         agent_index: int,
         layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> np.ndarray:
+        """生成无通信记忆时的私有局部观测，不暴露队友覆盖历史。"""
+
         all_agents, _, _, obstacles, _ = layers
         self_agent = np.zeros_like(all_agents)
         self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
@@ -695,7 +838,8 @@ class GridCoverageEnv:
                 self.step_count / max(self.config.max_steps, 1),
                 len(self.covered_by_agent[agent_index]) / max(self.config.width * self.config.height, 1),
                 self.num_agents / max(self.config.width * self.config.height, 1),
-                *([0.0] * 8),
+                *self._last_effective_move_vector(agent_index),
+                *([0.0] * 6),
             ],
             dtype=np.float32,
         )
@@ -706,6 +850,12 @@ class GridCoverageEnv:
         agent_index: int,
         layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> np.ndarray:
+        """从 agent 已知地图生成显式记忆观测。
+
+        ``known_team_covered`` 只包含自身轨迹或已经通信融合的队友信息；
+        这里不会从环境真实 ``covered`` 集合读取未知团队覆盖。
+        """
+
         all_agents, _, _, _, _ = layers
         self_agent = np.zeros_like(all_agents)
         self_agent[self._canonical_position(self.positions[agent_index])] = 1.0
@@ -715,36 +865,47 @@ class GridCoverageEnv:
         known_uncovered = known_free - known_team_covered
         known_obstacles = self.known_obstacles_by_agent[agent_index]
         unknown = self._memory_unknown(agent_index)
-        frontier = self._memory_frontiers(agent_index)
+        frontier = self._memory_frontiers(agent_index, unknown)
         self_covered = self.covered_by_agent[agent_index]
 
         radius = max(self.config.observation_radius, 0)
         center = self._canonical_position(self.positions[agent_index])
+        if self._uses_centered_memory_observation():
+            teammates = self._known_teammates_layer(agent_index)
+            window = self._centered_memory_window
+        else:
+            teammates = other_agents
+            window = lambda grid, current_center: self._local_window(grid, radius, current_center)
         channels = [
-            self._local_window(self_agent, radius, center),
-            self._local_window(other_agents, radius, center),
-            self._local_window(self._cells_layer(known_uncovered), radius, center),
-            self._local_window(self._cells_layer(known_team_covered), radius, center),
-            self._local_window(self._cells_layer(known_obstacles), radius, center),
-            self._local_window(self._cells_layer(self_covered), radius, center),
-            self._local_window(self._recent_path_layer(agent_index), radius, center),
-            self._local_window(self._cells_layer(unknown), radius, center),
-            self._local_window(self._cells_layer(frontier), radius, center),
+            window(self_agent, center),
+            window(teammates, center),
+            window(self._cells_layer(known_uncovered), center),
+            window(self._cells_layer(known_team_covered), center),
+            window(self._cells_layer(known_obstacles), center),
+            window(self._cells_layer(self_covered), center),
+            window(self._recent_path_layer(agent_index), center),
+            window(self._cells_layer(unknown), center),
+            window(self._cells_layer(frontier), center),
         ]
-        message = self._coverage_message(agent_index)
+        message = self._coverage_message(agent_index, unknown=unknown, frontier=frontier)
+        self._node_message_cache[agent_index] = message
         metadata = np.array(
             [
                 float(self.row_direction(center[0])),
                 self.step_count / max(self.config.max_steps, 1),
                 self._known_coverage_ratio(agent_index),
                 len(known_free) / max(self.config.height * self.config.width, 1),
-                *message[:8],
+                *self._last_effective_move_vector(agent_index),
+                *message[:6],
             ],
             dtype=np.float32,
         )
         return np.concatenate([channel.ravel() for channel in channels] + [metadata])
 
     def _refresh_explicit_map_memory(self) -> None:
+        """用局部传感更新各自记忆，并在通信可达时融合已知地图。"""
+
+        self._node_message_cache = [None for _ in self.positions]
         if not self.config.use_explicit_map_memory:
             return
         radius = max(self.config.observation_radius, 0)
@@ -754,7 +915,7 @@ class GridCoverageEnv:
                 for row in range(max(position[0] - radius, 0), min(position[0] + radius + 1, self.config.height))
                 for col in range(max(position[1] - radius, 0), min(position[1] + radius + 1, self.config.width))
             }
-            # Global sets are sampled only through this local sensor window.
+            # 全局真值只能通过这个局部传感窗口进入某个 agent 的私有记忆。
             self.known_obstacles_by_agent[agent_index].update(visible_cells & self.obstacles)
             self.known_free_by_agent[agent_index].update(visible_cells - self.obstacles)
             self.known_free_by_agent[agent_index].update(self.covered_by_agent[agent_index])
@@ -762,6 +923,7 @@ class GridCoverageEnv:
 
         if not self.config.share_map_memory:
             return
+        # 使用更新前的快照做成对融合，避免单个时间步内沿通信链无限传播知识。
         mask = self.neighbor_mask()
         source_free = [set(cells) for cells in self.known_free_by_agent]
         source_obstacles = [set(cells) for cells in self.known_obstacles_by_agent]
@@ -780,12 +942,20 @@ class GridCoverageEnv:
                 self.known_team_covered_by_agent[source].update(merged_covered)
                 self.known_team_covered_by_agent[target].update(merged_covered)
 
-    def _coverage_message(self, agent_index: int) -> np.ndarray:
+    def _coverage_message(
+        self,
+        agent_index: int,
+        *,
+        unknown: set[GridPosition] | None = None,
+        frontier: set[GridPosition] | None = None,
+    ) -> np.ndarray:
+        """将已知覆盖进度、近期行为与探索意图编码为固定长度消息。"""
+
         known_free = self.known_free_by_agent[agent_index]
         known_team_covered = self.known_team_covered_by_agent[agent_index] & known_free
         self_covered = self.covered_by_agent[agent_index] & known_free
-        unknown = self._memory_unknown(agent_index)
-        frontier = self._memory_frontiers(agent_index)
+        unknown = self._memory_unknown(agent_index) if unknown is None else unknown
+        frontier = self._memory_frontiers(agent_index, unknown) if frontier is None else frontier
         map_area = max(self.config.width * self.config.height, 1)
         known_free_count = max(len(known_free), 1)
         recent_new_ratio, recent_repeat_ratio = self._recent_self_coverage_rates(agent_index)
@@ -800,6 +970,7 @@ class GridCoverageEnv:
         regions = np.zeros(max(self.config.intent_grid_size, 1) ** 2, dtype=np.float32)
         intent_valid = 0.0
         if target is not None:
+            # 消息只发送目标方向/区域摘要，不直接把整张记忆地图交给邻居。
             source_position = self._canonical_position(self.positions[agent_index])
             target_position = self._canonical_position(target)
             delta_row = target_position[0] - source_position[0]
@@ -841,6 +1012,8 @@ class GridCoverageEnv:
         )
 
     def _recent_self_coverage_rates(self, agent_index: int) -> tuple[float, float]:
+        """统计最近路径中新格与重复格比例，作为是否停滞的提示。"""
+
         path = self.paths[agent_index]
         horizon = max(self.config.recent_path_length, 1)
         start = max(len(path) - horizon, 1)
@@ -857,6 +1030,8 @@ class GridCoverageEnv:
         return novel / len(recent_moves), repeat / len(recent_moves)
 
     def _intent_target(self, agent_index: int, frontier: set[GridPosition]) -> GridPosition | None:
+        """从已知未覆盖格或 frontier 中选择最近的消息目标。"""
+
         uncovered = self.known_free_by_agent[agent_index] - self.known_team_covered_by_agent[agent_index]
         candidates = uncovered if uncovered else frontier
         if not candidates:
@@ -868,18 +1043,24 @@ class GridCoverageEnv:
         )
 
     def _intent_region_index(self, canonical_position: GridPosition) -> int:
+        """将目标位置量化到粗网格区域，以固定维度发送意图。"""
+
         bins = max(self.config.intent_grid_size, 1)
         row = min(canonical_position[0] * bins // max(self.config.height, 1), bins - 1)
         col = min(canonical_position[1] * bins // max(self.config.width, 1), bins - 1)
         return row * bins + col
 
     def _known_coverage_ratio(self, agent_index: int) -> float:
+        """计算该 agent 已知自由空间中的已知团队覆盖比例。"""
+
         known_free = self.known_free_by_agent[agent_index]
         if not known_free:
             return 0.0
         return len(self.known_team_covered_by_agent[agent_index] & known_free) / len(known_free)
 
     def _memory_unknown(self, agent_index: int) -> set[GridPosition]:
+        """返回该 agent 尚未感知、也未通过通信获知的格子。"""
+
         known = self.known_free_by_agent[agent_index] | self.known_obstacles_by_agent[agent_index]
         return {
             (row, col)
@@ -888,8 +1069,14 @@ class GridCoverageEnv:
             if (row, col) not in known
         }
 
-    def _memory_frontiers(self, agent_index: int) -> set[GridPosition]:
-        unknown = self._memory_unknown(agent_index)
+    def _memory_frontiers(
+        self,
+        agent_index: int,
+        unknown: set[GridPosition] | None = None,
+    ) -> set[GridPosition]:
+        """返回已知自由区与未知区域交界处的探索 frontier。"""
+
+        unknown = self._memory_unknown(agent_index) if unknown is None else unknown
         return {
             cell
             for cell in self.known_free_by_agent[agent_index]
@@ -897,12 +1084,100 @@ class GridCoverageEnv:
         }
 
     def _cells_layer(self, cells: set[GridPosition]) -> np.ndarray:
+        """将格子集合转换为按规范坐标排列的二值图层。"""
+
         layer = np.zeros((self.config.height, self.config.width), dtype=np.float32)
         for cell in cells:
             layer[self._canonical_position(cell)] = 1.0
         return layer
 
+    def _known_teammates_layer(self, agent_index: int) -> np.ndarray:
+        """Encode only currently sensed or communication-reachable teammates."""
+
+        layer = np.zeros((self.config.height, self.config.width), dtype=np.float32)
+        position = self.positions[agent_index]
+        visibility_radius = max(self.config.observation_radius, self.config.communication_radius, 0)
+        if visibility_radius <= 0:
+            return layer
+        for other_index, other_position in enumerate(self.positions):
+            if other_index == agent_index:
+                continue
+            if self._manhattan(position, other_position) <= visibility_radius:
+                layer[self._canonical_position(other_position)] = 1.0
+        return layer
+
+    def _uses_centered_memory_observation(self) -> bool:
+        """Whether actor observations should use the map-size-invariant memory tensor."""
+
+        return self.config.use_explicit_map_memory and self.config.observation_mode in {
+            "centered_memory",
+            "centered_compressed_memory",
+        }
+
+    def _centered_map_size(self) -> int:
+        """Return a positive odd window size for centered memory observations."""
+
+        size = max(int(self.config.centered_map_size), 3)
+        if size % 2 == 0:
+            size += 1
+        return size
+
+    def _centered_memory_window(self, grid: np.ndarray, center: GridPosition) -> np.ndarray:
+        """Build a fixed-size agent-centered tensor with optional compressed borders.
+
+        The high-resolution interior is a local crop around the agent. Cells outside
+        that interior are summarized into the outer border, so larger remembered maps
+        keep a fixed actor input size without reading hidden environment truth.
+        """
+
+        size = self._centered_map_size()
+        if not self.config.compressed_border or size <= 3:
+            return self._local_window(grid, size // 2, center)
+
+        inner_size = size - 2
+        inner_radius = inner_size // 2
+        row, col = center
+        window = np.zeros((size, size), dtype=grid.dtype)
+        window[1:-1, 1:-1] = self._local_window(grid, inner_radius, center)
+
+        row_min = max(row - inner_radius, 0)
+        row_max = min(row + inner_radius + 1, grid.shape[0])
+        col_min = max(col - inner_radius, 0)
+        col_max = min(col + inner_radius + 1, grid.shape[1])
+
+        inner_row_origin = row - inner_radius
+        inner_col_origin = col - inner_radius
+        for actual_col in range(col_min, col_max):
+            target_col = 1 + actual_col - inner_col_origin
+            if 1 <= target_col < size - 1:
+                window[0, target_col] = self._region_mean(grid, 0, row_min, actual_col, actual_col + 1)
+                window[-1, target_col] = self._region_mean(grid, row_max, grid.shape[0], actual_col, actual_col + 1)
+        for actual_row in range(row_min, row_max):
+            target_row = 1 + actual_row - inner_row_origin
+            if 1 <= target_row < size - 1:
+                window[target_row, 0] = self._region_mean(grid, actual_row, actual_row + 1, 0, col_min)
+                window[target_row, -1] = self._region_mean(grid, actual_row, actual_row + 1, col_max, grid.shape[1])
+
+        window[0, 0] = self._region_mean(grid, 0, row_min, 0, col_min)
+        window[0, -1] = self._region_mean(grid, 0, row_min, col_max, grid.shape[1])
+        window[-1, 0] = self._region_mean(grid, row_max, grid.shape[0], 0, col_min)
+        window[-1, -1] = self._region_mean(grid, row_max, grid.shape[0], col_max, grid.shape[1])
+        return window
+
+    @staticmethod
+    def _region_mean(grid: np.ndarray, row_start: int, row_stop: int, col_start: int, col_stop: int) -> float:
+        """Return the density in a possibly empty rectangular region."""
+
+        if row_stop <= row_start or col_stop <= col_start:
+            return 0.0
+        region = grid[row_start:row_stop, col_start:col_stop]
+        if region.size == 0:
+            return 0.0
+        return float(region.mean())
+
     def _recent_path_layer(self, agent_index: int) -> np.ndarray:
+        """将近期轨迹编码为越新越亮的衰减图层。"""
+
         layer = np.zeros((self.config.height, self.config.width), dtype=np.float32)
         memory_length = max(self.config.recent_path_length, 1)
         recent = self.paths[agent_index][-memory_length:]
@@ -913,6 +1188,8 @@ class GridCoverageEnv:
         return layer
 
     def _communication_metadata(self, agent_index: int) -> list[float]:
+        """旧局部观测使用的邻居摘要统计量。"""
+
         radius = max(self.config.communication_radius, 0)
         if radius <= 0 or self.num_agents <= 1:
             return [0.0] * 8
@@ -950,6 +1227,8 @@ class GridCoverageEnv:
         ]
 
     def _last_move_vector(self, agent_index: int) -> tuple[float, float]:
+        """读取某 agent 最近一个时间步的二维位移，供旧邻居摘要使用。"""
+
         path = self.paths[agent_index]
         if len(path) < 2:
             return 0.0, 0.0
@@ -957,7 +1236,25 @@ class GridCoverageEnv:
         current = path[-1]
         return float(current[0] - previous[0]), float(current[1] - previous[1])
 
+    def _last_effective_move_vector(self, agent_index: int) -> tuple[float, float]:
+        """读取最近一次有效移动的规范方向，供 actor 判断是否继续直行。"""
+
+        path = self.paths[agent_index]
+        for index in range(len(path) - 1, 0, -1):
+            previous = self._canonical_position(path[index - 1])
+            current = self._canonical_position(path[index])
+            vector = float(current[0] - previous[0]), float(current[1] - previous[1])
+            if vector != (0.0, 0.0):
+                return vector
+        return 0.0, 0.0
+
     def _canonical_layers(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """构造规范方向下的全局真值图层。
+
+        这些层直接用于 centralized critic 和评估；仅 legacy 分支会把其中
+        的团队覆盖层送入 actor，因此新实验不得依赖那个分支。
+        """
+
         all_agents = np.zeros((self.config.height, self.config.width), dtype=np.float32)
         uncovered = np.zeros_like(all_agents)
         team_covered = np.zeros_like(all_agents)
@@ -981,6 +1278,8 @@ class GridCoverageEnv:
         return all_agents, uncovered, team_covered, obstacles, blocked
 
     def _info(self, reward_terms: dict[str, float]) -> dict[str, Any]:
+        """组织日志和评估使用的可读回合信息。"""
+
         return {
             "position": self.position,
             "positions": list(self.positions),
@@ -997,6 +1296,8 @@ class GridCoverageEnv:
         }
 
     def _build_map(self) -> None:
+        """合并固定/随机障碍并确保剩余自由区域连通。"""
+
         obstacles = set(self.config.obstacles)
         random_count = self.config.random_obstacle_count
         if self.config.obstacle_ratio is not None:
@@ -1013,6 +1314,8 @@ class GridCoverageEnv:
             raise ValueError("free cells must form a connected region")
 
     def _sample_connected_random_obstacles(self, base_obstacles: set[GridPosition], random_count: int) -> set[GridPosition]:
+        """随机放置障碍，同时拒绝会把自由区切断的候选格。"""
+
         rng = random.Random(self._current_random_obstacle_seed())
         all_cells = {(row, col) for row in range(self.config.height) for col in range(self.config.width)}
         corner_positions = set(self._corner_positions()) if self.config.random_corner_start else set()
@@ -1023,6 +1326,7 @@ class GridCoverageEnv:
 
         selected: set[GridPosition] = set()
         target_count = min(random_count, len(candidates))
+        # 逐个试放使生成地图天然可完成，而不是在训练时出现隔离目标格。
         for candidate in candidates:
             if len(selected) >= target_count:
                 break
@@ -1039,6 +1343,8 @@ class GridCoverageEnv:
         return selected
 
     def _current_random_obstacle_seed(self) -> int:
+        """依据回合序号选择当前随机地图 seed。"""
+
         seeds = self.config.random_obstacle_seeds
         if not seeds:
             return self.config.random_obstacle_seed
@@ -1047,6 +1353,8 @@ class GridCoverageEnv:
         return seeds[seed_index]
 
     def _free_cells_are_connected(self, free_cells: set[GridPosition]) -> bool:
+        """用 BFS 验证所有可通行格是否属于同一连通分量。"""
+
         if not free_cells:
             return False
         start = next(iter(free_cells))
@@ -1062,9 +1370,13 @@ class GridCoverageEnv:
         return len(visited) == len(free_cells)
 
     def _select_start_position(self) -> GridPosition:
+        """返回第一个 agent 的起点，保留给单 agent 兼容调用。"""
+
         return self._select_start_positions()[0]
 
     def _select_start_positions(self) -> list[GridPosition]:
+        """选择互不重合的起点，并尽可能让额外 agent 分散开。"""
+
         selected: list[GridPosition] = []
         for position in self.config.start_positions:
             if position in self.free_cells and position not in selected:
@@ -1084,6 +1396,7 @@ class GridCoverageEnv:
                     break
                 selected.append(corner)
 
+        # 起点不足时选择离既有起点最远的格，降低开局路径重叠。
         while len(selected) < self.num_agents:
             candidates = [cell for cell in self.free_cells if cell not in selected]
             if not candidates:
@@ -1094,6 +1407,8 @@ class GridCoverageEnv:
         return selected
 
     def _valid_teammate_positions(self, positions: list[GridPosition]) -> list[GridPosition]:
+        """过滤旧接口提供的静态队友位置，排除无效或重叠格。"""
+
         valid_positions: list[GridPosition] = []
         seen: set[GridPosition] = set()
         occupied = set(self.positions)
@@ -1105,6 +1420,8 @@ class GridCoverageEnv:
         return valid_positions
 
     def _configure_orientation(self, start_position: GridPosition) -> None:
+        """将随机角落起点翻转为统一的左上角视角。"""
+
         self.start_position = start_position
         self._row_flip = -1 if start_position[0] == self.config.height - 1 else 1
         self._col_flip = -1 if start_position[1] == self.config.width - 1 else 1
@@ -1113,6 +1430,8 @@ class GridCoverageEnv:
             self._col_flip = 1
 
     def _canonical_position(self, position: GridPosition) -> GridPosition:
+        """把真实坐标映射到与起点方向无关的规范坐标。"""
+
         row, col = position
         if self._row_flip == -1:
             row = self.config.height - 1 - row
@@ -1121,15 +1440,23 @@ class GridCoverageEnv:
         return row, col
 
     def _canonical_row(self, row: int) -> int:
+        """返回真实行在规范视角下的行号。"""
+
         return self._canonical_position((row, 0))[0]
 
     def _canonical_free_cells(self) -> set[GridPosition]:
+        """将全部自由格转换到规范坐标。"""
+
         return {self._canonical_position(cell) for cell in self.free_cells}
 
     def _canonical_covered_cells(self) -> set[GridPosition]:
+        """将真实覆盖集合转换到规范坐标。"""
+
         return {self._canonical_position(cell) for cell in self.covered}
 
     def _corner_positions(self) -> list[GridPosition]:
+        """列出地图的四个角落，用于随机角落起点。"""
+
         return [
             (0, 0),
             (0, self.config.width - 1),
@@ -1138,6 +1465,8 @@ class GridCoverageEnv:
         ]
 
     def _actual_action(self, action: int) -> int | None:
+        """将规范视角中的动作翻转回真实地图方向。"""
+
         delta = ACTIONS.get(action)
         if delta is None:
             return None
@@ -1145,21 +1474,35 @@ class GridCoverageEnv:
         return ACTION_BY_DELTA.get(actual_delta)
 
     def _local_window(self, grid: np.ndarray, radius: int, center: GridPosition | None = None) -> np.ndarray:
+        """围绕 agent 裁出固定大小局部窗口；边界外用零填充。"""
+
         center = self._canonical_position(self.position) if center is None else center
         if radius <= 0:
             row, col = center
             return grid[row : row + 1, col : col + 1]
 
-        padded = np.pad(grid, radius, mode="constant")
         row, col = center
-        row += radius
-        col += radius
-        return padded[row - radius : row + radius + 1, col - radius : col + radius + 1]
+        row_start = max(row - radius, 0)
+        row_stop = min(row + radius + 1, grid.shape[0])
+        col_start = max(col - radius, 0)
+        col_stop = min(col + radius + 1, grid.shape[1])
+        window = np.zeros((radius * 2 + 1, radius * 2 + 1), dtype=grid.dtype)
+        target_row = row_start - (row - radius)
+        target_col = col_start - (col - radius)
+        window[
+            target_row : target_row + row_stop - row_start,
+            target_col : target_col + col_stop - col_start,
+        ] = grid[row_start:row_stop, col_start:col_stop]
+        return window
 
     def _agent_density(self) -> float:
+        """返回每个自由格平均承载的 agent 数量。"""
+
         return self.num_agents / max(len(self.free_cells), 1)
 
     def _sync_legacy_aliases(self) -> None:
+        """同步单 agent 时代保留的 ``position``/``path`` 别名。"""
+
         self.position = self.positions[0]
         self.path = self.paths[0] if self.paths else []
         self.path_length = int(sum(self.path_lengths))
