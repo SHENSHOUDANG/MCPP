@@ -439,9 +439,14 @@ use_explicit_map_memory = true
 observation_mode = "centered_compressed_memory"
 centered_map_size = 7
 compressed_border = true
+
+[ppo]
+actor_encoder = "cnn"
 ```
 
 This mode keeps the actor map tensor size fixed with respect to environment width and height. The high-resolution interior is centered on the acting agent, while remembered cells outside that interior are summarized into the outer border. The compression reads only per-agent memory layers such as known free cells, known obstacles, self coverage, communicated known-team coverage, unknown cells, frontier cells, recent path, and currently sensed or communication-reachable teammates. It does not compress global environment truth into the actor observation.
+
+The CNN actor encoder is optional and checkpoint-compatible. Older checkpoints default to the historical MLP actor. New CNN checkpoints store the actor map shape and metadata split, so the same actor can be loaded on larger maps as long as `centered_map_size` and the observation channels are unchanged.
 
 Recommended map-size experiment stages:
 

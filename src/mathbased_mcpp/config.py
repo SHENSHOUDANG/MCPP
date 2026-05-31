@@ -127,6 +127,7 @@ class PPOConfig:
     gat_attention_dropout: float = 0.0
     use_coverage_messages: bool = False
     use_action_mask: bool = False
+    actor_encoder: str = "mlp"
 
 
 @dataclass(slots=True)
@@ -240,7 +241,9 @@ def _experiment_config_from_raw(raw: dict[str, Any]) -> ExperimentConfig:
         env_raw.pop("reward", None)
     reward = _reward_from_raw(reward_source)
     env = _grid_config_from_raw(env_raw, reward)
-    ppo = PPOConfig(**raw.get("ppo", {}))
+    ppo_raw = dict(raw.get("ppo", {}))
+    ppo_raw["actor_encoder"] = str(ppo_raw.get("actor_encoder", "mlp")).strip().lower()
+    ppo = PPOConfig(**ppo_raw)
     train = TrainConfig(**raw.get("train", {}))
     curriculum = _curriculum_from_raw(raw, reward, ppo.total_timesteps, env_raw)
     return ExperimentConfig(env=env, ppo=ppo, train=train, curriculum=curriculum)

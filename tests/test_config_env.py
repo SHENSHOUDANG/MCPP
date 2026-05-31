@@ -851,6 +851,42 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(model.node_message_dim, 24)
         self.assertIsNotNone(model.latest_attention_weights())
 
+    def test_cnn_actor_consumes_centered_memory_observation(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=10,
+                height=10,
+                num_agents=2,
+                start_positions=[(3, 3), (3, 5)],
+                observation_radius=1,
+                communication_radius=3,
+                use_explicit_map_memory=True,
+                observation_mode="centered_compressed_memory",
+                centered_map_size=7,
+            )
+        )
+        observation = env.reset()
+        state = np.repeat(env.global_state()[None, :], env.num_agents, axis=0)
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+            actor_encoder="cnn",
+            actor_map_shape=env.actor_map_shape,
+            actor_metadata_dim=env.observation_metadata_dim,
+        )
+        actions, log_probs, values = model.act_batch(
+            torch.as_tensor(observation, dtype=torch.float32),
+            torch.as_tensor(state, dtype=torch.float32),
+        )
+
+        self.assertEqual(model.actor_encoder, "cnn")
+        self.assertEqual(model.actor_map_shape, env.actor_map_shape)
+        self.assertEqual(actions.shape, (2,))
+        self.assertEqual(log_probs.shape, (2,))
+        self.assertEqual(values.shape, (2,))
+
     def test_multi_agent_rewards_are_shared(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(width=4, height=1, num_agents=2, start_positions=[(0, 0), (0, 3)], max_steps=5)
@@ -926,6 +962,76 @@ class ConfigEnvTests(unittest.TestCase):
             )
 
             self.assertEqual(model.state_shape, (8, 8))
+            self.assertIn(action, range(target_env.action_dim))
+            self.assertTrue(torch.isfinite(value).item())
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_cnn_actor_checkpoint_can_load_on_larger_map(self) -> None:
+        source_env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=8,
+                height=8,
+                start=(3, 3),
+                observation_radius=1,
+                use_explicit_map_memory=True,
+                observation_mode="centered_compressed_memory",
+                centered_map_size=7,
+            )
+        )
+        source_model = ActorCritic(
+            observation_dim=source_env.observation_dim,
+            action_dim=source_env.action_dim,
+            hidden_dim=16,
+            state_shape=(source_env.config.height, source_env.config.width),
+            actor_encoder="cnn",
+            actor_map_shape=source_env.actor_map_shape,
+            actor_metadata_dim=source_env.observation_metadata_dim,
+        )
+
+        run_dir = ROOT / ".tmp_tests" / "cnn-actor-policy-load"
+        shutil.rmtree(run_dir, ignore_errors=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            checkpoint_path = run_dir / "policy.pt"
+            torch.save(
+                {
+                    "model_state_dict": source_model.state_dict(),
+                    "observation_dim": source_model.observation_dim,
+                    "state_dim": source_model.state_dim,
+                    "action_dim": source_model.action_dim,
+                    "hidden_dim": source_model.hidden_dim,
+                    "critic_type": source_model.critic_mode,
+                    "state_shape": source_model.state_shape,
+                    "state_channels": source_model.state_channels,
+                    "state_metadata_dim": source_model.state_metadata_dim,
+                    "actor_encoder": source_model.actor_encoder,
+                    "actor_map_shape": source_model.actor_map_shape,
+                    "actor_metadata_dim": source_model.actor_metadata_dim,
+                },
+                checkpoint_path,
+            )
+
+            config = load_config(ROOT / "configs" / "smoke.toml")
+            config.env.width = 24
+            config.env.height = 24
+            config.env.start = (3, 3)
+            config.env.use_explicit_map_memory = True
+            config.env.observation_mode = "centered_compressed_memory"
+            config.env.centered_map_size = 7
+            model = load_policy(config, checkpoint_path)
+
+            target_env = GridCoverageEnv(config.env)
+            observation = target_env.reset()
+            state = target_env.global_state()
+            action, _, value = model.act(
+                torch.as_tensor(observation, dtype=torch.float32),
+                torch.as_tensor(state, dtype=torch.float32),
+            )
+
+            self.assertEqual(model.actor_encoder, "cnn")
+            self.assertEqual(model.actor_map_shape, source_env.actor_map_shape)
+            self.assertEqual(target_env.observation_dim, source_env.observation_dim)
             self.assertIn(action, range(target_env.action_dim))
             self.assertTrue(torch.isfinite(value).item())
         finally:

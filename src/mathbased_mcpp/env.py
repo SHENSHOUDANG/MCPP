@@ -111,13 +111,20 @@ class GridCoverageEnv:
     def observation_dim(self) -> int:
         """一个 actor 的扁平观测向量长度。"""
 
+        _, window_size, _ = self.actor_map_shape
+        channel_dim = window_size * window_size * self.active_observation_channels
+        return channel_dim + self.observation_metadata_dim
+
+    @property
+    def actor_map_shape(self) -> tuple[int, int, int]:
+        """Return ``(channels, height, width)`` for the actor's spatial map block."""
+
         if self._uses_centered_memory_observation():
             window_size = self._centered_map_size()
         else:
             radius = max(self.config.observation_radius, 0)
             window_size = radius * 2 + 1
-        channel_dim = window_size * window_size * self.active_observation_channels
-        return channel_dim + self.observation_metadata_dim
+        return self.active_observation_channels, window_size, window_size
 
     @property
     def active_observation_channels(self) -> int:

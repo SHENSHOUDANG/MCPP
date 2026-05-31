@@ -1,3 +1,10 @@
+"""单个 checkpoint 的确定性评估与覆盖效率指标。
+
+训练奖励只能说明优化目标是否提升；论文比较更关心固定预算下覆盖多快、
+高覆盖后是否反复绕行、多个 agent 是否重复访问同一区域。本模块把轨迹
+转换成这些可解释指标。
+"""
+
 from __future__ import annotations
 
 import json
@@ -17,12 +24,15 @@ from .ppo import ActorCritic
 
 
 def resolve_runtime_config(config: ExperimentConfig, checkpoint_path: str | Path) -> ExperimentConfig:
+    """优先读取 checkpoint 同目录的实际训练配置，并兼容旧观测模型。"""
+
     checkpoint_path = Path(checkpoint_path)
     manifest_path = checkpoint_path.parent / "course_config.json"
     if manifest_path.exists():
         runtime_config = load_config(manifest_path)
         raw_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         env_manifest = raw_manifest.get("env", {})
+        # 旧快照尚无信息边界字段；重放它们时必须显式进入 legacy 观测分支。
         if (
             "use_legacy_truth_coverage_observation" not in env_manifest
             and not runtime_config.env.use_explicit_map_memory
@@ -33,6 +43,8 @@ def resolve_runtime_config(config: ExperimentConfig, checkpoint_path: str | Path
 
 
 def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorCritic:
+    """根据 checkpoint 保存的结构元数据重建并加载策略网络。"""
+
     config = resolve_runtime_config(config, checkpoint_path)
     payload = torch.load(checkpoint_path, map_location="cpu")
     hidden_dim = int(payload.get("hidden_dim", config.ppo.hidden_dim))
@@ -46,7 +58,11 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
     gat_residual = bool(payload.get("gat_residual", config.ppo.gat_residual))
     gat_attention_dropout = float(payload.get("gat_attention_dropout", config.ppo.gat_attention_dropout))
     node_message_dim = int(payload.get("node_message_dim", 0))
+    actor_encoder = str(payload.get("actor_encoder", "mlp")).lower()
+    actor_map_shape = tuple(payload["actor_map_shape"]) if actor_encoder == "cnn" else None
+    actor_metadata_dim = int(payload.get("actor_metadata_dim", 0))
     if critic_type == "spatial" or "state_shape" in payload:
+        # 新 checkpoint 使用能读取全局地图通道的卷积 critic。
         model = ActorCritic(
             observation_dim=observation_dim,
             action_dim=action_dim,
@@ -60,8 +76,12 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             gat_residual=gat_residual,
             gat_attention_dropout=gat_attention_dropout,
             node_message_dim=node_message_dim,
+            actor_encoder=actor_encoder,
+            actor_map_shape=actor_map_shape,
+            actor_metadata_dim=actor_metadata_dim,
         )
     else:
+        # 仅为历史模型保留扁平状态 critic 的加载路径。
         model = ActorCritic(
             observation_dim=observation_dim,
             action_dim=action_dim,
@@ -73,6 +93,9 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             gat_residual=gat_residual,
             gat_attention_dropout=gat_attention_dropout,
             node_message_dim=node_message_dim,
+            actor_encoder=actor_encoder,
+            actor_map_shape=actor_map_shape,
+            actor_metadata_dim=actor_metadata_dim,
         )
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
@@ -87,6 +110,8 @@ def evaluate_policy(
     budgets: list[int] | None = None,
     stall_steps: int = 50,
 ) -> dict[str, Any]:
+    """运行一个完整回合，返回轨迹、终点结果及覆盖效率诊断。"""
+
     config = resolve_runtime_config(config, checkpoint_path)
     env = GridCoverageEnv(config.env)
     model = load_policy(config, checkpoint_path)
@@ -99,8 +124,9 @@ def evaluate_policy(
     info: dict[str, Any] = {}
 
     while not done:
+        # 使用同一套观测、通信与动作路径，保证评估复现训练时的执行语义。
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32)
-        state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32)
+        state_tensor = torch.as_tensor(state, dtype=torch.float32)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool)
         edge_features = (
             torch.as_tensor(env.neighbor_features(), dtype=torch.float32)
@@ -112,6 +138,11 @@ def evaluate_policy(
             if model.node_message_dim > 0
             else None
         )
+        action_mask = (
+            torch.as_tensor(env.action_mask(), dtype=torch.bool)
+            if config.ppo.use_action_mask
+            else None
+        )
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -119,6 +150,7 @@ def evaluate_policy(
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
                 node_messages=node_messages,
+                action_mask=action_mask,
                 deterministic=deterministic,
             )
         result = env.step(actions.cpu().numpy().tolist())
@@ -142,6 +174,7 @@ def evaluate_policy(
         "trajectory": trajectories[0] if env.num_agents == 1 else trajectories,
         "trajectories": trajectories,
     }
+    # 从逐步覆盖曲线与各 agent 路径中追加固定预算效率指标。
     summary.update(
         coverage_efficiency_metrics(
             trajectories=trajectories,
@@ -168,6 +201,12 @@ def coverage_efficiency_metrics(
     budgets: list[int] | None = None,
     stall_steps: int = 50,
 ) -> dict[str, Any]:
+    """将轨迹和覆盖曲线变成不依赖训练奖励的评价指标。
+
+    回合提前完成后，曲线以最终覆盖率补齐到统一 horizon，使不同策略的
+    ``Coverage-AUC`` 和 ``Coverage@H`` 可以公平比较。
+    """
+
     if not coverage_curve:
         raise ValueError("coverage_curve must contain at least the initial coverage ratio")
     horizon = max(int(max_steps), 1)
@@ -185,6 +224,7 @@ def coverage_efficiency_metrics(
     for budget in metric_budgets:
         metrics[f"coverage_at_{budget}"] = float(padded_curve[budget - 1])
 
+    # T90/T95/T99 表示第一次达到给定覆盖率阈值的环境步。
     threshold_steps: dict[int, int | None] = {}
     for percentage in (90, 95, 99):
         threshold = percentage / 100.0
@@ -194,6 +234,7 @@ def coverage_efficiency_metrics(
         )
         metrics[f"t{percentage}"] = threshold_steps[percentage]
 
+    # repeat_ratio 观察全局重复访问；overlap 只计算不同 agent 间的重复区域。
     total_visits = sum(len(path) for path in trajectories)
     unique_visits = len({cell for path in trajectories for cell in path})
     metrics["repeat_ratio"] = float(max(total_visits - unique_visits, 0) / max(total_visits, 1))
@@ -209,6 +250,8 @@ def coverage_efficiency_metrics(
 
 
 def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.ndarray:
+    """统一单/多 agent 观测形状。"""
+
     observation = np.asarray(observation, dtype=np.float32)
     if observation.ndim == 1:
         return observation.reshape(1, -1)
@@ -216,6 +259,8 @@ def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.nda
 
 
 def _serialize_trajectory(trajectory: Any) -> Any:
+    """把坐标元组转换成可写入 JSON 的列表。"""
+
     if not trajectory:
         return []
     first = trajectory[0]
@@ -225,6 +270,8 @@ def _serialize_trajectory(trajectory: Any) -> Any:
 
 
 def _normalize_budgets(budgets: list[int] | None, max_steps: int) -> list[int]:
+    """规范固定预算检查点，并把非法或越界预算裁回回合范围内。"""
+
     if budgets is None:
         budgets = list(range(100, max_steps + 1, 100))
         if not budgets or budgets[-1] != max_steps:
@@ -234,6 +281,8 @@ def _normalize_budgets(budgets: list[int] | None, max_steps: int) -> list[int]:
 
 
 def _repeat_ratio_after_threshold(trajectories: list[list[tuple[int, int]]], threshold_step: int | None) -> float:
+    """计算达到指定高覆盖阈值后，继续访问既有格子的比例。"""
+
     if threshold_step is None:
         return 0.0
     visited = {path[0] for path in trajectories if path}
@@ -250,6 +299,8 @@ def _repeat_ratio_after_threshold(trajectories: list[list[tuple[int, int]]], thr
 
 
 def _inter_agent_overlap_ratio(trajectories: list[list[tuple[int, int]]]) -> float:
+    """计算被至少两个不同 agent 访问过的区域占联合访问区域比例。"""
+
     visits_by_agent = [set(path) for path in trajectories]
     union = set().union(*visits_by_agent) if visits_by_agent else set()
     overlapped = {
@@ -261,6 +312,8 @@ def _inter_agent_overlap_ratio(trajectories: list[list[tuple[int, int]]]) -> flo
 
 
 def _stall_coverage(coverage_curve: list[float], stall_steps: int) -> float | None:
+    """检测连续若干步没有新增覆盖时策略停滞在何种覆盖率。"""
+
     stalled_for = 0
     for before, after in zip(coverage_curve, coverage_curve[1:]):
         stalled_for = stalled_for + 1 if after <= before + 1e-12 else 0
