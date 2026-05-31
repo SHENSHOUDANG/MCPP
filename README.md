@@ -9,6 +9,7 @@ The current map-intent curriculum is run one course at a time. Each course write
 ```powershell
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp doctor --config configs/smoke.toml
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/smoke.toml
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp doctor --config configs/smoke_centered_cnn.toml
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/ablation_mapmsg_gat_on.toml --course tier-1-8x8-1agent
 ```
 
@@ -450,6 +451,7 @@ The CNN actor encoder is optional and checkpoint-compatible. Older checkpoints d
 
 Two matched centered-memory CNN configs are available for the next ablation:
 
+- `configs/smoke_centered_cnn.toml` for a cheap doctor/smoke check of the new path.
 - `configs/ablation_centered_cnn_gat_on.toml`
 - `configs/ablation_centered_cnn_gat_off.toml`
 

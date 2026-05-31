@@ -49,6 +49,18 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.ppo.rollout_steps, 64)
         self.assertTrue(config.ppo.use_action_mask)
 
+    def test_load_centered_cnn_smoke_config(self) -> None:
+        config = load_config(ROOT / "configs" / "smoke_centered_cnn.toml")
+        env = GridCoverageEnv(config.env)
+
+        self.assertEqual(config.env.observation_mode, "centered_compressed_memory")
+        self.assertEqual(config.env.centered_map_size, 7)
+        self.assertEqual(config.ppo.actor_encoder, "cnn")
+        self.assertTrue(config.ppo.use_graph_attention)
+        self.assertTrue(config.ppo.use_coverage_messages)
+        self.assertEqual(env.actor_map_shape, (9, 7, 7))
+        self.assertEqual(env.observation_dim, 9 * 7 * 7 + env.observation_metadata_dim)
+
     def test_load_current_curriculum_config(self) -> None:
         config = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
         self.assertIsNotNone(config.curriculum)
