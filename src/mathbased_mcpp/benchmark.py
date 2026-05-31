@@ -1,9 +1,3 @@
-"""在多组地图条件上批量评估同一个 checkpoint。
-
-``evaluation.py`` 解释一次 rollout；本模块重复执行它的核心过程，以便在
-匹配的随机种子和障碍密度下比较 GAT-on/GAT-off 或未来的观测消融方案。
-"""
-
 from __future__ import annotations
 
 import copy
@@ -33,8 +27,6 @@ def benchmark_policy(
     budgets: list[int] | None = None,
     stall_steps: int = 50,
 ) -> dict[str, Any]:
-    """在种子与障碍比例的笛卡尔积上运行策略并汇总指标。"""
-
     checkpoint = Path(checkpoint_path)
     runtime_config = resolve_runtime_config(config, checkpoint)
     model = load_policy(runtime_config, checkpoint)
@@ -43,7 +35,6 @@ def benchmark_policy(
     rows: list[dict[str, float | int | str]] = []
     for ratio in ratios:
         for seed in seeds:
-            # 每个 trial 深拷贝配置，确保修改地图因子不会污染下一次评估。
             trial_config = copy.deepcopy(runtime_config)
             trial_config.env.seed = int(seed)
             trial_config.env.random_obstacle_seed = int(seed)
@@ -78,8 +69,6 @@ def _evaluate_trial(
     budgets: list[int] | None,
     stall_steps: int,
 ) -> dict[str, Any]:
-    """在一张指定随机地图上执行一次完整策略 rollout。"""
-
     env = GridCoverageEnv(config.env)
     observation = _agent_observations(env, env.reset(seed=seed))
     state = env.global_state()
@@ -92,7 +81,7 @@ def _evaluate_trial(
 
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
-        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
+        state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32, device=device)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool, device=device)
         edge_features = (
             torch.as_tensor(env.neighbor_features(), dtype=torch.float32, device=device)
@@ -104,11 +93,6 @@ def _evaluate_trial(
             if getattr(model, "node_message_dim", 0) > 0
             else None
         )
-        action_mask = (
-            torch.as_tensor(env.action_mask(), dtype=torch.bool, device=device)
-            if config.ppo.use_action_mask
-            else None
-        )
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -116,7 +100,6 @@ def _evaluate_trial(
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
                 node_messages=node_messages,
-                action_mask=action_mask,
                 deterministic=deterministic,
             )
         result = env.step(actions.cpu().numpy().tolist())
@@ -130,7 +113,6 @@ def _evaluate_trial(
             trajectories[index].append(position)
         coverage_curve.append(env.coverage_ratio())
 
-    # 每个 trial 保留条件字段，之后可检查性能是否随地图难度变化。
     row: dict[str, Any] = {
         "seed": seed,
         "obstacle_ratio": "" if obstacle_ratio is None else float(obstacle_ratio),
@@ -157,8 +139,6 @@ def _evaluate_trial(
 
 
 def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float | int]:
-    """把各 trial 行聚合为跨地图均值、最低覆盖率和阈值达到率。"""
-
     if not rows:
         return {
             "episodes": 0,
@@ -190,7 +170,6 @@ def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float | int]:
         "stall_termination_coverage_mean": _mean(rows, "stall_termination_coverage"),
         "total_reward_mean": _mean(rows, "total_reward"),
     }
-    # 只对确实达到阈值的回合求平均时间，同时另报达到率。
     for field in ("t90", "t95", "t99"):
         values = _numeric_values(rows, field)
         summary[f"{field}_mean_reached"] = float(np.mean(values)) if values else 0.0
@@ -202,26 +181,18 @@ def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float | int]:
 
 
 def _mean(rows: list[dict[str, Any]], key: str) -> float:
-    """计算数值列平均值。"""
-
     return float(np.mean([float(row[key]) for row in rows]))
 
 
 def _min(rows: list[dict[str, Any]], key: str) -> float:
-    """计算数值列最低值。"""
-
     return float(np.min([float(row[key]) for row in rows]))
 
 
 def _numeric_values(rows: list[dict[str, Any]], key: str) -> list[float]:
-    """过滤未达到阈值等空值后返回可聚合数字。"""
-
     return [float(row[key]) for row in rows if row.get(key) is not None and row.get(key) != ""]
 
 
 def _write_rows(output_path: Path, rows: list[dict[str, Any]]) -> None:
-    """将逐地图结果写入 CSV，保留后续统计/画图所需细节。"""
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(rows[0]) if rows else ["seed", "obstacle_ratio", "coverage_ratio", "completed"]
     with output_path.open("w", newline="", encoding="utf-8") as handle:
@@ -231,8 +202,6 @@ def _write_rows(output_path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.ndarray:
-    """统一单/多 agent 观测形状。"""
-
     observation = np.asarray(observation, dtype=np.float32)
     if observation.ndim == 1:
         return observation.reshape(1, -1)
@@ -240,8 +209,6 @@ def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.nda
 
 
 def _agent_rewards(env: GridCoverageEnv, reward: float | np.ndarray) -> np.ndarray:
-    """统一单/多 agent 奖励形状。"""
-
     reward_array = np.asarray(reward, dtype=np.float32)
     if reward_array.ndim == 0:
         return np.full(env.num_agents, float(reward_array), dtype=np.float32)

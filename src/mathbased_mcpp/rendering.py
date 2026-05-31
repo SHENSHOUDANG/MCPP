@@ -1,5 +1,3 @@
-"""将评估产生的网格轨迹绘制为静态图片。"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,8 +22,6 @@ def render_trajectory(
     trajectory: Iterable[GridPosition] | Sequence[Iterable[GridPosition]],
     output_path: str | Path,
 ) -> Path:
-    """绘制障碍、可行区域以及一个或多个 agent 的行动轨迹。"""
-
     env = GridCoverageEnv(config.env)
     trajectories = _normalize_trajectories(trajectory)
     output = Path(output_path)
@@ -41,7 +37,6 @@ def render_trajectory(
     ax.set_yticks(range(config.env.height))
     ax.grid(color="#d0d7de", linewidth=0.8)
 
-    # 先铺地图底图，再叠加路径；这样轨迹和起终点始终清晰可见。
     for row, col in env.free_cells:
         ax.add_patch(plt.Rectangle((col - 0.5, row - 0.5), 1, 1, facecolor="#f6f8fa", edgecolor="none"))
     for row, col in env.obstacles:
@@ -73,8 +68,6 @@ def render_trajectory(
 def _normalize_trajectories(
     trajectory: Iterable[GridPosition] | Sequence[Iterable[GridPosition]],
 ) -> list[list[GridPosition]]:
-    """统一单 agent 路径与多 agent 路径的输入形式。"""
-
     paths = list(trajectory)
     if not paths:
         return []

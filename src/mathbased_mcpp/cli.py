@@ -1,9 +1,3 @@
-"""项目命令行入口。
-
-常用阅读顺序是先运行 ``doctor`` 检查配置，再由 ``train`` 产生模型，
-最后通过 ``evaluate``/``render``/``benchmark`` 分析行为。
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -19,12 +13,9 @@ from .training import train_ppo
 
 
 def main() -> None:
-    """解析命令并分发到训练、评估、渲染或消融比较流程。"""
-
     parser = argparse.ArgumentParser(prog="mathbased_mcpp")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # 这些命令共享基础配置参数，仅在需要模型或额外评估设置时追加参数。
     for name in ("doctor", "train", "evaluate", "render", "benchmark"):
         subparser = subparsers.add_parser(name)
         subparser.add_argument("--config", default="configs/smoke.toml")
@@ -40,11 +31,10 @@ def main() -> None:
             subparser.add_argument("--stall-steps", type=int, default=50)
             subparser.add_argument("--output", default=None)
 
-    # 消融命令一次运行两臂，确保 GAT-on 与 GAT-off 使用同一批评估设置。
     ablation = subparsers.add_parser("gat-ablation")
-    ablation.add_argument("--gat-on-config", default="configs/ablation_mapmsg_gat_on.toml")
+    ablation.add_argument("--gat-on-config", default="configs/ablation_gat_on.toml")
     ablation.add_argument("--gat-on-checkpoint", required=True)
-    ablation.add_argument("--gat-off-config", default="configs/ablation_mapmsg_gat_off.toml")
+    ablation.add_argument("--gat-off-config", default="configs/ablation_gat_off.toml")
     ablation.add_argument("--gat-off-checkpoint", required=True)
     ablation.add_argument("--seeds", default="20260501,20260502,20260503,20260504,20260505")
     ablation.add_argument("--obstacle-ratios", default="0.05,0.10,0.15,0.20")
@@ -55,7 +45,6 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "gat-ablation":
-        # 两个 checkpoint 分别评估，再写出一张包含差值的汇总表。
         seeds = _parse_int_csv(args.seeds)
         if not seeds:
             parser.error("--seeds must contain at least one integer seed")
@@ -100,7 +89,6 @@ def main() -> None:
     config = load_config(args.config)
 
     if args.command == "doctor":
-        # doctor 不训练模型，只构建一次环境以暴露形状和关键开关。
         env = GridCoverageEnv(config.env)
         env.reset(seed=config.env.seed)
         print(f"grid={config.env.height}x{config.env.width}")
@@ -134,7 +122,6 @@ def main() -> None:
         return
 
     if args.command == "train":
-        # 课程配置要求显式选课，避免误把多级训练写入同一输出目录。
         if config.curriculum and config.curriculum.courses and not args.course:
             parser.error("curriculum configs require --course so each course can be trained separately")
         checkpoint = train_ppo(config, course=args.course, previous_checkpoint=args.previous_checkpoint)
@@ -144,7 +131,6 @@ def main() -> None:
     checkpoint_path = Path(args.checkpoint)
 
     if args.command == "benchmark":
-        # benchmark 在多张地图上统计性能，用于比较泛化而非单条轨迹。
         seeds = _parse_int_csv(args.seeds)
         if not seeds:
             parser.error("--seeds must contain at least one integer seed")
@@ -179,7 +165,6 @@ def main() -> None:
         print(f"benchmark={output_path}")
         return
 
-    # evaluate 与 render 共用同一次确定性 rollout，渲染只负责画出轨迹。
     run_dir = checkpoint_path.parent
     trajectory_path = run_dir / "trajectory.json"
     runtime_config = resolve_runtime_config(config, checkpoint_path)
@@ -206,20 +191,14 @@ def main() -> None:
 
 
 def _parse_int_csv(value: str) -> list[int]:
-    """解析命令行中以逗号分隔的整数列表，例如地图随机种子。"""
-
     return [int(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def _parse_float_csv(value: str) -> list[float]:
-    """解析命令行中以逗号分隔的浮点列表，例如障碍比例。"""
-
     return [float(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def _ablation_summary_rows(gat_on: dict[str, object], gat_off: dict[str, object]) -> list[dict[str, float | int | str]]:
-    """把两臂基准结果整理为 on、off 与 ``on - off`` 三行。"""
-
     fields = [
         "episodes",
         "coverage_ratio_mean",
@@ -256,8 +235,6 @@ def _ablation_summary_rows(gat_on: dict[str, object], gat_off: dict[str, object]
 
 
 def _write_ablation_summary(output_path: Path, rows: list[dict[str, float | int | str]]) -> None:
-    """将 GAT 消融汇总写为方便绘图和论文整理的 CSV。"""
-
     fieldnames = list(rows[0]) if rows else ["arm"]
     with output_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)

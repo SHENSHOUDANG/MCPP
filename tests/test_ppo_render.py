@@ -1,9 +1,3 @@
-"""从训练到评估/渲染的端到端 smoke 测试。
-
-这些测试只使用很小训练预算，目标是验证整条流水线能运行和写出结果，
-而不是证明策略已经收敛。
-"""
-
 from pathlib import Path
 import shutil
 import sys
@@ -22,8 +16,6 @@ from mathbased_mcpp.training import train_ppo
 
 
 class PpoRenderTests(unittest.TestCase):
-    """验证 PPO 输出、评价指标、图片渲染和 map-intent GAT 训练路径。"""
-
     def test_train_evaluate_and_render_smoke(self) -> None:
         config = load_config(ROOT / "configs" / "smoke.toml")
         run_dir = ROOT / ".tmp_tests" / "ppo-render"
@@ -144,7 +136,6 @@ class PpoRenderTests(unittest.TestCase):
                 gat_use_edge_features=True,
                 gat_residual=True,
                 use_coverage_messages=True,
-                use_action_mask=True,
             ),
             train=TrainConfig(run_root="runs", log_interval=1),
         )

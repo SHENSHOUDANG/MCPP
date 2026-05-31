@@ -1,14 +1,3 @@
-"""PPO 训练循环与课程学习调度。
-
-训练的主流程为：
-
-``建立环境/模型 -> 收集一段 rollout -> 用 GAE 计算回报与优势
--> 进行若干轮 PPO 更新 -> 周期性评估和保存 checkpoint``。
-
-在多智能体模式中，每个环境步会产生多个 agent transition，因此总训练
-步数按 agent transition 数量累计，而不是仅按环境调用次数累计。
-"""
-
 from __future__ import annotations
 
 import json
@@ -38,8 +27,6 @@ def train_ppo(
     course: str | None = None,
     previous_checkpoint: str | Path | None = None,
 ) -> Path:
-    """训练入口：根据配置选择单课程、完整课程链或普通训练。"""
-
     if config.curriculum and config.curriculum.courses:
         if course is not None:
             return _train_single_curriculum_course(
@@ -53,8 +40,6 @@ def train_ppo(
 
 
 def _train_curriculum(config: ExperimentConfig, run_dir: str | Path | None = None) -> Path:
-    """依次训练全部课程阶段，并把上一阶段最优模型传给下一阶段。"""
-
     assert config.curriculum is not None
     master_run_path = Path(run_dir) if run_dir is not None else make_run_dir(config.train.run_root)
     master_run_path.mkdir(parents=True, exist_ok=True)
@@ -62,7 +47,6 @@ def _train_curriculum(config: ExperimentConfig, run_dir: str | Path | None = Non
     previous_checkpoint: Path | None = None
     final_checkpoint = master_run_path / "policy.pt"
     for index, course in enumerate(config.curriculum.courses):
-        # 课程难度逐级提升，允许新阶段从上一个阶段的最优权重继续学习。
         course_config = build_course_config(config, course)
         course_dir = master_run_path / f"{index + 1:02d}-{_slugify(course.name)}"
         checkpoint = _train_single_course(
@@ -83,8 +67,6 @@ def _train_single_curriculum_course(
     run_dir: str | Path | None = None,
     previous_checkpoint: str | Path | None = None,
 ) -> Path:
-    """单独运行指定课程，适合耗时较长的正式训练逐阶段执行。"""
-
     assert config.curriculum is not None
     course_index, course = select_curriculum_course(config, course_name=course_name)
     course_config = build_course_config(config, course)
@@ -117,8 +99,6 @@ def _train_single_course(
     run_dir: str | Path | None = None,
     checkpoint_path: str | Path | None = None,
 ) -> Path:
-    """训练一个固定环境/课程配置并产出可评估的模型文件。"""
-
     set_seed(config.ppo.seed)
     env = env or GridCoverageEnv(config.env)
     if config.ppo.use_coverage_messages and not env.config.use_explicit_map_memory:
@@ -129,7 +109,6 @@ def _train_single_course(
     writer = make_tensorboard_writer(run_path, config.train.tensorboard_dir) if config.train.use_tensorboard else None
 
     device = _resolve_device(config.ppo.device)
-    # actor 接收每个 agent 的去中心化观测；critic 在训练中接收全局空间状态。
     model = ActorCritic(
         env.observation_dim,
         env.action_dim,
@@ -143,15 +122,11 @@ def _train_single_course(
         gat_residual=config.ppo.gat_residual,
         gat_attention_dropout=config.ppo.gat_attention_dropout,
         node_message_dim=env.node_message_dim if config.ppo.use_coverage_messages else 0,
-        actor_encoder=config.ppo.actor_encoder,
-        actor_map_shape=env.actor_map_shape if config.ppo.actor_encoder == "cnn" else None,
-        actor_metadata_dim=env.observation_metadata_dim if config.ppo.actor_encoder == "cnn" else 0,
     ).to(device)
     if checkpoint_path is not None:
         _load_checkpoint_weights(model, checkpoint_path)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ppo.learning_rate)
 
-    # observation 带 agent 维度；state 为所有 agent 共享的一份全局 critic 输入。
     observation = _agent_observations(env, env.reset(seed=config.env.seed))
     state = env.global_state()
     timestep = 0
@@ -168,7 +143,6 @@ def _train_single_course(
 
     try:
         while timestep < config.ppo.total_timesteps:
-            # 一轮更新先用当前策略采样固定长度轨迹，再在这批旧数据上优化。
             batch, observation, state, rollout_metrics = _collect_rollout(
                 config=config,
                 env=env,
@@ -185,7 +159,6 @@ def _train_single_course(
             episode_start_length = int(rollout_metrics.pop("episode_start_length"))
             new_metric_rows = rollout_metrics.pop("metric_rows")
             metric_rows.extend(new_metric_rows)
-            # numel = 环境步数 x agent 数量，代表实际学习到的 transition 数。
             timestep += int(batch.actions.numel())
             update_index += 1
 
@@ -201,7 +174,6 @@ def _train_single_course(
                 torch.save(_checkpoint_payload(config, model), last_checkpoint_path)
 
             if update_index % eval_interval == 0:
-                # 确定性评估用于挑选 best_policy，避免只按随机训练奖励选模型。
                 eval_row = _evaluate_model(config, model, update_index)
                 append_metrics(run_path / "eval_metrics.csv", [eval_row])
                 if writer is not None:
@@ -226,8 +198,6 @@ def _train_single_course(
 
 
 def _finalize_course_outputs(config: ExperimentConfig, run_path: Path, checkpoint_path: Path) -> None:
-    """用最优 checkpoint 生成最终评估轨迹与可视化图片。"""
-
     from .evaluation import evaluate_policy
     from .rendering import render_trajectory
 
@@ -236,14 +206,10 @@ def _finalize_course_outputs(config: ExperimentConfig, run_path: Path, checkpoin
 
 
 def _write_config_snapshot(config: ExperimentConfig, run_path: Path) -> None:
-    """把实际生效配置写入结果目录，保证实验可追溯。"""
-
     run_path.joinpath("course_config.json").write_text(json.dumps(asdict(config), indent=2), encoding="utf-8")
 
 
 def _curriculum_state_path(config: ExperimentConfig, state_root: str | Path | None = None) -> Path:
-    """返回记录各课程最优 checkpoint 的状态文件位置。"""
-
     return Path(state_root) / "_curriculum_state.json" if state_root is not None else Path(config.train.run_root) / "_curriculum_state.json"
 
 
@@ -252,8 +218,6 @@ def _resolve_previous_checkpoint(
     course_index: int,
     explicit_checkpoint: str | Path | None = None,
 ) -> Path | None:
-    """优先使用显式指定模型，否则从课程状态文件查找前一阶段模型。"""
-
     if explicit_checkpoint is not None:
         path = Path(explicit_checkpoint)
         if not path.exists():
@@ -286,8 +250,6 @@ def _update_curriculum_state(
     run_dir: Path,
     state_root: str | Path | None = None,
 ) -> None:
-    """在课程完成后记录其最优模型与输出目录。"""
-
     if not config.curriculum or not config.curriculum.courses:
         return
     state_path = _curriculum_state_path(config, state_root=state_root)
@@ -307,8 +269,6 @@ def _update_curriculum_state(
 
 
 def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: int) -> dict[str, float | int]:
-    """用确定性动作完整执行一个回合，返回选模需要的简明指标。"""
-
     env = GridCoverageEnv(config.env)
     observation = _agent_observations(env, env.reset(seed=config.env.seed))
     state = env.global_state()
@@ -318,11 +278,10 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
     info = {}
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
-        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
+        state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32, device=device)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool, device=device)
         edge_features = _edge_features_tensor(env, model, device)
         node_messages = _node_messages_tensor(env, model, device)
-        action_mask = _action_mask_tensor(env, config, device)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -330,7 +289,6 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
                 node_messages=node_messages,
-                action_mask=action_mask,
                 deterministic=True,
             )
         result = env.step(actions.cpu().numpy().tolist())
@@ -351,15 +309,11 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
 
 
 def _load_checkpoint_weights(model: ActorCritic, checkpoint_path: str | Path) -> None:
-    """把前一课程或恢复训练的参数装入结构相同的模型。"""
-
     payload = torch.load(checkpoint_path, map_location="cpu")
     model.load_state_dict(payload["model_state_dict"])
 
 
 def _metric_score(row: dict[str, float | int]) -> tuple[float, int, float, float]:
-    """定义 best checkpoint 排序：覆盖优先，其次完成、路径短和奖励高。"""
-
     coverage = float(row["coverage_ratio"])
     completed = int(row["completed"])
     path_length = float(row["path_length"])
@@ -378,12 +332,6 @@ def _collect_rollout(
     episode_reward: float,
     episode_start_length: int,
 ) -> tuple[RolloutBatch, np.ndarray, np.ndarray, dict[str, object]]:
-    """使用当前策略采样一段轨迹，并构造一次 PPO 更新所需批次。
-
-    列表的第一个维度是环境时间步，第二个维度是 agent。这样 GAT 更新时
-    仍能保留每一时刻的完整邻接图，而不是打散 agent 间的同步关系。
-    """
-
     observations: list[np.ndarray] = []
     states: list[np.ndarray] = []
     actions: list[np.ndarray] = []
@@ -394,14 +342,13 @@ def _collect_rollout(
     neighbor_masks: list[np.ndarray] = []
     edge_features: list[np.ndarray] = []
     node_messages: list[np.ndarray] = []
-    action_masks: list[np.ndarray] = []
     metric_rows: list[dict[str, float | int]] = []
     device = _model_device(model)
 
     for _ in range(max_steps):
-        # 采样时缓存策略看到的全部输入，之后 PPO 才能正确重算旧动作概率。
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
-        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
+        state_batch = np.repeat(state[None, :], env.num_agents, axis=0)
+        state_tensor = torch.as_tensor(state_batch, dtype=torch.float32, device=device)
         neighbor_mask = env.neighbor_mask()
         neighbor_mask_tensor = torch.as_tensor(neighbor_mask, dtype=torch.bool, device=device)
         edge_feature_array = env.neighbor_features() if _uses_edge_features(model) else None
@@ -412,10 +359,6 @@ def _collect_rollout(
         node_message_tensor = (
             torch.as_tensor(node_message_array, dtype=torch.float32, device=device) if node_message_array is not None else None
         )
-        action_mask_array = env.action_mask() if config.ppo.use_action_mask else None
-        action_mask_tensor = (
-            torch.as_tensor(action_mask_array, dtype=torch.bool, device=device) if action_mask_array is not None else None
-        )
         with torch.no_grad():
             action_tensor, log_prob_tensor, value_tensor = model.act_batch(
                 obs_tensor,
@@ -423,13 +366,12 @@ def _collect_rollout(
                 neighbor_mask=neighbor_mask_tensor,
                 edge_features=edge_feature_tensor,
                 node_messages=node_message_tensor,
-                action_mask=action_mask_tensor,
             )
 
         result = env.step(action_tensor.cpu().numpy().tolist())
         reward_array = _agent_rewards(env, result.reward)
         observations.append(observation)
-        states.append(state)
+        states.append(state_batch)
         actions.append(action_tensor.cpu().numpy())
         log_probs.append(log_prob_tensor.cpu().numpy())
         rewards.append(reward_array)
@@ -440,14 +382,11 @@ def _collect_rollout(
             edge_features.append(edge_feature_array)
         if node_message_array is not None:
             node_messages.append(node_message_array)
-        if action_mask_array is not None:
-            action_masks.append(action_mask_array)
         episode_reward += float(np.mean(reward_array))
         observation = _agent_observations(env, result.observation)
         state = result.state
 
         if result.done:
-            # rollout 可以跨越多个回合；终止后立即 reset 继续填满训练批次。
             metric_rows.append(
                 {
                     "episode": episode_index,
@@ -465,14 +404,12 @@ def _collect_rollout(
             episode_start_length = env.path_length
 
     with torch.no_grad():
-        # 非终止截断的 rollout 需要用最后状态价值 bootstrap 后续回报。
         if dones and bool(dones[-1][0]):
             next_values = np.zeros(env.num_agents, dtype=np.float32)
         else:
-            next_value = model.value(torch.as_tensor(state, dtype=torch.float32, device=device))
-            next_values = next_value.expand(env.num_agents).cpu().numpy()
+            next_state_batch = np.repeat(state[None, :], env.num_agents, axis=0)
+            next_values = model.value(torch.as_tensor(next_state_batch, dtype=torch.float32, device=device)).cpu().numpy()
 
-    # GAE 将一步 TD 残差累积为方差较小的策略优势估计。
     returns, advantages = _gae_array(
         rewards=np.asarray(rewards, dtype=np.float32),
         dones=np.asarray(dones, dtype=np.float32),
@@ -506,11 +443,6 @@ def _collect_rollout(
             if node_messages
             else None
         ),
-        action_masks=(
-            torch.as_tensor(np.asarray(action_masks, dtype=bool), dtype=torch.bool, device=device)
-            if action_masks
-            else None
-        ),
     )
     metrics = {
         "episode_index": episode_index,
@@ -522,8 +454,6 @@ def _collect_rollout(
 
 
 def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.ndarray:
-    """为单 agent 观测补上 agent 维度，使训练循环始终处理统一形状。"""
-
     observation = np.asarray(observation, dtype=np.float32)
     if observation.ndim == 1:
         return observation.reshape(1, -1)
@@ -531,8 +461,6 @@ def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.nda
 
 
 def _agent_rewards(env: GridCoverageEnv, reward: float | np.ndarray) -> np.ndarray:
-    """将标量团队奖励转换为每个 agent 对齐的一维数组。"""
-
     reward_array = np.asarray(reward, dtype=np.float32)
     if reward_array.ndim == 0:
         return np.full(env.num_agents, float(reward_array), dtype=np.float32)
@@ -540,8 +468,6 @@ def _agent_rewards(env: GridCoverageEnv, reward: float | np.ndarray) -> np.ndarr
 
 
 def _resolve_device(device_name: str) -> torch.device:
-    """解析 CPU/GPU 配置；请求不可用 CUDA 时稳妥回落到 CPU。"""
-
     normalized = device_name.lower().strip()
     if normalized == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -551,8 +477,6 @@ def _resolve_device(device_name: str) -> torch.device:
 
 
 def _model_device(model: ActorCritic) -> torch.device:
-    """读取模型参数所在设备，供新建输入张量对齐。"""
-
     return next(model.parameters()).device
 
 
@@ -564,8 +488,6 @@ def _gae(
     gamma: float,
     gae_lambda: float,
 ) -> tuple[list[float], list[float]]:
-    """单序列版 generalized advantage estimation，保留给简单调用/测试。"""
-
     advantages = [0.0 for _ in rewards]
     last_advantage = 0.0
     for index in reversed(range(len(rewards))):
@@ -586,8 +508,6 @@ def _gae_array(
     gamma: float,
     gae_lambda: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """对 ``[time, agents]`` 奖励批量计算 GAE 与目标回报。"""
-
     advantages = np.zeros_like(rewards, dtype=np.float32)
     last_advantage = np.zeros(rewards.shape[1], dtype=np.float32)
     for index in reversed(range(rewards.shape[0])):
@@ -601,8 +521,6 @@ def _gae_array(
 
 
 def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torch.optim.Optimizer, batch: RolloutBatch) -> None:
-    """以 PPO clipped objective 对一段 rollout 进行多轮小批量更新。"""
-
     advantages = (batch.advantages - batch.advantages.mean()) / (batch.advantages.std(unbiased=False) + 1e-8)
     rollout_steps = batch.actions.shape[0]
     num_agents = batch.actions.shape[1] if batch.actions.ndim > 1 else 1
@@ -618,7 +536,6 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
             neighbor_mask = batch.neighbor_masks[mb_tensor] if batch.neighbor_masks is not None else None
             edge_features = batch.edge_features[mb_tensor] if batch.edge_features is not None else None
             node_messages = batch.node_messages[mb_tensor] if batch.node_messages is not None else None
-            action_masks = batch.action_masks[mb_tensor] if batch.action_masks is not None else None
             log_probs, entropy, values = model.evaluate_actions(
                 batch.observations[mb_tensor],
                 batch.states[mb_tensor],
@@ -626,15 +543,12 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
                 node_messages=node_messages,
-                action_mask=action_masks,
             )
-            # ratio 衡量新策略相对采样时旧策略改变了多少；clip 防止步子过大。
             ratio = torch.exp(log_probs - batch.log_probs[mb_tensor])
             clipped = torch.clamp(ratio, 1.0 - config.ppo.clip_ratio, 1.0 + config.ppo.clip_ratio) * advantages[mb_tensor]
             policy_loss = -torch.min(ratio * advantages[mb_tensor], clipped).mean()
             value_loss = nn.functional.mse_loss(values, batch.returns[mb_tensor])
             entropy_loss = entropy.mean()
-            # actor 希望提升优势动作，critic 拟合回报，entropy 鼓励适量探索。
             loss = policy_loss + config.ppo.value_coef * value_loss - config.ppo.entropy_coef * entropy_loss
 
             optimizer.zero_grad()
@@ -644,8 +558,6 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
 
 
 def _checkpoint_payload(config: ExperimentConfig, model: ActorCritic) -> dict[str, object]:
-    """保存权重及重建网络结构所需元信息。"""
-
     return {
         "model_state_dict": model.state_dict(),
         "observation_dim": model.observation_dim,
@@ -665,44 +577,25 @@ def _checkpoint_payload(config: ExperimentConfig, model: ActorCritic) -> dict[st
         "gat_attention_dropout": model.gat_attention_dropout,
         "node_message_dim": model.node_message_dim,
         "use_coverage_messages": model.node_message_dim > 0,
-        "actor_encoder": model.actor_encoder,
-        "actor_map_shape": model.actor_map_shape,
-        "actor_metadata_dim": model.actor_metadata_dim,
     }
 
 
 def _edge_features_tensor(env: GridCoverageEnv, model: ActorCritic, device: torch.device) -> torch.Tensor | None:
-    """仅在模型启用边特征时将环境相对几何转换为张量。"""
-
     if not _uses_edge_features(model):
         return None
     return torch.as_tensor(env.neighbor_features(), dtype=torch.float32, device=device)
 
 
 def _uses_edge_features(model: ActorCritic) -> bool:
-    """判断当前 GAT 是否需要环境提供 agent 对几何特征。"""
-
     return model.use_graph_attention and model.gat_edge_dim > 0
 
 
 def _node_messages_tensor(env: GridCoverageEnv, model: ActorCritic, device: torch.device) -> torch.Tensor | None:
-    """仅在消息化 actor 开启时取得 map-intent 节点消息。"""
-
     if model.node_message_dim <= 0:
         return None
     return torch.as_tensor(env.node_messages(), dtype=torch.float32, device=device)
 
 
-def _action_mask_tensor(env: GridCoverageEnv, config: ExperimentConfig, device: torch.device) -> torch.Tensor | None:
-    """Build the decentralized feasibility mask only for configured experiments."""
-
-    if not config.ppo.use_action_mask:
-        return None
-    return torch.as_tensor(env.action_mask(), dtype=torch.bool, device=device)
-
-
 def _slugify(text: str) -> str:
-    """将课程名称转换为适合目录名的 ASCII 标识。"""
-
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
     return slug or "course"

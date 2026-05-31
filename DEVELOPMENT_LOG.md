@@ -74,24 +74,6 @@
   - 为旧 checkpoint 保留显式 legacy 重放兼容路径，以便审计既有结果，但禁止将其混称为修正后的去中心化消融结果。
   - 本轮不引入信息素通道；若后续研究信息素启发式，必须作为独立消融变量实现和报告。
 
-## 2026-05-25
-
-- 在 `map-intent` 正式课程训练开始前降低收尾奖励噪声：
-  - `configs/ablation_mapmsg_gat_on.toml` 与 `configs/ablation_mapmsg_gat_off.toml` 同步将 `finish_reward` 设置为 `20.0`。
-  - 新增 `normalize_team_finish_reward = true`，将完成奖励解释为一次团队完成事件的总奖金；多 agent 时按 agent 数量分配到共享 transition reward。
-  - 例如课程四的每 agent 完成加分由未归一化语义下的 `120` 降为 `20 / 4 = 5`，避免最后少数格的偶发完成对价值学习产生过强跳变。
-  - 默认配置语义保持向后兼容，历史 legacy checkpoint 重放不启用该新归一化开关。
-- 补充奖励归一化与 map-intent 两臂一致性的自动化测试；本轮尚未启动新的正式课程训练。
-
-- 将 `map-intent` 训练目标改为固定预算下的覆盖效率优先：
-  - `team_time_weight` 改为固定每步成本，新训练不再因覆盖率接近 100% 而降低尾部搜索价格。
-  - `finish_reward` 进一步降为 `10.0`，并继续按 agent 数量归一化；严格完成仅作小额补充激励。
-  - 评价主次明确为优先观察 `Coverage@H`、`Coverage-AUC`、`T90/T95`、`RepeatRatioAfter90` 与 `InterAgentOverlapRatio`，将 `completion_rate/T100` 作为补充指标。
-- 为新的 `ablation_mapmsg_gat_on` / `ablation_mapmsg_gat_off` 两臂同步启用去中心化 action mask：
-  - mask 仅移除越界动作，以及 agent 已经通过本地感知或地图融合获知的障碍动作。
-  - 未知障碍、重复访问和同步 agent 碰撞不使用环境真值预先屏蔽，继续由策略与奖励学习处理。
-- 2026-05-25 已经启动的 `mapmsg_gat_on` 课程运行使用本次变更前的配置快照，不应与采用固定时间成本和 action mask 的新运行混作同一实验线。
-
 ## Pending Work
 
 - 依次训练 `ablation_mapmsg_gat_on` 与 `ablation_mapmsg_gat_off` 的四级课程，并在相同未见地图 seed 集上完成公平比较。

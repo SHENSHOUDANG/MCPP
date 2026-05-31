@@ -10,14 +10,13 @@ random_obstacle_seed = 11
 danger_radius = 1
 
 [reward]
-finish_reward = 10.0
-normalize_team_finish_reward = true
-team_new_cell_weight = 1.0
-team_straight_weight = 0.01
-team_repeat_weight = 0.3
-team_invalid_weight = 1.0
-team_time_weight = 0.02
-scale_time_cost_by_uncovered = false
+distance_weight = 1.0
+straight_weight = 1.0
+coverage_weight = 1.0
+time_penalty_weight = 0.3
+repeat_penalty_weight = 0.1
+finish_reward = 80.0
+invalid_move_penalty = -1.0
 
 [ppo]
 total_timesteps = 256
@@ -34,7 +33,6 @@ max_grad_norm = 0.5
 hidden_dim = 64
 seed = 7
 device = "auto"
-use_action_mask = true
 
 [train]
 run_root = "runs"
