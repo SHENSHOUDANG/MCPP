@@ -58,7 +58,11 @@ The command writes:
 - `bc_policy.pt`
 - `imitation_metrics.csv`
 - `imitation_summary.json`
+- `expert_trajectory.json` and `expert_trajectory.png`
+- `bc_trajectory.json` and `bc_trajectory.png`
 - `course_config.json`
+
+Use `expert_trajectory.png` to inspect whether the rule expert generated a sensible boustrophedon path around obstacles. Use `bc_trajectory.png` to inspect the cloned actor after pretraining. The expert plot validates the labels; the BC plot validates what the network actually learned from those labels.
 
 Use the produced checkpoint as a PPO warm start:
 

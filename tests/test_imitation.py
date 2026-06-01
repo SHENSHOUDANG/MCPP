@@ -13,7 +13,7 @@ if str(SRC) not in sys.path:
 from mathbased_mcpp.config import ExperimentConfig, GridCoverageConfig, PPOConfig, TrainConfig
 from mathbased_mcpp.env import GridCoverageEnv
 from mathbased_mcpp.evaluation import evaluate_policy, load_policy
-from mathbased_mcpp.imitation import BoustrophedonExpert, generate_expert_dataset, pretrain_imitation
+from mathbased_mcpp.imitation import BoustrophedonExpert, generate_expert_dataset, pretrain_imitation, rollout_expert_policy
 
 
 class ImitationTests(unittest.TestCase):
@@ -80,6 +80,24 @@ class ImitationTests(unittest.TestCase):
         self.assertEqual(dataset.edge_features.shape[1:3], (2, 2))
         self.assertEqual(dataset.node_messages.shape[1], 2)
 
+    def test_rollout_expert_policy_writes_trajectory(self) -> None:
+        config = ExperimentConfig(
+            env=GridCoverageConfig(width=4, height=4, max_steps=8, seed=23, start=(0, 0)),
+            ppo=PPOConfig(hidden_dim=32, seed=23),
+            train=TrainConfig(use_tensorboard=False),
+        )
+        run_dir = ROOT / ".tmp_tests" / "expert-rollout"
+        shutil.rmtree(run_dir, ignore_errors=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            summary = rollout_expert_policy(config, output_path=run_dir / "expert_trajectory.json")
+
+            self.assertIn("coverage_ratio", summary)
+            self.assertTrue((run_dir / "expert_trajectory.json").exists())
+            self.assertGreater(float(summary["coverage_ratio"]), 0.4)
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
     def test_pretrain_writes_loadable_checkpoint(self) -> None:
         config = ExperimentConfig(
             env=GridCoverageConfig(width=4, height=4, max_steps=8, seed=19, start=(0, 0)),
@@ -95,8 +113,16 @@ class ImitationTests(unittest.TestCase):
             self.assertTrue(result.checkpoint.exists())
             self.assertTrue((run_dir / "imitation_metrics.csv").exists())
             self.assertTrue((run_dir / "imitation_summary.json").exists())
+            self.assertTrue((run_dir / "expert_trajectory.json").exists())
+            self.assertTrue((run_dir / "expert_trajectory.png").exists())
+            self.assertTrue((run_dir / "bc_trajectory.json").exists())
+            self.assertTrue((run_dir / "bc_trajectory.png").exists())
+            self.assertGreater((run_dir / "expert_trajectory.png").stat().st_size, 0)
+            self.assertGreater((run_dir / "bc_trajectory.png").stat().st_size, 0)
             self.assertGreater(result.transitions, 0)
             self.assertGreaterEqual(result.final_accuracy, 0.0)
+            self.assertEqual(result.expert_render.name, "expert_trajectory.png")
+            self.assertEqual(result.bc_render.name, "bc_trajectory.png")
 
             model = load_policy(config, result.checkpoint)
             env = GridCoverageEnv(config.env)

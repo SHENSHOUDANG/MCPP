@@ -154,6 +154,8 @@ def main() -> None:
         print(f"transitions={result.transitions}")
         print(f"final_loss={result.final_loss:.6f}")
         print(f"final_accuracy={result.final_accuracy:.4f}")
+        print(f"expert_render={result.expert_render}")
+        print(f"bc_render={result.bc_render}")
         return
 
     checkpoint_path = Path(args.checkpoint)

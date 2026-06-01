@@ -16,7 +16,9 @@ from torch import nn
 
 from .config import ExperimentConfig, GridCoverageConfig, GridPosition, build_course_config, select_curriculum_course
 from .env import ACTIONS, GridCoverageEnv
+from .evaluation import coverage_efficiency_metrics, evaluate_policy
 from .ppo import ActorCritic
+from .rendering import render_trajectory
 from .utils import append_metrics, make_run_dir, set_seed
 
 
@@ -46,6 +48,8 @@ class ImitationPretrainResult:
     episodes: int
     final_loss: float
     final_accuracy: float
+    expert_render: Path
+    bc_render: Path
 
 
 class BoustrophedonExpert:
@@ -302,6 +306,10 @@ def pretrain_imitation(
 
     checkpoint_path = run_path / "bc_policy.pt"
     torch.save(_checkpoint_payload(course_config, model, dataset, final_loss, final_accuracy), checkpoint_path)
+    expert_summary = rollout_expert_policy(course_config, output_path=run_path / "expert_trajectory.json")
+    expert_render = render_trajectory(course_config, expert_summary["trajectory"], run_path / "expert_trajectory.png")
+    bc_summary = evaluate_policy(course_config, checkpoint_path, output_path=run_path / "bc_trajectory.json")
+    bc_render = render_trajectory(course_config, bc_summary["trajectory"], run_path / "bc_trajectory.png")
     run_path.joinpath("imitation_summary.json").write_text(
         json.dumps(
             {
@@ -310,6 +318,10 @@ def pretrain_imitation(
                 "transitions": dataset.transitions,
                 "final_loss": final_loss,
                 "final_accuracy": final_accuracy,
+                "expert_coverage_ratio": expert_summary["coverage_ratio"],
+                "expert_render": str(expert_render),
+                "bc_coverage_ratio": bc_summary["coverage_ratio"],
+                "bc_render": str(bc_render),
             },
             indent=2,
         ),
@@ -322,7 +334,59 @@ def pretrain_imitation(
         episodes=dataset.episodes,
         final_loss=final_loss,
         final_accuracy=final_accuracy,
+        expert_render=expert_render,
+        bc_render=bc_render,
     )
+
+
+def rollout_expert_policy(
+    config: ExperimentConfig,
+    output_path: str | Path | None = None,
+    expert: BoustrophedonExpert | None = None,
+) -> dict[str, object]:
+    expert = expert or BoustrophedonExpert()
+    env = GridCoverageEnv(config.env)
+    env.reset(seed=config.env.seed)
+    trajectories = [[position] for position in env.positions]
+    coverage_curve = [env.coverage_ratio()]
+    total_reward = 0.0
+    done = False
+    info: dict[str, object] = {}
+    while not done:
+        result = env.step(expert.actions(env))
+        rewards = np.asarray(result.reward, dtype=np.float32)
+        total_reward += float(rewards.mean() if rewards.ndim > 0 else rewards)
+        done = result.done
+        info = result.info
+        for index, position in enumerate(env.positions):
+            trajectories[index].append(position)
+        coverage_curve.append(env.coverage_ratio())
+
+    summary: dict[str, object] = {
+        "total_reward": total_reward,
+        "coverage_ratio": info.get("coverage_ratio", env.coverage_ratio()),
+        "path_length": env.path_length,
+        "path_lengths": list(env.path_lengths),
+        "completed": bool(info.get("completed", False)),
+        "steps": info.get("step_count", env.step_count),
+        "trajectory": trajectories[0] if env.num_agents == 1 else trajectories,
+        "trajectories": trajectories,
+    }
+    summary.update(
+        coverage_efficiency_metrics(
+            trajectories=trajectories,
+            coverage_curve=coverage_curve,
+            max_steps=env.config.max_steps,
+        )
+    )
+    if output_path is not None:
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        serializable = dict(summary)
+        serializable["trajectory"] = _serialize_trajectory(summary["trajectory"])
+        serializable["trajectories"] = [[list(cell) for cell in trajectory] for trajectory in trajectories]
+        path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
+    return summary
 
 
 def _course_config(config: ExperimentConfig, course: str | None) -> ExperimentConfig:
@@ -404,6 +468,14 @@ def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.nda
     if observation.ndim == 1:
         return observation.reshape(1, -1)
     return observation
+
+
+def _serialize_trajectory(trajectory: object) -> object:
+    if isinstance(trajectory, list) and trajectory and isinstance(trajectory[0], tuple):
+        return [list(cell) for cell in trajectory]
+    if isinstance(trajectory, list):
+        return [[list(cell) for cell in path] for path in trajectory]
+    return trajectory
 
 
 def _resolve_device(device_name: str) -> torch.device:
