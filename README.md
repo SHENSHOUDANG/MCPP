@@ -9,6 +9,7 @@ The formal curriculum is run one course at a time. Each course writes its own ch
 ```powershell
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp doctor --config configs/smoke.toml
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/smoke.toml
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 16 --epochs 4
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent
 ```
 
@@ -22,6 +23,7 @@ The recent training line now includes these changes:
 - `team_frontier_weight = 0.0` disables frontier-distance shaping, and the environment skips the associated distance-search work.
 - Course-level PPO rollout sizes increase with task difficulty.
 - The formal curriculum is capped at 20x20 maps. Obstacle density is a per-course experiment knob, not a curriculum difficulty axis.
+- A low-cost imitation warm start is available through a boustrophedon obstacle-avoidance expert and behavior cloning pretraining.
 
 ## Formal Curriculum
 
@@ -33,6 +35,38 @@ The recent training line now includes these changes:
 - `tier-4-20x20-4agents`: 20x20 map, 500 episode steps, 4 agents, 4400000 PPO timesteps, initialized from tier 3.
 
 All formal tiers use `observation_radius = 2`, so the actor receives a 5x5 local observation window. The largest formal course is fixed at 20x20 to keep training and ablation experiments manageable. Each course has its own explicit `obstacle_ratio`, so you can change course 2, 3, or 4 independently without changing the others.
+
+## Imitation Warm Start
+
+The large-map zero-shot representation from the literature is intentionally not part of the current implementation. It is too expensive for the current training budget because it enlarges the actor input and becomes especially costly on courses 3 and 4. The cheaper alternative now implemented is behavior cloning from a rule expert before PPO.
+
+The expert is a boustrophedon-style coverage policy with obstacle avoidance:
+
+- it orders free cells in alternating row sweeps;
+- it uses shortest paths through connected free cells to route around obstacles;
+- in multi-agent maps, it assigns row bands to agents and avoids immediate same-cell and current-position conflicts;
+- it generates labels offline, while the learned actor still receives only the normal local observation and optional GAT/message inputs.
+
+Run behavior cloning for one curriculum course:
+
+```powershell
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 16 --epochs 4
+```
+
+The command writes:
+
+- `bc_policy.pt`
+- `imitation_metrics.csv`
+- `imitation_summary.json`
+- `course_config.json`
+
+Use the produced checkpoint as a PPO warm start:
+
+```powershell
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent --previous-checkpoint "E:\test plot\imitation\<run>\bc_policy.pt"
+```
+
+After course 1, the existing curriculum transfer remains unchanged: train course 2 from course 1, course 3 from course 2, and course 4 from course 3. The imitation checkpoint is meant to reduce early PPO exploration cost, not to replace PPO or claim large-map zero-shot generalization.
 
 ## Obstacle Density Rationale
 

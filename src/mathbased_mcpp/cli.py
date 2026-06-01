@@ -8,6 +8,7 @@ from .benchmark import benchmark_policy
 from .config import load_config
 from .env import GridCoverageEnv
 from .evaluation import evaluate_policy, resolve_runtime_config
+from .imitation import pretrain_imitation
 from .rendering import render_trajectory
 from .training import train_ppo
 
@@ -16,14 +17,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="mathbased_mcpp")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for name in ("doctor", "train", "evaluate", "render", "benchmark"):
+    for name in ("doctor", "train", "pretrain", "evaluate", "render", "benchmark"):
         subparser = subparsers.add_parser(name)
         subparser.add_argument("--config", default="configs/smoke.toml")
         if name in {"evaluate", "render", "benchmark"}:
             subparser.add_argument("--checkpoint", required=True)
-        if name == "train":
+        if name in {"train", "pretrain"}:
             subparser.add_argument("--course", default=None)
+        if name == "train":
             subparser.add_argument("--previous-checkpoint", default=None)
+        if name == "pretrain":
+            subparser.add_argument("--episodes", type=int, default=8)
+            subparser.add_argument("--epochs", type=int, default=3)
+            subparser.add_argument("--batch-size", type=int, default=256)
+            subparser.add_argument("--learning-rate", type=float, default=None)
+            subparser.add_argument("--run-dir", default=None)
         if name == "benchmark":
             subparser.add_argument("--seeds", default="20260501,20260502,20260503,20260504,20260505")
             subparser.add_argument("--obstacle-ratios", default=None)
@@ -126,6 +134,26 @@ def main() -> None:
             parser.error("curriculum configs require --course so each course can be trained separately")
         checkpoint = train_ppo(config, course=args.course, previous_checkpoint=args.previous_checkpoint)
         print(f"checkpoint={checkpoint}")
+        return
+
+    if args.command == "pretrain":
+        if config.curriculum and config.curriculum.courses and not args.course:
+            parser.error("curriculum configs require --course for imitation pretraining")
+        result = pretrain_imitation(
+            config,
+            run_dir=args.run_dir,
+            course=args.course,
+            episodes=args.episodes,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            learning_rate=args.learning_rate,
+        )
+        print(f"checkpoint={result.checkpoint}")
+        print(f"run_dir={result.run_dir}")
+        print(f"episodes={result.episodes}")
+        print(f"transitions={result.transitions}")
+        print(f"final_loss={result.final_loss:.6f}")
+        print(f"final_accuracy={result.final_accuracy:.4f}")
         return
 
     checkpoint_path = Path(args.checkpoint)

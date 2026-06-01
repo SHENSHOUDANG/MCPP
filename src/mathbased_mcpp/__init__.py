@@ -11,22 +11,28 @@ from .config import (
     select_curriculum_course,
 )
 from .env import ACTIONS, GridCoverageEnv, StepResult
+from .imitation import BoustrophedonExpert, ExpertDataset, ImitationPretrainResult, generate_expert_dataset, pretrain_imitation
 from .safety import AvoidancePolicy, SafetyLayer
 
 __all__ = [
     "ACTIONS",
     "AvoidancePolicy",
+    "BoustrophedonExpert",
     "CurriculumConfig",
     "CurriculumCourseConfig",
     "ExperimentConfig",
+    "ExpertDataset",
     "GridCoverageConfig",
     "GridCoverageEnv",
+    "ImitationPretrainResult",
     "PPOConfig",
     "RewardConfig",
     "SafetyLayer",
     "StepResult",
     "build_course_config",
     "default_max_steps",
+    "generate_expert_dataset",
     "load_config",
+    "pretrain_imitation",
     "select_curriculum_course",
 ]
