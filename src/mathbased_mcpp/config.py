@@ -95,6 +95,7 @@ class PPOConfig:
     gat_residual: bool = False
     gat_attention_dropout: float = 0.0
     use_coverage_messages: bool = False
+    use_action_mask: bool = False
 
 
 @dataclass(slots=True)

@@ -50,6 +50,7 @@ gat_num_heads = 4
 gat_use_edge_features = true
 gat_residual = true
 gat_attention_dropout = 0.0
+use_action_mask = true
 
 [train]
 run_root = "E:\\test plot"

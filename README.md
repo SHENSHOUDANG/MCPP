@@ -9,7 +9,7 @@ The formal curriculum is run one course at a time. Each course writes its own ch
 ```powershell
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp doctor --config configs/smoke.toml
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/smoke.toml
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 16 --epochs 4
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 64 --epochs 40
 E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent
 ```
 
@@ -24,6 +24,7 @@ The recent training line now includes these changes:
 - Course-level PPO rollout sizes increase with task difficulty.
 - The formal curriculum is capped at 20x20 maps. Obstacle density is a per-course experiment knob, not a curriculum difficulty axis.
 - A low-cost imitation warm start is available through a boustrophedon obstacle-avoidance expert and behavior cloning pretraining.
+- PPO, evaluation, benchmarking, and imitation pretraining share the same `use_action_mask` setting from the active course config.
 
 ## Formal Curriculum
 
@@ -47,10 +48,12 @@ The expert is a boustrophedon-style coverage policy with obstacle avoidance:
 - in multi-agent maps, it assigns row bands to agents and avoids immediate same-cell and current-position conflicts;
 - it generates labels offline, while the learned actor still receives only the normal local observation and optional GAT/message inputs.
 
+When `use_action_mask = true`, behavior cloning uses the same one-step action mask as PPO. The mask removes moves that are already provably infeasible from the current cell, namely boundary exits and adjacent obstacle moves. It does not solve coverage by itself, but it keeps pretraining and formal PPO on the same action-space contract.
+
 Run behavior cloning for one curriculum course:
 
 ```powershell
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 16 --epochs 4
+E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 64 --epochs 40
 ```
 
 The command writes:
@@ -63,6 +66,8 @@ The command writes:
 - `course_config.json`
 
 Use `expert_trajectory.png` to inspect whether the rule expert generated a sensible boustrophedon path around obstacles. Use `bc_trajectory.png` to inspect the cloned actor after pretraining. The expert plot validates the labels; the BC plot validates what the network actually learned from those labels.
+
+Do not judge the warm start from a tiny `16 episodes / 4 epochs` run. On the course-1 map-intent setting that was enough to learn a high action frequency but not enough to learn row-end turns. Use `64 episodes / 40 epochs` as the first course-1 diagnostic target, then check that `final_accuracy` is close to 1.0 and `bc_coverage_ratio` is close to `expert_coverage_ratio` before starting PPO.
 
 Use the produced checkpoint as a PPO warm start:
 
@@ -473,7 +478,7 @@ Useful ideas to borrow later, in priority order:
 - Huber value loss: reduce the effect of rare extreme value errors compared with plain MSE.
 - Separate actor and critic optimizers: allow different learning rates or update behavior for policy and value function. This should be tested only after the simpler value-loss changes.
 - `active_masks`: useful if future environments include dead/inactive agents, turn-based behavior, or temporarily disabled robots. It is not urgent for the current simultaneous grid coverage setting.
-- `available_actions`: official code supports discrete action masking by setting unavailable action logits to a very small value. For this project it should remain a later optional ablation, because masking illegal moves changes the learning problem and may hide whether the policy learned boundary/obstacle avoidance.
+- `available_actions`: the current formal/map-intent configs already use a one-step mask for boundary exits and observed obstacle moves. Richer masks, such as collision-reservation or unknown-risk masks, should remain separate ablations because they change the learning problem.
 - Parallel rollout threads: official MAPPO uses vectorized rollout shapes, but this should be copied carefully. First add timing logs and a synchronous vector environment; multiprocessing comes only after shape, seed, reset, and GAT-mask tests pass.
 
 Mechanisms not to copy by default:
@@ -487,7 +492,7 @@ Recommended order after the GAT ablation:
 2. Fix termination semantics with `masks` and `bad_masks`.
 3. Add `ValueNorm`, clipped value loss, and Huber value loss behind config flags.
 4. Compare against the current baseline on the same seeds and obstacle ratios.
-5. Only then consider separate actor/critic optimizers, action masking, or vectorized rollout.
+5. Only then consider separate actor/critic optimizers, richer action masks, or vectorized rollout.
 
 ## Parallel Environment Cautions
 

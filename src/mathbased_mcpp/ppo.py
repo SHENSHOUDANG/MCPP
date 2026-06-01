@@ -297,6 +297,7 @@ class ActorCritic(nn.Module):
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
         node_messages: torch.Tensor | None = None,
+        action_mask: torch.Tensor | None = None,
     ) -> Categorical:
         logits = self.actor(
             self._actor_features(
@@ -306,7 +307,20 @@ class ActorCritic(nn.Module):
                 node_messages=node_messages,
             )
         )
-        return Categorical(logits=logits)
+        return Categorical(logits=self._mask_action_logits(logits, action_mask))
+
+    @staticmethod
+    def _mask_action_logits(logits: torch.Tensor, action_mask: torch.Tensor | None) -> torch.Tensor:
+        if action_mask is None:
+            return logits
+        mask = action_mask.to(device=logits.device, dtype=torch.bool)
+        if mask.ndim + 1 == logits.ndim:
+            mask = mask.unsqueeze(0)
+        if mask.shape != logits.shape:
+            raise ValueError(f"action mask shape {tuple(mask.shape)} does not match logits shape {tuple(logits.shape)}")
+        has_available_action = mask.any(dim=-1, keepdim=True)
+        effective_mask = torch.where(has_available_action, mask, torch.ones_like(mask))
+        return logits.masked_fill(~effective_mask, torch.finfo(logits.dtype).min)
 
     def value(self, states: torch.Tensor) -> torch.Tensor:
         if states.ndim == 1:
@@ -320,6 +334,7 @@ class ActorCritic(nn.Module):
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
         node_messages: torch.Tensor | None = None,
+        action_mask: torch.Tensor | None = None,
         deterministic: bool = False,
     ) -> tuple[int, torch.Tensor, torch.Tensor]:
         actions, log_probs, values = self.act_batch(
@@ -328,6 +343,7 @@ class ActorCritic(nn.Module):
             neighbor_mask=neighbor_mask,
             edge_features=edge_features,
             node_messages=node_messages,
+            action_mask=action_mask,
             deterministic=deterministic,
         )
         return int(actions[0].item()), log_probs[0], values[0]
@@ -339,6 +355,7 @@ class ActorCritic(nn.Module):
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
         node_messages: torch.Tensor | None = None,
+        action_mask: torch.Tensor | None = None,
         deterministic: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if observation.ndim == 1:
@@ -352,6 +369,7 @@ class ActorCritic(nn.Module):
             edge_features=edge_features,
             node_messages=node_messages,
         )
+        logits = self._mask_action_logits(logits, action_mask)
         dist = Categorical(logits=logits)
         action = torch.argmax(logits, dim=-1) if deterministic else dist.sample()
         log_prob = dist.log_prob(action)
@@ -365,6 +383,7 @@ class ActorCritic(nn.Module):
         neighbor_mask: torch.Tensor | None = None,
         edge_features: torch.Tensor | None = None,
         node_messages: torch.Tensor | None = None,
+        action_mask: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         logits, values = self.forward(
             observations,
@@ -373,7 +392,7 @@ class ActorCritic(nn.Module):
             edge_features=edge_features,
             node_messages=node_messages,
         )
-        dist = Categorical(logits=logits)
+        dist = Categorical(logits=self._mask_action_logits(logits, action_mask))
         return dist.log_prob(actions), dist.entropy(), values
 
     def latest_attention_weights(self) -> torch.Tensor | None:
@@ -392,3 +411,4 @@ class RolloutBatch:
     neighbor_masks: torch.Tensor | None = None
     edge_features: torch.Tensor | None = None
     node_messages: torch.Tensor | None = None
+    action_masks: torch.Tensor | None = None

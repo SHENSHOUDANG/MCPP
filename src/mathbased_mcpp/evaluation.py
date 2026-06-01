@@ -112,6 +112,7 @@ def evaluate_policy(
             if model.node_message_dim > 0
             else None
         )
+        action_mask = torch.as_tensor(env.action_masks(), dtype=torch.bool) if config.ppo.use_action_mask else None
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -119,6 +120,7 @@ def evaluate_policy(
                 neighbor_mask=neighbor_mask,
                 edge_features=edge_features,
                 node_messages=node_messages,
+                action_mask=action_mask,
                 deterministic=deterministic,
             )
         result = env.step(actions.cpu().numpy().tolist())

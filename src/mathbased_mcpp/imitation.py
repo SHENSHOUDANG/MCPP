@@ -27,6 +27,7 @@ class ExpertDataset:
     observations: np.ndarray
     actions: np.ndarray
     neighbor_masks: np.ndarray
+    action_masks: np.ndarray | None
     edge_features: np.ndarray | None
     node_messages: np.ndarray | None
     episodes: int
@@ -188,6 +189,7 @@ def generate_expert_dataset(
     observations: list[np.ndarray] = []
     actions: list[np.ndarray] = []
     neighbor_masks: list[np.ndarray] = []
+    action_masks: list[np.ndarray] = []
     edge_features: list[np.ndarray] = []
     node_messages: list[np.ndarray] = []
     use_edge_features = config.ppo.use_graph_attention and config.ppo.gat_use_edge_features
@@ -201,6 +203,8 @@ def generate_expert_dataset(
         for _ in range(max_steps):
             observations.append(observation.copy())
             neighbor_masks.append(env.neighbor_mask().copy())
+            if config.ppo.use_action_mask:
+                action_masks.append(env.action_masks().copy())
             if use_edge_features:
                 edge_features.append(env.neighbor_features().copy())
             if use_node_messages:
@@ -220,6 +224,7 @@ def generate_expert_dataset(
         observations=np.asarray(observations, dtype=np.float32),
         actions=np.asarray(actions, dtype=np.int64),
         neighbor_masks=np.asarray(neighbor_masks, dtype=bool),
+        action_masks=np.asarray(action_masks, dtype=bool) if action_masks else None,
         edge_features=np.asarray(edge_features, dtype=np.float32) if edge_features else None,
         node_messages=np.asarray(node_messages, dtype=np.float32) if node_messages else None,
         episodes=max(int(episodes), 1),
@@ -230,8 +235,8 @@ def pretrain_imitation(
     config: ExperimentConfig,
     run_dir: str | Path | None = None,
     course: str | None = None,
-    episodes: int = 8,
-    epochs: int = 3,
+    episodes: int = 64,
+    epochs: int = 40,
     batch_size: int = 256,
     learning_rate: float | None = None,
 ) -> ImitationPretrainResult:
@@ -260,6 +265,11 @@ def pretrain_imitation(
             observations = torch.as_tensor(dataset.observations[batch_indices], dtype=torch.float32, device=device)
             actions = torch.as_tensor(dataset.actions[batch_indices], dtype=torch.long, device=device)
             neighbor_mask = torch.as_tensor(dataset.neighbor_masks[batch_indices], dtype=torch.bool, device=device)
+            action_mask = (
+                torch.as_tensor(dataset.action_masks[batch_indices], dtype=torch.bool, device=device)
+                if dataset.action_masks is not None
+                else None
+            )
             edge_features = (
                 torch.as_tensor(dataset.edge_features[batch_indices], dtype=torch.float32, device=device)
                 if dataset.edge_features is not None
@@ -278,6 +288,7 @@ def pretrain_imitation(
                     node_messages=node_messages,
                 )
             )
+            logits = model._mask_action_logits(logits, action_mask)
             loss = nn.functional.cross_entropy(logits.reshape(-1, model.action_dim), actions.reshape(-1))
 
             optimizer.zero_grad()
@@ -321,6 +332,7 @@ def pretrain_imitation(
                 "expert_coverage_ratio": expert_summary["coverage_ratio"],
                 "expert_render": str(expert_render),
                 "bc_coverage_ratio": bc_summary["coverage_ratio"],
+                "bc_expert_coverage_gap": float(expert_summary["coverage_ratio"]) - float(bc_summary["coverage_ratio"]),
                 "bc_render": str(bc_render),
             },
             indent=2,
@@ -454,6 +466,7 @@ def _checkpoint_payload(
         "gat_attention_dropout": model.gat_attention_dropout,
         "node_message_dim": model.node_message_dim,
         "use_coverage_messages": model.node_message_dim > 0,
+        "use_action_mask": config.ppo.use_action_mask,
         "pretrain_type": "boustrophedon_behavior_cloning",
         "expert": "boustrophedon_shortest_path",
         "expert_episodes": dataset.episodes,

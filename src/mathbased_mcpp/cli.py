@@ -27,8 +27,8 @@ def main() -> None:
         if name == "train":
             subparser.add_argument("--previous-checkpoint", default=None)
         if name == "pretrain":
-            subparser.add_argument("--episodes", type=int, default=8)
-            subparser.add_argument("--epochs", type=int, default=3)
+            subparser.add_argument("--episodes", type=int, default=64)
+            subparser.add_argument("--epochs", type=int, default=40)
             subparser.add_argument("--batch-size", type=int, default=256)
             subparser.add_argument("--learning-rate", type=float, default=None)
             subparser.add_argument("--run-dir", default=None)

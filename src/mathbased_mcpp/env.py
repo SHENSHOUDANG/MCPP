@@ -255,6 +255,15 @@ class GridCoverageEnv:
     def legal_actions(self, agent_index: int = 0) -> list[int]:
         return [action for action in ACTIONS if self.peek(action, agent_index=agent_index)[1]]
 
+    def action_masks(self) -> np.ndarray:
+        return np.asarray(
+            [
+                [self.peek(action, agent_index=agent_index)[1] for action in ACTIONS]
+                for agent_index in range(self.num_agents)
+            ],
+            dtype=bool,
+        )
+
     def safe_actions(self, agent_index: int = 0) -> list[int]:
         actions = []
         for action in self.legal_actions(agent_index=agent_index):

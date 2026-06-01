@@ -66,6 +66,7 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.curriculum.courses[3].env.communication_radius, 4)
         self.assertFalse(config.env.use_legacy_truth_coverage_observation)
         self.assertTrue(config.ppo.use_graph_attention)
+        self.assertTrue(config.ppo.use_action_mask)
         self.assertEqual(config.ppo.gat_num_heads, 4)
         self.assertTrue(config.ppo.gat_use_edge_features)
         self.assertTrue(config.ppo.gat_residual)
@@ -144,6 +145,8 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertTrue(gat_on.ppo.use_coverage_messages)
         self.assertTrue(gat_on.ppo.use_graph_attention)
         self.assertFalse(gat_off.ppo.use_graph_attention)
+        self.assertTrue(gat_on.ppo.use_action_mask)
+        self.assertTrue(gat_off.ppo.use_action_mask)
         self.assertEqual(gat_on.env.intent_grid_size, gat_off.env.intent_grid_size)
         self.assertEqual(gat_on.ppo.use_coverage_messages, gat_off.ppo.use_coverage_messages)
         self.assertEqual(
@@ -616,6 +619,30 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(model.node_message_dim, 24)
         self.assertIsNotNone(model.latest_attention_weights())
 
+    def test_actor_action_mask_blocks_invalid_argmax(self) -> None:
+        env = GridCoverageEnv(GridCoverageConfig(width=3, height=3, start=(0, 0), obstacles=[(0, 1)]))
+        observation = env.reset()
+        state = env.global_state()
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+        )
+        with torch.no_grad():
+            for parameter in model.parameters():
+                parameter.zero_()
+            model.actor.bias[:] = torch.tensor([0.0, 1.0, 0.0, 10.0])
+
+        action, _, _ = model.act(
+            torch.as_tensor(observation, dtype=torch.float32),
+            torch.as_tensor(state, dtype=torch.float32),
+            action_mask=torch.as_tensor(env.action_masks()[0], dtype=torch.bool),
+            deterministic=True,
+        )
+
+        self.assertEqual(action, 1)
+
     def test_multi_agent_rewards_are_shared(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(width=4, height=1, num_agents=2, start_positions=[(0, 0), (0, 3)], max_steps=5)
@@ -723,6 +750,16 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(env.position, (0, 1))
         self.assertEqual(result.info["path_length"], 1)
         self.assertIn((0, 1), env.covered)
+
+    def test_action_masks_block_boundary_and_obstacle_moves(self) -> None:
+        env = GridCoverageEnv(GridCoverageConfig(width=3, height=3, start=(0, 0), obstacles=[(0, 1)]))
+        env.reset()
+        mask = env.action_masks()
+        self.assertEqual(mask.shape, (1, env.action_dim))
+        self.assertFalse(mask[0, 0])
+        self.assertTrue(mask[0, 1])
+        self.assertFalse(mask[0, 2])
+        self.assertFalse(mask[0, 3])
 
     def test_illegal_move_keeps_state_and_penalizes(self) -> None:
         env = GridCoverageEnv(GridCoverageConfig(width=6, height=6, start=(0, 0)))
