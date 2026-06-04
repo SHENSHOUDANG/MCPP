@@ -17,7 +17,17 @@ from torch import nn
 from .config import ExperimentConfig, build_course_config, select_curriculum_course
 from .env import GridCoverageEnv
 from .ppo import ActorCritic, RolloutBatch
-from .utils import append_metrics, make_run_dir, make_tensorboard_writer, set_seed, write_tensorboard_rows
+from .utils import (
+    agent_observations,
+    agent_rewards,
+    append_metrics,
+    checkpoint_model_metadata,
+    make_run_dir,
+    make_tensorboard_writer,
+    resolve_device,
+    set_seed,
+    write_tensorboard_rows,
+)
 
 
 def train_ppo(
@@ -108,7 +118,7 @@ def _train_single_course(
     _write_config_snapshot(config, run_path)
     writer = make_tensorboard_writer(run_path, config.train.tensorboard_dir) if config.train.use_tensorboard else None
 
-    device = _resolve_device(config.ppo.device)
+    device = resolve_device(config.ppo.device)
     model = ActorCritic(
         env.observation_dim,
         env.action_dim,
@@ -127,7 +137,7 @@ def _train_single_course(
         _load_checkpoint_weights(model, checkpoint_path)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ppo.learning_rate)
 
-    observation = _agent_observations(env, env.reset(seed=config.env.seed))
+    observation = agent_observations(env.reset(seed=config.env.seed))
     state = env.global_state()
     timestep = 0
     update_index = 0
@@ -270,7 +280,7 @@ def _update_curriculum_state(
 
 def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: int) -> dict[str, float | int]:
     env = GridCoverageEnv(config.env)
-    observation = _agent_observations(env, env.reset(seed=config.env.seed))
+    observation = agent_observations(env.reset(seed=config.env.seed))
     state = env.global_state()
     device = _model_device(model)
     total_reward = 0.0
@@ -278,7 +288,7 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
     info = {}
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
-        state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32, device=device)
+        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool, device=device)
         edge_features = _edge_features_tensor(env, model, device)
         node_messages = _node_messages_tensor(env, model, device)
@@ -294,9 +304,9 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
                 deterministic=True,
             )
         result = env.step(actions.cpu().numpy().tolist())
-        rewards = _agent_rewards(env, result.reward)
+        rewards = agent_rewards(env.num_agents, result.reward)
         total_reward += float(np.mean(rewards))
-        observation = _agent_observations(env, result.observation)
+        observation = agent_observations(result.observation)
         state = result.state
         done = result.done
         info = result.info
@@ -350,8 +360,7 @@ def _collect_rollout(
 
     for _ in range(max_steps):
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
-        state_batch = np.repeat(state[None, :], env.num_agents, axis=0)
-        state_tensor = torch.as_tensor(state_batch, dtype=torch.float32, device=device)
+        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
         neighbor_mask = env.neighbor_mask()
         neighbor_mask_tensor = torch.as_tensor(neighbor_mask, dtype=torch.bool, device=device)
         action_mask = env.action_masks() if config.ppo.use_action_mask else None
@@ -377,9 +386,9 @@ def _collect_rollout(
             )
 
         result = env.step(action_tensor.cpu().numpy().tolist())
-        reward_array = _agent_rewards(env, result.reward)
+        reward_array = agent_rewards(env.num_agents, result.reward)
         observations.append(observation)
-        states.append(state_batch)
+        states.append(state)
         actions.append(action_tensor.cpu().numpy())
         log_probs.append(log_prob_tensor.cpu().numpy())
         rewards.append(reward_array)
@@ -393,7 +402,7 @@ def _collect_rollout(
         if node_message_array is not None:
             node_messages.append(node_message_array)
         episode_reward += float(np.mean(reward_array))
-        observation = _agent_observations(env, result.observation)
+        observation = agent_observations(result.observation)
         state = result.state
 
         if result.done:
@@ -409,7 +418,7 @@ def _collect_rollout(
             )
             episode_index += 1
             episode_reward = 0.0
-            observation = _agent_observations(env, env.reset())
+            observation = agent_observations(env.reset())
             state = env.global_state()
             episode_start_length = env.path_length
 
@@ -417,8 +426,8 @@ def _collect_rollout(
         if dones and bool(dones[-1][0]):
             next_values = np.zeros(env.num_agents, dtype=np.float32)
         else:
-            next_state_batch = np.repeat(state[None, :], env.num_agents, axis=0)
-            next_values = model.value(torch.as_tensor(next_state_batch, dtype=torch.float32, device=device)).cpu().numpy()
+            next_value = model.value(torch.as_tensor(state, dtype=torch.float32, device=device))
+            next_values = next_value.expand(env.num_agents).cpu().numpy()
 
     returns, advantages = _gae_array(
         rewards=np.asarray(rewards, dtype=np.float32),
@@ -466,29 +475,6 @@ def _collect_rollout(
         "metric_rows": metric_rows,
     }
     return batch, observation, state, metrics
-
-
-def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.ndarray:
-    observation = np.asarray(observation, dtype=np.float32)
-    if observation.ndim == 1:
-        return observation.reshape(1, -1)
-    return observation
-
-
-def _agent_rewards(env: GridCoverageEnv, reward: float | np.ndarray) -> np.ndarray:
-    reward_array = np.asarray(reward, dtype=np.float32)
-    if reward_array.ndim == 0:
-        return np.full(env.num_agents, float(reward_array), dtype=np.float32)
-    return reward_array
-
-
-def _resolve_device(device_name: str) -> torch.device:
-    normalized = device_name.lower().strip()
-    if normalized == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if normalized.startswith("cuda") and not torch.cuda.is_available():
-        return torch.device("cpu")
-    return torch.device(normalized)
 
 
 def _model_device(model: ActorCritic) -> torch.device:
@@ -575,27 +561,7 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
 
 
 def _checkpoint_payload(config: ExperimentConfig, model: ActorCritic) -> dict[str, object]:
-    return {
-        "model_state_dict": model.state_dict(),
-        "observation_dim": model.observation_dim,
-        "state_dim": model.state_dim,
-        "action_dim": model.action_dim,
-        "hidden_dim": config.ppo.hidden_dim,
-        "critic_type": model.critic_mode,
-        "state_shape": model.state_shape,
-        "state_channels": model.state_channels,
-        "state_metadata_dim": model.state_metadata_dim,
-        "num_agents": config.env.num_agents,
-        "use_graph_attention": model.use_graph_attention,
-        "gat_num_heads": model.gat_num_heads,
-        "gat_edge_dim": model.gat_edge_dim,
-        "gat_use_edge_features": model.gat_edge_dim > 0,
-        "gat_residual": model.gat_residual,
-        "gat_attention_dropout": model.gat_attention_dropout,
-        "node_message_dim": model.node_message_dim,
-        "use_coverage_messages": model.node_message_dim > 0,
-        "use_action_mask": config.ppo.use_action_mask,
-    }
+    return checkpoint_model_metadata(config, model)
 
 
 def _edge_features_tensor(env: GridCoverageEnv, model: ActorCritic, device: torch.device) -> torch.Tensor | None:

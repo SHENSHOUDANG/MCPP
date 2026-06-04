@@ -22,13 +22,16 @@ class RewardConfig:
     time_penalty_weight: float = 0.3
     repeat_penalty_weight: float = 0.1
     finish_reward: float = 80.0
+    normalize_team_finish_reward: bool = False
     invalid_move_penalty: float = -1.0
     team_new_cell_weight: float = 1.0
+    team_straight_weight: float = 0.01
     team_frontier_weight: float = 0.25
     team_repeat_weight: float = 0.3
     team_invalid_weight: float = 0.8
     team_collision_weight: float = 1.2
-    team_time_weight: float = 0.02
+    team_time_weight: float = 0.03
+    scale_time_cost_by_uncovered: bool = True
 
 
 @dataclass(slots=True)

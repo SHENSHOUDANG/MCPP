@@ -49,6 +49,65 @@ def append_metrics(path: str | Path, rows: Iterable[dict[str, float | int]]) -> 
         writer.writerows(rows)
 
 
+def agent_observations(observation: np.ndarray) -> np.ndarray:
+    observation = np.asarray(observation, dtype=np.float32)
+    if observation.ndim == 1:
+        return observation.reshape(1, -1)
+    return observation
+
+
+def agent_rewards(num_agents: int, reward: float | np.ndarray) -> np.ndarray:
+    reward_array = np.asarray(reward, dtype=np.float32)
+    if reward_array.ndim == 0:
+        return np.full(num_agents, float(reward_array), dtype=np.float32)
+    return reward_array
+
+
+def resolve_device(device_name: str) -> torch.device:
+    normalized = device_name.lower().strip()
+    if normalized == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if normalized.startswith("cuda") and not torch.cuda.is_available():
+        return torch.device("cpu")
+    return torch.device(normalized)
+
+
+def serialize_trajectory(trajectory: object) -> object:
+    if trajectory is None:
+        return []
+    if isinstance(trajectory, list):
+        if not trajectory:
+            return []
+        if isinstance(trajectory[0], tuple):
+            return [list(cell) for cell in trajectory]
+        return [[list(cell) for cell in path] for path in trajectory]
+    return trajectory
+
+
+def checkpoint_model_metadata(config: object, model: object) -> dict[str, object]:
+    return {
+        "model_state_dict": model.state_dict(),
+        "observation_dim": model.observation_dim,
+        "state_dim": model.state_dim,
+        "action_dim": model.action_dim,
+        "hidden_dim": config.ppo.hidden_dim,
+        "critic_type": model.critic_mode,
+        "state_shape": model.state_shape,
+        "state_channels": model.state_channels,
+        "state_metadata_dim": model.state_metadata_dim,
+        "num_agents": config.env.num_agents,
+        "use_graph_attention": model.use_graph_attention,
+        "gat_num_heads": model.gat_num_heads,
+        "gat_edge_dim": model.gat_edge_dim,
+        "gat_use_edge_features": model.gat_edge_dim > 0,
+        "gat_residual": model.gat_residual,
+        "gat_attention_dropout": model.gat_attention_dropout,
+        "node_message_dim": model.node_message_dim,
+        "use_coverage_messages": model.node_message_dim > 0,
+        "use_action_mask": config.ppo.use_action_mask,
+    }
+
+
 def make_tensorboard_writer(run_path: str | Path, subdir: str = "tensorboard"):
     try:
         from tensorboard.compat.proto import event_pb2, summary_pb2

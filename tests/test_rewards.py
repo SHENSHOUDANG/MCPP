@@ -7,7 +7,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from mathbased_mcpp.config import GridCoverageConfig
+from mathbased_mcpp.config import GridCoverageConfig, RewardConfig
 from mathbased_mcpp.env import GridCoverageEnv
 from mathbased_mcpp.safety import SafetyLayer
 
@@ -20,7 +20,10 @@ class RewardStructureTests(unittest.TestCase):
         result = env.step(3)
         self.assertAlmostEqual(result.info["reward_terms"]["Rd"], 1.0)
         self.assertAlmostEqual(result.info["reward_terms"]["Rs"], 1.0)
-        self.assertLess(result.info["reward_terms"]["time"], 0.0)
+        self.assertAlmostEqual(
+            result.info["reward_terms"]["time"],
+            -env.config.reward.team_time_weight * result.info["reward_terms"]["time_cost_scale"],
+        )
 
     def test_coverage_reward_prefers_boundary_move(self) -> None:
         env = GridCoverageEnv(
@@ -43,6 +46,28 @@ class RewardStructureTests(unittest.TestCase):
         self.assertLess(result.info["reward_terms"]["repeat"], 0.0)
         self.assertLess(result.info["reward_terms"]["time"], 0.0)
         self.assertEqual(result.info["reward_terms"]["avoidable_repeats"], 1.0)
+
+    def test_nonavoidable_backtrack_has_small_negative_reward(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=3,
+                height=2,
+                start=(0, 0),
+                obstacles=[(1, 1)],
+                reward=RewardConfig(team_frontier_weight=0.0),
+            )
+        )
+        env.reset()
+        for action in (3, 3, 1):
+            env.step(action)
+
+        result = env.step(0)
+
+        self.assertEqual(result.info["reward_terms"]["repeated_cells"], 1.0)
+        self.assertEqual(result.info["reward_terms"]["avoidable_repeats"], 0.0)
+        self.assertEqual(result.info["reward_terms"]["nonavoidable_repeats"], 1.0)
+        self.assertLess(result.info["reward_terms"]["repeat"], 0.0)
+        self.assertLess(result.reward, 0.0)
 
     def test_invalid_move_is_penalized(self) -> None:
         env = GridCoverageEnv(GridCoverageConfig(width=3, height=1, start=(0, 0)))

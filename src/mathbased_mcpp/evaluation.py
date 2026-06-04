@@ -14,6 +14,7 @@ import torch
 from .config import ExperimentConfig, load_config
 from .env import GridCoverageEnv
 from .ppo import ActorCritic
+from .utils import agent_observations, serialize_trajectory
 
 
 def resolve_runtime_config(config: ExperimentConfig, checkpoint_path: str | Path) -> ExperimentConfig:
@@ -90,7 +91,7 @@ def evaluate_policy(
     config = resolve_runtime_config(config, checkpoint_path)
     env = GridCoverageEnv(config.env)
     model = load_policy(config, checkpoint_path)
-    observation = _agent_observations(env, env.reset(seed=config.env.seed))
+    observation = agent_observations(env.reset(seed=config.env.seed))
     state = env.global_state()
     trajectories = [[position] for position in env.positions]
     coverage_curve = [env.coverage_ratio()]
@@ -100,7 +101,7 @@ def evaluate_policy(
 
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32)
-        state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32)
+        state_tensor = torch.as_tensor(state, dtype=torch.float32)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool)
         edge_features = (
             torch.as_tensor(env.neighbor_features(), dtype=torch.float32)
@@ -126,7 +127,7 @@ def evaluate_policy(
         result = env.step(actions.cpu().numpy().tolist())
         rewards = np.asarray(result.reward, dtype=np.float32)
         total_reward += float(rewards.mean() if rewards.ndim > 0 else rewards)
-        observation = _agent_observations(env, result.observation)
+        observation = agent_observations(result.observation)
         state = result.state
         done = result.done
         info = result.info
@@ -157,7 +158,7 @@ def evaluate_policy(
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         serializable = dict(summary)
-        serializable["trajectory"] = _serialize_trajectory(summary["trajectory"])
+        serializable["trajectory"] = serialize_trajectory(summary["trajectory"])
         serializable["trajectories"] = [[list(cell) for cell in trajectory] for trajectory in trajectories]
         path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
     return summary
@@ -208,22 +209,6 @@ def coverage_efficiency_metrics(
     metrics["stall_coverage"] = stall_coverage
     metrics["stall_termination_coverage"] = float(stall_coverage if stall_coverage is not None else terminal_coverage)
     return metrics
-
-
-def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.ndarray:
-    observation = np.asarray(observation, dtype=np.float32)
-    if observation.ndim == 1:
-        return observation.reshape(1, -1)
-    return observation
-
-
-def _serialize_trajectory(trajectory: Any) -> Any:
-    if not trajectory:
-        return []
-    first = trajectory[0]
-    if isinstance(first, tuple):
-        return [list(cell) for cell in trajectory]
-    return [[list(cell) for cell in path] for path in trajectory]
 
 
 def _normalize_budgets(budgets: list[int] | None, max_steps: int) -> list[int]:

@@ -15,6 +15,7 @@ import torch
 from .config import ExperimentConfig
 from .env import GridCoverageEnv
 from .evaluation import coverage_efficiency_metrics, load_policy, resolve_runtime_config
+from .utils import agent_observations, agent_rewards
 
 
 def benchmark_policy(
@@ -70,7 +71,7 @@ def _evaluate_trial(
     stall_steps: int,
 ) -> dict[str, Any]:
     env = GridCoverageEnv(config.env)
-    observation = _agent_observations(env, env.reset(seed=seed))
+    observation = agent_observations(env.reset(seed=seed))
     state = env.global_state()
     trajectories = [[position] for position in env.positions]
     coverage_curve = [env.coverage_ratio()]
@@ -81,7 +82,7 @@ def _evaluate_trial(
 
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
-        state_tensor = torch.as_tensor(np.repeat(state[None, :], env.num_agents, axis=0), dtype=torch.float32, device=device)
+        state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
         neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool, device=device)
         edge_features = (
             torch.as_tensor(env.neighbor_features(), dtype=torch.float32, device=device)
@@ -105,9 +106,9 @@ def _evaluate_trial(
                 deterministic=deterministic,
             )
         result = env.step(actions.cpu().numpy().tolist())
-        rewards = _agent_rewards(env, result.reward)
+        rewards = agent_rewards(env.num_agents, result.reward)
         total_reward += float(np.mean(rewards))
-        observation = _agent_observations(env, result.observation)
+        observation = agent_observations(result.observation)
         state = result.state
         done = result.done
         info = result.info
@@ -201,17 +202,3 @@ def _write_rows(output_path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-
-
-def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.ndarray:
-    observation = np.asarray(observation, dtype=np.float32)
-    if observation.ndim == 1:
-        return observation.reshape(1, -1)
-    return observation
-
-
-def _agent_rewards(env: GridCoverageEnv, reward: float | np.ndarray) -> np.ndarray:
-    reward_array = np.asarray(reward, dtype=np.float32)
-    if reward_array.ndim == 0:
-        return np.full(env.num_agents, float(reward_array), dtype=np.float32)
-    return reward_array

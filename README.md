@@ -176,9 +176,9 @@ A new opt-in ablation baseline implements this memory design without changing th
 - `configs/ablation_mapmsg_gat_on.toml`
 - `configs/ablation_mapmsg_gat_off.toml`
 
-In these configs, every agent maintains its own full-map memory of known free cells, known obstacles, self-covered cells, and communicated known-team-covered cells. A teammate's historical coverage is not visible merely because that cell lies inside the local sensor window. Memory is updated from the agent's own movement and local map sensing; teammate coverage enters only through map exchange within `communication_radius`. The actor reads a fixed-size local crop from this memory, so curriculum transfer from 8x8 to 20x20 keeps a fixed actor input size.
+In these configs, every agent maintains its own full-map memory of known free cells, known obstacles, self-covered cells, and known covered cells. A teammate's historical coverage is not visible merely because that cell lies inside the local sensor window. In the GAT-on arm, teammate coverage and map knowledge enter only through map/message exchange within `communication_radius`; in the GAT-off arm, `share_map_memory=false` and `use_coverage_messages=false`, so each agent keeps only its own memory and does not receive teammate map memory or coverage node messages. The actor reads a fixed-size local crop from this memory, so curriculum transfer from 8x8 to 20x20 keeps a fixed actor input size.
 
-Explicit-memory observations add `unknown` and `frontier` map channels. The policy also receives a fixed-size coverage message generated from the agent's own memory:
+Explicit-memory observations add `unknown` and `frontier` map channels. When `use_coverage_messages=true`, the policy also receives a fixed-size coverage message generated from the agent's own memory:
 
 - known team coverage, self coverage, unknown-space, and frontier summaries;
 - recent new-cell, repeat, and stall summaries;
@@ -571,7 +571,7 @@ gat-ablation --gat-on-config configs/ablation_gat_on.toml --gat-on-checkpoint "E
 
 The summary CSV contains `gat_on`, `gat_off`, and `delta_on_minus_off`. The primary fields are `coverage_at_<budget>_mean`, `coverage_auc_mean`, `t90/t95/t99_mean_reached`, `t90/t95/t99_reach_rate`, and `stall_termination_coverage_mean`. Use `repeat_ratio_after_90_mean`, `inter_agent_overlap_ratio_mean`, `completion_rate`, and `path_length_mean` as supporting diagnostics. Results from archived legacy checkpoints must be labeled as legacy truth-observation results, not decentralized baseline results.
 
-The map-intent ablation follows the same workflow with new configs and separate output roots:
+The map-intent ablation follows the same workflow with new configs and separate output roots. The GAT-off arm is intentionally a no-communication baseline: agents retain their own explicit map memory but do not share memory or coverage node messages.
 
 ```text
 train --config configs/ablation_mapmsg_gat_on.toml --course tier-1-8x8-1agent

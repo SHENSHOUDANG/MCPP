@@ -288,8 +288,13 @@ class ActorCritic(nn.Module):
             edge_features=edge_features,
             node_messages=node_messages,
         )
-        critic_features = self._critic_features(states)
-        return self.actor(actor_features), self.critic(critic_features).squeeze(-1)
+        logits = self.actor(actor_features)
+        values = self.critic(self._critic_features(states)).squeeze(-1)
+        if logits.ndim == 2 and values.shape == (1,) and logits.shape[0] != 1:
+            values = values.expand(logits.shape[0])
+        elif logits.ndim == 3 and values.shape == logits.shape[:1]:
+            values = values.unsqueeze(-1).expand(logits.shape[:2])
+        return logits, values
 
     def distribution(
         self,

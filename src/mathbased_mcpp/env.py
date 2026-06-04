@@ -18,6 +18,7 @@ ACTIONS: dict[int, GridPosition] = {
 }
 
 ACTION_BY_DELTA: dict[GridPosition, int] = {delta: action for action, delta in ACTIONS.items()}
+NONAVOIDABLE_REPEAT_WEIGHT = 0.1
 
 
 @dataclass(slots=True)
@@ -60,6 +61,7 @@ class GridCoverageEnv:
         self.known_free_by_agent: list[set[GridPosition]] = [set()]
         self.known_obstacles_by_agent: list[set[GridPosition]] = [set()]
         self.known_team_covered_by_agent: list[set[GridPosition]] = [{config.start}]
+        self._node_message_cache: list[np.ndarray | None] = [None]
         self.last_novel_step_by_agent: list[int] = [0]
         self.path_lengths: list[int] = [0]
         self.path_length = 0
@@ -150,6 +152,7 @@ class GridCoverageEnv:
         known_free_by_agent = [set(cells) for cells in self.known_free_by_agent]
         known_obstacles_by_agent = [set(cells) for cells in self.known_obstacles_by_agent]
         known_team_covered_by_agent = [set(cells) for cells in self.known_team_covered_by_agent]
+        node_message_cache = [None if message is None else message.copy() for message in self._node_message_cache]
         last_novel_step_by_agent = list(self.last_novel_step_by_agent)
         obstacles = set(self.obstacles)
         free_cells = set(self.free_cells)
@@ -164,6 +167,7 @@ class GridCoverageEnv:
         self.known_free_by_agent = known_free_by_agent
         self.known_obstacles_by_agent = known_obstacles_by_agent
         self.known_team_covered_by_agent = known_team_covered_by_agent
+        self._node_message_cache = node_message_cache
         self.last_novel_step_by_agent = last_novel_step_by_agent
         self.paths = paths
         self.teammate_positions = teammate_positions
@@ -339,14 +343,6 @@ class GridCoverageEnv:
 
         completed = self.covered >= self.free_cells
         if valid:
-            base_reward = (
-                self.config.reward.distance_weight * reward_terms["Rd"]
-                + self.config.reward.straight_weight * reward_terms["Rs"]
-                + self.config.reward.coverage_weight * reward_terms["Rb"]
-            )
-            reward_terms["time"] = -self.config.reward.time_penalty_weight * base_reward
-            if repeated:
-                reward_terms["repeat"] = -self.config.reward.repeat_penalty_weight * base_reward
             if completed:
                 reward_terms["finish"] = self.config.reward.finish_reward
         else:
@@ -366,18 +362,33 @@ class GridCoverageEnv:
                     np.clip((before_distance - after_distance) / max(self.config.height + self.config.width, 1), -1.0, 1.0)
                 )
             new_cell = 0.0 if repeated else 1.0
+            repeated_cell = float(repeated)
             avoidable_repeat = float(repeated and self._has_uncovered_neighbor(previous_position, previous_covered))
+            nonavoidable_repeat = max(repeated_cell - avoidable_repeat, 0.0)
             uncovered_ratio = 1.0 - self.coverage_ratio()
-            straight_bonus = 0.05 * self.config.reward.straight_weight * reward_terms["Rs"]
+            time_cost_scale = uncovered_ratio if self.config.reward.scale_time_cost_by_uncovered else 1.0
+            finish_reward = self.config.reward.finish_reward if completed else 0.0
+            straight_bonus = (
+                self.config.reward.team_straight_weight
+                * reward_terms["Rs"]
+                * new_cell
+            )
+            repeat_penalty = -self.config.reward.team_repeat_weight * (
+                avoidable_repeat + NONAVOIDABLE_REPEAT_WEIGHT * nonavoidable_repeat
+            )
             reward_terms.update(
                 {
                     "new_cells": new_cell,
                     "frontier_progress": frontier_progress,
                     "avoidable_repeats": avoidable_repeat,
+                    "repeated_cells": repeated_cell,
+                    "nonavoidable_repeats": nonavoidable_repeat,
                     "uncovered_ratio": uncovered_ratio,
+                    "time_cost_scale": time_cost_scale,
                     "straight_bonus": straight_bonus,
-                    "time": -self.config.reward.team_time_weight * uncovered_ratio,
-                    "repeat": -self.config.reward.team_repeat_weight * avoidable_repeat,
+                    "time": -self.config.reward.team_time_weight * time_cost_scale,
+                    "repeat": repeat_penalty,
+                    "finish": finish_reward,
                 }
             )
             reward = float(
@@ -477,24 +488,37 @@ class GridCoverageEnv:
 
         completed = self.covered >= self.free_cells
         uncovered_ratio = 1.0 - self.coverage_ratio()
+        time_cost_scale = uncovered_ratio if self.config.reward.scale_time_cost_by_uncovered else 1.0
+        finish_team_total = self.config.reward.finish_reward if completed else 0.0
+        finish_reward = finish_team_total
+        if completed and self.config.reward.normalize_team_finish_reward:
+            finish_reward = finish_team_total / self.num_agents
         reward_terms = {
             "new_cells": float(len(new_cells)),
             "frontier_progress": frontier_progress,
             "avoidable_repeats": float(avoidable_repeats),
             "repeated_cells": float(repeated_cells),
+            "nonavoidable_repeats": float(max(repeated_cells - avoidable_repeats, 0)),
             "invalid_moves": float(len(invalid_agents)),
             "collision_agents": float(len(collision_agents)),
             "uncovered_ratio": uncovered_ratio,
-            "finish": self.config.reward.finish_reward if completed else 0.0,
+            "time_cost_scale": time_cost_scale,
+            "time": -self.config.reward.team_time_weight * time_cost_scale,
+            "finish": finish_reward,
+            "finish_team_total": finish_team_total,
         }
+        repeat_penalty = -self.config.reward.team_repeat_weight * (
+            avoidable_repeats + NONAVOIDABLE_REPEAT_WEIGHT * reward_terms["nonavoidable_repeats"]
+        ) / self.num_agents
+        reward_terms["repeat"] = repeat_penalty
         reward = float(
             self.config.reward.team_new_cell_weight * len(new_cells) / self.num_agents
             + self.config.reward.team_frontier_weight * frontier_progress
-            - self.config.reward.team_repeat_weight * avoidable_repeats / self.num_agents
+            + repeat_penalty
             - self.config.reward.team_invalid_weight * len(invalid_agents) / self.num_agents
             - self.config.reward.team_collision_weight * len(collision_agents) / self.num_agents
-            - self.config.reward.team_time_weight * uncovered_ratio
-            + reward_terms["finish"]
+            + reward_terms["time"]
+            + finish_reward
         )
         self.done = completed or self.step_count >= self.config.max_steps
         self._sync_legacy_aliases()
@@ -628,7 +652,10 @@ class GridCoverageEnv:
     def node_messages(self) -> np.ndarray:
         if not self.config.use_explicit_map_memory:
             return np.zeros((self.num_agents, self.node_message_dim), dtype=np.float32)
-        return np.stack([self._coverage_message(index) for index in range(self.num_agents)]).astype(np.float32)
+        for index in range(self.num_agents):
+            if self._node_message_cache[index] is None:
+                self._node_message_cache[index] = self._coverage_message(index)
+        return np.stack(self._node_message_cache).astype(np.float32)
 
     def _observations(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
         if layers is None:
@@ -724,7 +751,7 @@ class GridCoverageEnv:
         known_uncovered = known_free - known_team_covered
         known_obstacles = self.known_obstacles_by_agent[agent_index]
         unknown = self._memory_unknown(agent_index)
-        frontier = self._memory_frontiers(agent_index)
+        frontier = self._memory_frontiers(agent_index, unknown)
         self_covered = self.covered_by_agent[agent_index]
 
         radius = max(self.config.observation_radius, 0)
@@ -740,7 +767,8 @@ class GridCoverageEnv:
             self._local_window(self._cells_layer(unknown), radius, center),
             self._local_window(self._cells_layer(frontier), radius, center),
         ]
-        message = self._coverage_message(agent_index)
+        message = self._coverage_message(agent_index, unknown=unknown, frontier=frontier)
+        self._node_message_cache[agent_index] = message
         metadata = np.array(
             [
                 float(self.row_direction(center[0])),
@@ -754,6 +782,7 @@ class GridCoverageEnv:
         return np.concatenate([channel.ravel() for channel in channels] + [metadata])
 
     def _refresh_explicit_map_memory(self) -> None:
+        self._node_message_cache = [None for _ in self.positions]
         if not self.config.use_explicit_map_memory:
             return
         radius = max(self.config.observation_radius, 0)
@@ -789,12 +818,18 @@ class GridCoverageEnv:
                 self.known_team_covered_by_agent[source].update(merged_covered)
                 self.known_team_covered_by_agent[target].update(merged_covered)
 
-    def _coverage_message(self, agent_index: int) -> np.ndarray:
+    def _coverage_message(
+        self,
+        agent_index: int,
+        *,
+        unknown: set[GridPosition] | None = None,
+        frontier: set[GridPosition] | None = None,
+    ) -> np.ndarray:
         known_free = self.known_free_by_agent[agent_index]
         known_team_covered = self.known_team_covered_by_agent[agent_index] & known_free
         self_covered = self.covered_by_agent[agent_index] & known_free
-        unknown = self._memory_unknown(agent_index)
-        frontier = self._memory_frontiers(agent_index)
+        unknown = self._memory_unknown(agent_index) if unknown is None else unknown
+        frontier = self._memory_frontiers(agent_index, unknown) if frontier is None else frontier
         map_area = max(self.config.width * self.config.height, 1)
         known_free_count = max(len(known_free), 1)
         recent_new_ratio, recent_repeat_ratio = self._recent_self_coverage_rates(agent_index)
@@ -897,8 +932,8 @@ class GridCoverageEnv:
             if (row, col) not in known
         }
 
-    def _memory_frontiers(self, agent_index: int) -> set[GridPosition]:
-        unknown = self._memory_unknown(agent_index)
+    def _memory_frontiers(self, agent_index: int, unknown: set[GridPosition] | None = None) -> set[GridPosition]:
+        unknown = self._memory_unknown(agent_index) if unknown is None else unknown
         return {
             cell
             for cell in self.known_free_by_agent[agent_index]

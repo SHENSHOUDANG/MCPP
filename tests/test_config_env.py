@@ -81,6 +81,12 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.train.eval_interval, 10)
         self.assertEqual(config.train.checkpoint_interval, 10)
         self.assertFalse(config.curriculum.courses[0].load_previous)
+        for course in config.curriculum.courses:
+            course_config = build_course_config(config, course)
+            self.assertEqual(course_config.env.reward.finish_reward, 10.0)
+            self.assertTrue(course_config.env.reward.normalize_team_finish_reward)
+            self.assertEqual(course_config.env.reward.team_time_weight, 0.05)
+            self.assertFalse(course_config.env.reward.scale_time_cost_by_uncovered)
 
     def test_course_obstacle_ratios_are_independent_overrides(self) -> None:
         config_path = ROOT / ".tmp_tests" / "course-obstacle-overrides.toml"
@@ -136,19 +142,25 @@ class ConfigEnvTests(unittest.TestCase):
             [(course.env.width, course.env.height, course.env.num_agents, course.env.obstacle_ratio) for course in gat_off.curriculum.courses],
         )
 
-    def test_mapmsg_ablation_configs_share_memory_and_message_design(self) -> None:
+    def test_mapmsg_ablation_configs_gate_inter_agent_information_exchange(self) -> None:
         gat_on = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
         gat_off = load_config(ROOT / "configs" / "ablation_mapmsg_gat_off.toml")
 
         self.assertTrue(gat_on.env.use_explicit_map_memory)
+        self.assertTrue(gat_off.env.use_explicit_map_memory)
         self.assertTrue(gat_on.env.share_map_memory)
+        self.assertFalse(gat_off.env.share_map_memory)
         self.assertTrue(gat_on.ppo.use_coverage_messages)
+        self.assertFalse(gat_off.ppo.use_coverage_messages)
         self.assertTrue(gat_on.ppo.use_graph_attention)
         self.assertFalse(gat_off.ppo.use_graph_attention)
         self.assertTrue(gat_on.ppo.use_action_mask)
         self.assertTrue(gat_off.ppo.use_action_mask)
         self.assertEqual(gat_on.env.intent_grid_size, gat_off.env.intent_grid_size)
-        self.assertEqual(gat_on.ppo.use_coverage_messages, gat_off.ppo.use_coverage_messages)
+        self.assertEqual(gat_on.env.reward.finish_reward, 10.0)
+        self.assertTrue(gat_on.env.reward.normalize_team_finish_reward)
+        self.assertEqual(gat_on.env.reward.team_time_weight, 0.05)
+        self.assertFalse(gat_on.env.reward.scale_time_cost_by_uncovered)
         self.assertEqual(
             [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_on.curriculum.courses],
             [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_off.curriculum.courses],

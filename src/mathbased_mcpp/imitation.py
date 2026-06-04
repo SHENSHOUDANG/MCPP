@@ -19,7 +19,15 @@ from .env import ACTIONS, GridCoverageEnv
 from .evaluation import coverage_efficiency_metrics, evaluate_policy
 from .ppo import ActorCritic
 from .rendering import render_trajectory
-from .utils import append_metrics, make_run_dir, set_seed
+from .utils import (
+    agent_observations,
+    append_metrics,
+    checkpoint_model_metadata,
+    make_run_dir,
+    resolve_device,
+    serialize_trajectory,
+    set_seed,
+)
 
 
 @dataclass(slots=True)
@@ -198,7 +206,7 @@ def generate_expert_dataset(
     for episode_index in range(max(int(episodes), 1)):
         episode_config = _episode_env_config(config.env, episode_index)
         env = GridCoverageEnv(episode_config)
-        observation = _agent_observations(env, env.reset(seed=episode_config.seed))
+        observation = agent_observations(env.reset(seed=episode_config.seed))
         max_steps = min(max_steps_per_episode or episode_config.max_steps, episode_config.max_steps)
         for _ in range(max_steps):
             observations.append(observation.copy())
@@ -213,7 +221,7 @@ def generate_expert_dataset(
             action_list = expert.actions(env)
             actions.append(np.asarray(action_list, dtype=np.int64))
             result = env.step(action_list)
-            observation = _agent_observations(env, result.observation)
+            observation = agent_observations(result.observation)
             if result.done:
                 break
 
@@ -244,7 +252,7 @@ def pretrain_imitation(
     set_seed(course_config.ppo.seed)
     dataset = generate_expert_dataset(course_config, episodes=episodes)
     env = GridCoverageEnv(course_config.env)
-    model = _build_model(course_config, env).to(_resolve_device(course_config.ppo.device))
+    model = _build_model(course_config, env).to(resolve_device(course_config.ppo.device))
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate or course_config.ppo.learning_rate)
     run_path = Path(run_dir) if run_dir is not None else make_run_dir(Path(course_config.train.run_root) / "imitation")
     run_path.mkdir(parents=True, exist_ok=True)
@@ -395,7 +403,7 @@ def rollout_expert_policy(
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         serializable = dict(summary)
-        serializable["trajectory"] = _serialize_trajectory(summary["trajectory"])
+        serializable["trajectory"] = serialize_trajectory(summary["trajectory"])
         serializable["trajectories"] = [[list(cell) for cell in trajectory] for trajectory in trajectories]
         path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
     return summary
@@ -447,54 +455,15 @@ def _checkpoint_payload(
     final_loss: float,
     final_accuracy: float,
 ) -> dict[str, object]:
-    return {
-        "model_state_dict": model.state_dict(),
-        "observation_dim": model.observation_dim,
-        "state_dim": model.state_dim,
-        "action_dim": model.action_dim,
-        "hidden_dim": config.ppo.hidden_dim,
-        "critic_type": model.critic_mode,
-        "state_shape": model.state_shape,
-        "state_channels": model.state_channels,
-        "state_metadata_dim": model.state_metadata_dim,
-        "num_agents": config.env.num_agents,
-        "use_graph_attention": model.use_graph_attention,
-        "gat_num_heads": model.gat_num_heads,
-        "gat_edge_dim": model.gat_edge_dim,
-        "gat_use_edge_features": model.gat_edge_dim > 0,
-        "gat_residual": model.gat_residual,
-        "gat_attention_dropout": model.gat_attention_dropout,
-        "node_message_dim": model.node_message_dim,
-        "use_coverage_messages": model.node_message_dim > 0,
-        "use_action_mask": config.ppo.use_action_mask,
-        "pretrain_type": "boustrophedon_behavior_cloning",
-        "expert": "boustrophedon_shortest_path",
-        "expert_episodes": dataset.episodes,
-        "expert_transitions": dataset.transitions,
-        "bc_final_loss": final_loss,
-        "bc_final_accuracy": final_accuracy,
-    }
-
-
-def _agent_observations(env: GridCoverageEnv, observation: np.ndarray) -> np.ndarray:
-    observation = np.asarray(observation, dtype=np.float32)
-    if observation.ndim == 1:
-        return observation.reshape(1, -1)
-    return observation
-
-
-def _serialize_trajectory(trajectory: object) -> object:
-    if isinstance(trajectory, list) and trajectory and isinstance(trajectory[0], tuple):
-        return [list(cell) for cell in trajectory]
-    if isinstance(trajectory, list):
-        return [[list(cell) for cell in path] for path in trajectory]
-    return trajectory
-
-
-def _resolve_device(device_name: str) -> torch.device:
-    normalized = device_name.lower().strip()
-    if normalized == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if normalized.startswith("cuda") and not torch.cuda.is_available():
-        return torch.device("cpu")
-    return torch.device(normalized)
+    payload = checkpoint_model_metadata(config, model)
+    payload.update(
+        {
+            "pretrain_type": "boustrophedon_behavior_cloning",
+            "expert": "boustrophedon_shortest_path",
+            "expert_episodes": dataset.episodes,
+            "expert_transitions": dataset.transitions,
+            "bc_final_loss": final_loss,
+            "bc_final_accuracy": final_accuracy,
+        }
+    )
+    return payload
