@@ -15,23 +15,18 @@ recent_path_length = 8
 communication_radius = 4
 use_legacy_truth_coverage_observation = false
 use_explicit_map_memory = true
-share_map_memory = true
+share_map_memory = false
 intent_grid_size = 3
 
 [reward]
-distance_weight = 1.0
-straight_weight = 1.0
-coverage_weight = 1.0
-time_penalty_weight = 0.5
-repeat_penalty_weight = 0.1
-finish_reward = 120.0
-invalid_move_penalty = -1.0
+finish_reward = 10.0
+normalize_team_finish_reward = true
 team_new_cell_weight = 1.0
-team_frontier_weight = 0.0
+team_straight_weight = 0.01
 team_repeat_weight = 0.5
 team_invalid_weight = 0.8
-team_collision_weight = 1.2
-team_time_weight = 0.02
+team_time_weight = 0.05
+scale_time_cost_by_uncovered = false
 
 [ppo]
 total_timesteps = 500000
@@ -53,11 +48,11 @@ gat_num_heads = 4
 gat_use_edge_features = true
 gat_residual = true
 gat_attention_dropout = 0.0
-use_coverage_messages = true
+use_coverage_messages = false
 use_action_mask = true
 
 [train]
-run_root = "E:\\test plot\\ablation_mapmsg_gat_off"
+run_root = "E:\\test plot\\ablation_mapmsg_gat_off_nocomm"
 log_interval = 1
 eval_interval = 10
 checkpoint_interval = 10
@@ -79,7 +74,7 @@ num_agents = 1
 observation_radius = 2
 recent_path_length = 8
 communication_radius = 4
-total_timesteps = 500000
+total_timesteps = 300000
 rollout_steps = 256
 load_previous = false
 
