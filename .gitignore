@@ -4,6 +4,9 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .tmp_tests/
+.tmp_installers/
+.python/
+.venv/
 runs/
 outputs/
 *.egg-info/

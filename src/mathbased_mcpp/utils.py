@@ -95,6 +95,10 @@ def checkpoint_model_metadata(config: object, model: object) -> dict[str, object
         "state_shape": model.state_shape,
         "state_channels": model.state_channels,
         "state_metadata_dim": model.state_metadata_dim,
+        "policy_phase": config.ppo.policy_phase,
+        "use_phase_critics": getattr(model, "use_phase_critics", False),
+        "use_phase_actors": getattr(model, "use_phase_actors", False),
+        "phase_metadata_index": getattr(model, "phase_metadata_index", 7),
         "num_agents": config.env.num_agents,
         "use_graph_attention": model.use_graph_attention,
         "gat_num_heads": model.gat_num_heads,
@@ -105,6 +109,11 @@ def checkpoint_model_metadata(config: object, model: object) -> dict[str, object
         "node_message_dim": model.node_message_dim,
         "use_coverage_messages": model.node_message_dim > 0,
         "use_action_mask": config.ppo.use_action_mask,
+        "cuap": {
+            "enabled": getattr(config.cuap, "enabled", False),
+            "beta": getattr(config.cuap, "beta", 0.0),
+            "disable_in_return_phase": getattr(config.cuap, "disable_in_return_phase", True),
+        },
     }
 
 

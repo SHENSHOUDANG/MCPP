@@ -65,6 +65,8 @@ class BoustrophedonExpert:
     """Rule expert that sweeps rows while using shortest paths around obstacles."""
 
     def actions(self, env: GridCoverageEnv) -> list[int]:
+        if env.return_mode:
+            return self._return_actions(env)
         current_positions = list(env.positions)
         reserved_targets: set[GridPosition] = set()
         actions: list[int] = []
@@ -72,6 +74,30 @@ class BoustrophedonExpert:
             action = self._action_for_agent(env, agent_index, current_positions, reserved_targets)
             target, valid = env.peek(action, agent_index=agent_index)
             if valid:
+                reserved_targets.add(target)
+            actions.append(action)
+        return actions
+
+    def _return_actions(self, env: GridCoverageEnv) -> list[int]:
+        current_positions = list(env.positions)
+        reserved_targets: set[GridPosition] = set()
+        actions: list[int] = []
+        depot = env.depot_position
+        for agent_index, start in enumerate(current_positions):
+            if start == depot:
+                actions.append(min(ACTIONS))
+                continue
+            other_positions = {
+                position
+                for index, position in enumerate(current_positions)
+                if index != agent_index and position != depot
+            }
+            blocked = set(env.obstacles) | other_positions | {cell for cell in reserved_targets if cell != depot}
+            action = self._first_path_action(env, agent_index, start, [depot], blocked)
+            if action is None:
+                action = self._fallback_action(env, agent_index, other_positions, reserved_targets)
+            target, valid = env.peek(action, agent_index=agent_index)
+            if valid and target != depot:
                 reserved_targets.add(target)
             actions.append(action)
         return actions
@@ -445,6 +471,9 @@ def _build_model(config: ExperimentConfig, env: GridCoverageEnv) -> ActorCritic:
         gat_residual=config.ppo.gat_residual,
         gat_attention_dropout=config.ppo.gat_attention_dropout,
         node_message_dim=env.node_message_dim if config.ppo.use_coverage_messages else 0,
+        use_phase_critics=config.env.use_depot and config.env.require_return_to_depot,
+        use_phase_actors=config.env.use_depot and config.env.require_return_to_depot,
+        phase_metadata_index=env.base_state_metadata_dim,
     )
 
 

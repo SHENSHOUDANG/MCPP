@@ -35,7 +35,7 @@ from mathbased_mcpp.ppo import ActorCritic
 
 
 DEFAULT_CHECKPOINT = Path(
-    r"E:\test plot\ablation_mapmsg_gat_on\20260526-113831\04-tier-4-20x20-4agents\best_policy.pt"
+    ROOT / "outputs" / "ablation_mapmsg_gat_on" / "RUN_ID" / "04-tier-4-20x20-4agents" / "best_policy.pt"
 )
 
 

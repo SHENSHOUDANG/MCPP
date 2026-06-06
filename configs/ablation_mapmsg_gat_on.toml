@@ -4,6 +4,12 @@ height = 8
 max_steps = 100
 seed = 20260428
 start = [0, 0]
+use_depot = true
+depot = [0, 0]
+depot_dispatch_enabled = true
+require_return_to_depot = true
+return_start_strategy = "diverse"
+broadcast_coverage_threshold = 0.90
 num_agents = 1
 random_corner_start = false
 obstacles = []
@@ -27,12 +33,19 @@ team_repeat_weight = 0.5
 team_invalid_weight = 0.8
 team_time_weight = 0.05
 scale_time_cost_by_uncovered = false
+return_progress_weight = 6.0
+return_time_weight = 0.02
+return_wrong_way_weight = 2.0
+return_arrival_reward = 8.0
+return_all_arrived_reward = 30.0
 
 [ppo]
 total_timesteps = 500000
+policy_phase = "coverage"
 rollout_steps = 256
+num_envs = 4
 update_epochs = 4
-mini_batch_size = 256
+mini_batch_size = 512
 gamma = 0.98
 gae_lambda = 0.95
 clip_ratio = 0.2
@@ -51,11 +64,15 @@ gat_attention_dropout = 0.0
 use_coverage_messages = true
 use_action_mask = true
 
+[cuap]
+enabled = false
+
 [train]
-run_root = "E:\\test plot\\ablation_mapmsg_gat_on"
+run_root = "outputs\\ablation_mapmsg_gat_on"
 log_interval = 1
 eval_interval = 10
 checkpoint_interval = 10
+cpu_threads = 4
 
 [curriculum]
 [[curriculum.courses]]

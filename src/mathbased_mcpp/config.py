@@ -32,6 +32,11 @@ class RewardConfig:
     team_collision_weight: float = 1.2
     team_time_weight: float = 0.03
     scale_time_cost_by_uncovered: bool = True
+    return_progress_weight: float = 1.0
+    return_time_weight: float = 0.05
+    return_wrong_way_weight: float = 0.2
+    return_arrival_reward: float = 2.0
+    return_all_arrived_reward: float = 10.0
 
 
 @dataclass(slots=True)
@@ -42,6 +47,14 @@ class GridCoverageConfig:
     seed: int = 0
     start: GridPosition = (0, 0)
     start_positions: list[GridPosition] = field(default_factory=list)
+    use_depot: bool = False
+    depot: GridPosition | None = None
+    depot_dispatch_enabled: bool = True
+    require_return_to_depot: bool = False
+    initial_return_mode: bool = False
+    return_start_positions: list[GridPosition] = field(default_factory=list)
+    return_start_strategy: str = "farthest"
+    broadcast_coverage_threshold: float = 0.90
     num_agents: int = 1
     random_corner_start: bool = False
     teammate_positions: list[GridPosition] = field(default_factory=list)
@@ -79,7 +92,9 @@ class CurriculumConfig:
 @dataclass(slots=True)
 class PPOConfig:
     total_timesteps: int = 10_000
+    policy_phase: str = "coverage"
     rollout_steps: int = 256
+    num_envs: int = 1
     update_epochs: int = 4
     mini_batch_size: int = 64
     gamma: float = 0.99
@@ -109,6 +124,24 @@ class TrainConfig:
     checkpoint_interval: int = 0
     use_tensorboard: bool = True
     tensorboard_dir: str = "tensorboard"
+    cpu_threads: int = 4
+    float32_matmul_precision: str = "high"
+    compile_model: bool = False
+
+
+@dataclass(slots=True)
+class CUAPConfig:
+    enabled: bool = False
+    beta: float = 0.3
+    disable_in_return_phase: bool = True
+    w_novelty: float = 1.0
+    w_frontier: float = 0.5
+    w_repeat: float = 0.7
+    w_conflict: float = 0.5
+    eval_radius: int = 1
+    normalize: bool = True
+    clip: float = 2.0
+    use_density_features: bool = False
 
 
 @dataclass(slots=True)
@@ -116,6 +149,7 @@ class ExperimentConfig:
     env: GridCoverageConfig
     ppo: PPOConfig
     train: TrainConfig
+    cuap: CUAPConfig = field(default_factory=CUAPConfig)
     curriculum: CurriculumConfig | None = None
 
 
@@ -152,6 +186,7 @@ def build_course_config(base_config: ExperimentConfig, course: CurriculumCourseC
         env=course.env,
         ppo=PPOConfig(**ppo_raw),
         train=base_config.train,
+        cuap=base_config.cuap,
         curriculum=None,
     )
 
@@ -196,8 +231,9 @@ def _experiment_config_from_raw(raw: dict[str, Any]) -> ExperimentConfig:
     env = _grid_config_from_raw(env_raw, reward)
     ppo = PPOConfig(**raw.get("ppo", {}))
     train = TrainConfig(**raw.get("train", {}))
+    cuap = CUAPConfig(**raw.get("cuap", {}))
     curriculum = _curriculum_from_raw(raw, reward, ppo.total_timesteps, env_raw)
-    return ExperimentConfig(env=env, ppo=ppo, train=train, curriculum=curriculum)
+    return ExperimentConfig(env=env, ppo=ppo, train=train, cuap=cuap, curriculum=curriculum)
 
 
 def _reward_from_raw(raw_reward: dict[str, Any], fallback: RewardConfig | None = None) -> RewardConfig:
@@ -234,6 +270,14 @@ def _grid_config_from_raw(env_raw: dict[str, Any], reward: RewardConfig) -> Grid
     raw["reward"] = reward
     raw["start"] = _position(raw.get("start", (0, 0)))
     raw["start_positions"] = [_position(item) for item in raw.get("start_positions", [])]
+    raw["use_depot"] = bool(raw.get("use_depot", False))
+    raw["depot"] = None if raw.get("depot") is None else _position(raw.get("depot"))
+    raw["depot_dispatch_enabled"] = bool(raw.get("depot_dispatch_enabled", True))
+    raw["require_return_to_depot"] = bool(raw.get("require_return_to_depot", False))
+    raw["initial_return_mode"] = bool(raw.get("initial_return_mode", False))
+    raw["return_start_positions"] = [_position(item) for item in raw.get("return_start_positions", [])]
+    raw["return_start_strategy"] = str(raw.get("return_start_strategy", "farthest")).strip().lower()
+    raw["broadcast_coverage_threshold"] = float(raw.get("broadcast_coverage_threshold", 0.90))
     raw["num_agents"] = max(int(raw.get("num_agents", 1)), 1)
     raw["random_corner_start"] = bool(raw.get("random_corner_start", False))
     raw["teammate_positions"] = [_position(item) for item in raw.get("teammate_positions", [])]

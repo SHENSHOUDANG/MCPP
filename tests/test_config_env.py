@@ -3,9 +3,12 @@ from collections import deque
 import sys
 import unittest
 import shutil
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -24,6 +27,7 @@ from mathbased_mcpp.config import (
 from mathbased_mcpp.evaluation import load_policy, resolve_runtime_config
 from mathbased_mcpp.env import GridCoverageEnv
 from mathbased_mcpp.ppo import ActorCritic
+from tools.run_depot_return_pipeline import _phase_config, _resolve_shared_return_checkpoint
 
 import torch
 
@@ -77,7 +81,20 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(config.curriculum.courses[3].rollout_steps, 2048)
         self.assertEqual(config.curriculum.courses[2].total_timesteps, 1800000)
         self.assertEqual(config.curriculum.courses[3].total_timesteps, 4400000)
-        self.assertEqual(config.ppo.mini_batch_size, 256)
+        self.assertEqual(config.ppo.num_envs, 4)
+        self.assertEqual(config.ppo.mini_batch_size, 512)
+        self.assertTrue(config.env.use_depot)
+        self.assertEqual(config.env.depot, (0, 0))
+        self.assertTrue(config.env.depot_dispatch_enabled)
+        self.assertTrue(config.env.require_return_to_depot)
+        self.assertEqual(config.env.return_start_strategy, "diverse")
+        self.assertEqual(config.env.broadcast_coverage_threshold, 0.90)
+        self.assertEqual(config.env.reward.return_progress_weight, 6.0)
+        self.assertEqual(config.env.reward.return_wrong_way_weight, 2.0)
+        self.assertEqual(config.env.reward.return_arrival_reward, 8.0)
+        self.assertEqual(config.env.reward.return_all_arrived_reward, 30.0)
+        self.assertFalse(config.cuap.enabled)
+        self.assertEqual(config.train.cpu_threads, 4)
         self.assertEqual(config.train.eval_interval, 10)
         self.assertEqual(config.train.checkpoint_interval, 10)
         self.assertFalse(config.curriculum.courses[0].load_previous)
@@ -87,6 +104,116 @@ class ConfigEnvTests(unittest.TestCase):
             self.assertTrue(course_config.env.reward.normalize_team_finish_reward)
             self.assertEqual(course_config.env.reward.team_time_weight, 0.05)
             self.assertFalse(course_config.env.reward.scale_time_cost_by_uncovered)
+
+    def test_depot_return_pipeline_phase_configs_are_separate(self) -> None:
+        base = load_config(ROOT / "configs" / "formal_v1.toml")
+        coverage = _phase_config(base, ROOT / ".tmp_tests" / "pipeline" / "coverage", phase="coverage")
+        returning = _phase_config(base, ROOT / ".tmp_tests" / "pipeline" / "return", phase="return")
+
+        self.assertEqual(coverage.ppo.policy_phase, "coverage")
+        self.assertEqual(returning.ppo.policy_phase, "return")
+        self.assertTrue(coverage.env.use_depot)
+        self.assertFalse(coverage.env.require_return_to_depot)
+        self.assertTrue(returning.env.use_depot)
+        self.assertTrue(returning.env.require_return_to_depot)
+        self.assertTrue(base.env.require_return_to_depot)
+        self.assertIsNotNone(coverage.curriculum)
+        self.assertIsNotNone(returning.curriculum)
+        assert coverage.curriculum is not None
+        assert returning.curriculum is not None
+        self.assertTrue(all(course.env.use_depot for course in coverage.curriculum.courses))
+        self.assertTrue(all(not course.env.require_return_to_depot for course in coverage.curriculum.courses))
+        self.assertTrue(all(course.env.require_return_to_depot for course in returning.curriculum.courses))
+        self.assertEqual(
+            [course.total_timesteps for course in returning.curriculum.courses],
+            [course.total_timesteps for course in coverage.curriculum.courses],
+        )
+
+    def test_depot_return_pipeline_can_shrink_return_training_budget(self) -> None:
+        base = load_config(ROOT / "configs" / "formal_v1.toml")
+        returning = _phase_config(
+            base,
+            ROOT / ".tmp_tests" / "pipeline" / "return",
+            phase="return",
+            timestep_scale=0.2,
+        )
+
+        self.assertIsNotNone(returning.curriculum)
+        assert returning.curriculum is not None
+        self.assertEqual(returning.ppo.total_timesteps, 100000)
+        self.assertEqual(
+            [course.total_timesteps for course in returning.curriculum.courses],
+            [100000, 200000, 360000, 880000],
+        )
+
+    def test_depot_return_pipeline_can_increase_return_phase_resources(self) -> None:
+        base = load_config(ROOT / "configs" / "formal_v1.toml")
+        returning = _phase_config(
+            base,
+            ROOT / ".tmp_tests" / "pipeline" / "return",
+            phase="return",
+            return_num_envs=8,
+            return_mini_batch_size=1024,
+            return_cpu_threads=6,
+            return_start_strategy="diverse",
+        )
+
+        self.assertEqual(returning.ppo.num_envs, 8)
+        self.assertEqual(returning.ppo.mini_batch_size, 1024)
+        self.assertEqual(returning.train.cpu_threads, 6)
+        self.assertEqual(returning.env.return_start_strategy, "diverse")
+        self.assertIsNotNone(returning.curriculum)
+        assert returning.curriculum is not None
+        self.assertTrue(all(course.env.return_start_strategy == "diverse" for course in returning.curriculum.courses))
+
+    def test_shared_return_checkpoint_is_validated(self) -> None:
+        run_dir = ROOT / ".tmp_tests" / "shared-return"
+        shutil.rmtree(run_dir, ignore_errors=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            checkpoint = run_dir / "policy.pt"
+            checkpoint.write_bytes(b"placeholder")
+
+            self.assertEqual(_resolve_shared_return_checkpoint(str(checkpoint)), checkpoint)
+            self.assertIsNone(_resolve_shared_return_checkpoint(None))
+            with self.assertRaises(FileNotFoundError):
+                _resolve_shared_return_checkpoint(str(run_dir / "missing.pt"))
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
+    def test_pipeline_dry_run_reuses_shared_return_checkpoint_without_training_return(self) -> None:
+        run_dir = ROOT / ".tmp_tests" / "shared-return-dry-run"
+        shutil.rmtree(run_dir, ignore_errors=True)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            checkpoint = run_dir / "shared_return.pt"
+            checkpoint.write_bytes(b"placeholder")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "tools/run_depot_return_pipeline.py",
+                    "--config",
+                    "configs/formal_v1.toml",
+                    "--run-root",
+                    str(run_dir / "pipeline"),
+                    "--skip-pretrain",
+                    "--skip-coverage",
+                    "--resume",
+                    "--shared-return-checkpoint",
+                    str(checkpoint),
+                    "--dry-run",
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertIn("shared_return_checkpoint=", result.stdout)
+            self.assertIn("return_training=no", result.stdout)
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
 
     def test_course_obstacle_ratios_are_independent_overrides(self) -> None:
         config_path = ROOT / ".tmp_tests" / "course-obstacle-overrides.toml"
@@ -135,8 +262,8 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(gat_on.ppo.gat_residual, gat_off.ppo.gat_residual)
         self.assertIsNotNone(gat_on.curriculum)
         self.assertIsNotNone(gat_off.curriculum)
-        self.assertEqual(gat_on.train.run_root, "E:\\test plot\\ablation_gat_on")
-        self.assertEqual(gat_off.train.run_root, "E:\\test plot\\ablation_gat_off")
+        self.assertEqual(gat_on.train.run_root, "outputs\\ablation_gat_on")
+        self.assertEqual(gat_off.train.run_root, "outputs\\ablation_gat_off")
         self.assertEqual(
             [(course.env.width, course.env.height, course.env.num_agents, course.env.obstacle_ratio) for course in gat_on.curriculum.courses],
             [(course.env.width, course.env.height, course.env.num_agents, course.env.obstacle_ratio) for course in gat_off.curriculum.courses],
@@ -156,6 +283,8 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertFalse(gat_off.ppo.use_graph_attention)
         self.assertTrue(gat_on.ppo.use_action_mask)
         self.assertTrue(gat_off.ppo.use_action_mask)
+        self.assertFalse(gat_on.cuap.enabled)
+        self.assertFalse(gat_off.cuap.enabled)
         self.assertEqual(gat_on.env.intent_grid_size, gat_off.env.intent_grid_size)
         self.assertEqual(gat_on.env.reward.finish_reward, 10.0)
         self.assertTrue(gat_on.env.reward.normalize_team_finish_reward)
@@ -164,6 +293,25 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(
             [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_on.curriculum.courses],
             [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_off.curriculum.courses],
+        )
+
+    def test_cuap_ablation_config_only_enables_cuap_on_gat_baseline(self) -> None:
+        gat_on = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on.toml")
+        cuap = load_config(ROOT / "configs" / "ablation_mapmsg_gat_on_cuap.toml")
+
+        self.assertTrue(gat_on.ppo.use_graph_attention)
+        self.assertTrue(cuap.ppo.use_graph_attention)
+        self.assertTrue(gat_on.ppo.use_coverage_messages)
+        self.assertTrue(cuap.ppo.use_coverage_messages)
+        self.assertTrue(gat_on.env.use_explicit_map_memory)
+        self.assertTrue(cuap.env.use_explicit_map_memory)
+        self.assertFalse(gat_on.cuap.enabled)
+        self.assertTrue(cuap.cuap.enabled)
+        self.assertEqual(cuap.cuap.beta, 0.3)
+        self.assertTrue(cuap.cuap.disable_in_return_phase)
+        self.assertEqual(
+            [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in gat_on.curriculum.courses],
+            [(course.env.width, course.env.height, course.env.num_agents, course.total_timesteps) for course in cuap.curriculum.courses],
         )
 
     def test_select_curriculum_course_by_name(self) -> None:
@@ -464,6 +612,25 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertEqual(env.known_team_covered_by_agent[0], {(0, 0)})
         self.assertEqual(env.known_team_covered_by_agent[1], {(0, 2), (0, 3)})
 
+    def test_explicit_map_memory_does_not_exchange_when_sharing_is_disabled(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=5,
+                height=1,
+                num_agents=2,
+                start_positions=[(0, 0), (0, 4)],
+                observation_radius=0,
+                communication_radius=4,
+                use_explicit_map_memory=True,
+                share_map_memory=False,
+            )
+        )
+        env.reset()
+        env.step([3, 2])
+
+        self.assertEqual(env.known_team_covered_by_agent[0], {(0, 0), (0, 1)})
+        self.assertEqual(env.known_team_covered_by_agent[1], {(0, 3), (0, 4)})
+
     def test_explicit_actor_inputs_are_invariant_to_uncommunicated_teammate_history(self) -> None:
         env = GridCoverageEnv(
             GridCoverageConfig(
@@ -492,6 +659,193 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertTrue(np.array_equal(before_message, after_message))
         self.assertEqual(env.known_team_covered_by_agent[0], {(0, 0)})
         self.assertNotAlmostEqual(env.coverage_ratio(), 2 / 5)
+
+    def test_depot_start_allows_initial_overlap(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(width=3, height=1, num_agents=2, use_depot=True, depot=(0, 0))
+        )
+        observation = env.reset()
+
+        self.assertEqual(env.positions, [(0, 0), (0, 0)])
+        self.assertEqual(observation.shape, (2, env.observation_dim))
+        self.assertEqual(env.observation_dim, 73)
+
+    def test_actor_mission_metadata_does_not_expose_all_agents_at_depot(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(width=3, height=1, num_agents=2, use_depot=True, depot=(0, 0))
+        )
+        env.reset()
+
+        actor_metadata = env._mission_metadata(agent_index=0)
+        state_metadata = env._mission_state_metadata()
+
+        self.assertEqual(len(actor_metadata), env.mission_metadata_dim)
+        self.assertEqual(env.mission_metadata_dim, 7)
+        self.assertEqual(len(state_metadata), env.mission_state_metadata_dim)
+        self.assertEqual(state_metadata[-1], float(env.all_agents_at_depot()))
+
+    def test_depot_overlap_is_not_a_collision_when_returning(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=2,
+                height=1,
+                num_agents=2,
+                use_depot=True,
+                depot=(0, 0),
+                require_return_to_depot=True,
+                max_steps=8,
+            )
+        )
+        env.reset()
+        env.covered = set(env.free_cells)
+        env.return_mode = True
+        env.positions = [(0, 0), (0, 1)]
+        env.paths = [[(0, 0)], [(0, 1)]]
+        env.covered_by_agent = [{(0, 0)}, {(0, 1)}]
+        env._sync_legacy_aliases()
+
+        result = env.step([3, 2])
+
+        self.assertEqual(env.positions, [(0, 0), (0, 0)])
+        self.assertEqual(result.info["reward_terms"]["collision_agents"], 0.0)
+        self.assertTrue(result.info["completed"])
+        self.assertTrue(result.info["all_at_depot"])
+
+    def test_depot_broadcasts_and_return_mode_after_full_coverage(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=2,
+                height=1,
+                use_depot=True,
+                depot=(0, 0),
+                require_return_to_depot=True,
+                broadcast_coverage_threshold=0.5,
+                max_steps=6,
+            )
+        )
+        env.reset()
+        outbound = env.step(3)
+
+        self.assertTrue(outbound.info["broadcast_coverage"])
+        self.assertTrue(outbound.info["broadcast_completion"])
+        self.assertTrue(outbound.info["coverage_completed"])
+        self.assertTrue(outbound.info["return_mode"])
+        self.assertFalse(outbound.info["completed"])
+
+        returned = env.step(2)
+
+        self.assertTrue(returned.info["completed"])
+        self.assertTrue(returned.info["all_at_depot"])
+        self.assertGreater(returned.info["reward_terms"]["return_all_arrived"], 0.0)
+
+    def test_initial_return_mode_starts_from_completed_coverage_away_from_depot(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=4,
+                height=1,
+                num_agents=2,
+                use_depot=True,
+                depot=(0, 0),
+                require_return_to_depot=True,
+                initial_return_mode=True,
+            )
+        )
+        env.reset()
+
+        self.assertTrue(env.return_mode)
+        self.assertTrue(env.coverage_completed())
+        self.assertFalse(env.all_agents_at_depot())
+        self.assertNotIn((0, 0), env.positions)
+
+    def test_diverse_return_start_strategy_cycles_across_regions(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=5,
+                height=5,
+                num_agents=1,
+                use_depot=True,
+                depot=(0, 0),
+                initial_return_mode=True,
+                return_start_strategy="diverse",
+                obstacle_ratio=None,
+            )
+        )
+
+        starts = []
+        for _ in range(4):
+            env.reset()
+            starts.append(env.positions[0])
+
+        self.assertEqual(starts, [(4, 4), (0, 4), (4, 0), (2, 2)])
+
+    def test_phase_critics_select_return_value_from_state_phase(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(width=2, height=1, use_depot=True, depot=(0, 0), require_return_to_depot=True)
+        )
+        env.reset()
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+            state_metadata_dim=env.state_metadata_dim,
+            use_phase_critics=True,
+            phase_metadata_index=env.base_state_metadata_dim,
+        )
+        with torch.no_grad():
+            for parameter in model.parameters():
+                parameter.zero_()
+            model.critic.bias.fill_(1.0)
+            assert model.return_critic is not None
+            model.return_critic.bias.fill_(7.0)
+
+        coverage_state = torch.as_tensor(env.global_state(), dtype=torch.float32)
+        return_state = coverage_state.clone()
+        phase_offset = env.state_channels * env.config.height * env.config.width + env.base_state_metadata_dim
+        return_state[phase_offset] = 1.0
+
+        self.assertAlmostEqual(float(model.value(coverage_state)[0]), 1.0)
+        self.assertAlmostEqual(float(model.value(return_state)[0]), 7.0)
+
+    def test_phase_actors_select_return_logits_from_state_phase(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(width=2, height=1, use_depot=True, depot=(0, 0), require_return_to_depot=True)
+        )
+        observation = env.reset()
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+            state_metadata_dim=env.state_metadata_dim,
+            use_phase_actors=True,
+            phase_metadata_index=env.base_state_metadata_dim,
+        )
+        with torch.no_grad():
+            for parameter in model.parameters():
+                parameter.zero_()
+            model.actor.bias[:] = torch.tensor([0.0, 5.0, 0.0, 0.0])
+            assert model.return_actor is not None
+            model.return_actor.bias[:] = torch.tensor([0.0, 0.0, 0.0, 9.0])
+
+        coverage_state = torch.as_tensor(env.global_state(), dtype=torch.float32)
+        return_state = coverage_state.clone()
+        phase_offset = env.state_channels * env.config.height * env.config.width + env.base_state_metadata_dim
+        return_state[phase_offset] = 1.0
+
+        coverage_action, _, _ = model.act(
+            torch.as_tensor(observation, dtype=torch.float32),
+            coverage_state,
+            deterministic=True,
+        )
+        return_action, _, _ = model.act(
+            torch.as_tensor(observation, dtype=torch.float32),
+            return_state,
+            deterministic=True,
+        )
+
+        self.assertEqual(coverage_action, 1)
+        self.assertEqual(return_action, 3)
 
     def test_coverage_message_contains_memory_derived_intent(self) -> None:
         env = GridCoverageEnv(
@@ -772,6 +1126,119 @@ class ConfigEnvTests(unittest.TestCase):
         self.assertTrue(mask[0, 1])
         self.assertFalse(mask[0, 2])
         self.assertFalse(mask[0, 3])
+
+    def test_return_mode_action_masks_block_illegal_moves(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=3,
+                height=3,
+                use_depot=True,
+                depot=(0, 0),
+                initial_return_mode=True,
+                return_start_positions=[(0, 1)],
+                obstacles=[(1, 1)],
+            )
+        )
+        env.reset()
+
+        self.assertTrue(env.return_mode)
+        self.assertEqual(env.positions, [(0, 1)])
+        self.assertEqual(env.action_masks().tolist(), [[False, False, True, True]])
+
+    def test_returned_agent_action_mask_uses_canonical_wait(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=2,
+                height=2,
+                use_depot=True,
+                depot=(0, 0),
+                initial_return_mode=True,
+                return_start_positions=[(0, 0)],
+            )
+        )
+        env.reset()
+
+        self.assertTrue(env.return_mode)
+        self.assertEqual(env.positions, [(0, 0)])
+        self.assertEqual(env.action_masks().tolist(), [[True, False, False, False]])
+
+    def test_depot_dispatch_stages_overlapped_agents_through_free_exits(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=3,
+                height=3,
+                num_agents=4,
+                use_depot=True,
+                depot=(0, 0),
+                max_steps=8,
+            )
+        )
+        env.reset()
+
+        self.assertEqual(env.positions, [(0, 0), (0, 0), (0, 0), (0, 0)])
+        self.assertEqual(
+            env.action_masks().tolist(),
+            [
+                [False, True, False, False],
+                [False, False, False, True],
+                [True, False, False, False],
+                [True, False, False, False],
+            ],
+        )
+
+        first_wave = env.step([1, 3, 0, 0])
+
+        self.assertEqual(env.positions, [(1, 0), (0, 1), (0, 0), (0, 0)])
+        self.assertEqual(first_wave.info["reward_terms"]["collision_agents"], 0.0)
+        self.assertEqual(first_wave.info["reward_terms"]["depot_waiting_agents"], 2.0)
+        self.assertEqual(env.path_lengths, [1, 1, 0, 0])
+        self.assertEqual(env.action_masks()[2:].tolist(), [[True, False, False, False], [True, False, False, False]])
+
+        second_wait = env.step([1, 3, 0, 0])
+
+        self.assertEqual(env.positions, [(2, 0), (0, 2), (0, 0), (0, 0)])
+        self.assertEqual(second_wait.info["reward_terms"]["collision_agents"], 0.0)
+        self.assertEqual(env.action_masks()[2:].tolist(), [[False, True, False, False], [False, False, False, True]])
+
+        second_wave = env.step([3, 1, 1, 3])
+
+        self.assertEqual(env.positions, [(2, 1), (1, 2), (1, 0), (0, 1)])
+        self.assertEqual(second_wave.info["reward_terms"]["collision_agents"], 0.0)
+
+    def test_return_policy_action_mask_blocks_invalid_argmax(self) -> None:
+        env = GridCoverageEnv(
+            GridCoverageConfig(
+                width=3,
+                height=3,
+                use_depot=True,
+                depot=(0, 0),
+                initial_return_mode=True,
+                return_start_positions=[(0, 1)],
+                obstacles=[(1, 1)],
+            )
+        )
+        observation = env.reset()
+        state = env.global_state()
+        model = ActorCritic(
+            observation_dim=env.observation_dim,
+            action_dim=env.action_dim,
+            hidden_dim=16,
+            state_shape=(env.config.height, env.config.width),
+            state_metadata_dim=env.state_metadata_dim,
+        )
+        with torch.no_grad():
+            for parameter in model.parameters():
+                parameter.zero_()
+            model.actor.bias[:] = torch.tensor([10.0, 9.0, 8.0, 0.0])
+
+        action, _, _ = model.act(
+            torch.as_tensor(observation, dtype=torch.float32),
+            torch.as_tensor(state, dtype=torch.float32),
+            action_mask=torch.as_tensor(env.action_masks()[0], dtype=torch.bool),
+            deterministic=True,
+        )
+
+        self.assertEqual(action, 2)
 
     def test_illegal_move_keeps_state_and_penalizes(self) -> None:
         env = GridCoverageEnv(GridCoverageConfig(width=6, height=6, start=(0, 0)))

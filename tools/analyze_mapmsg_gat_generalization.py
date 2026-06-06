@@ -33,8 +33,8 @@ from mathbased_mcpp.evaluation import coverage_efficiency_metrics
 from mathbased_mcpp.ppo import ActorCritic
 
 
-GAT_ON_CHECKPOINT = Path(r"E:\test plot\ablation_mapmsg_gat_on\20260526-113831\04-tier-4-20x20-4agents\best_policy.pt")
-GAT_OFF_CHECKPOINT = Path(r"E:\test plot\ablation_mapmsg_gat_off\20260527-210103\04-tier-4-20x20-4agents\best_policy.pt")
+GAT_ON_CHECKPOINT = ROOT / "outputs" / "ablation_mapmsg_gat_on" / "RUN_ID" / "04-tier-4-20x20-4agents" / "best_policy.pt"
+GAT_OFF_CHECKPOINT = ROOT / "outputs" / "ablation_mapmsg_gat_off" / "RUN_ID" / "04-tier-4-20x20-4agents" / "best_policy.pt"
 
 
 @dataclass(frozen=True)

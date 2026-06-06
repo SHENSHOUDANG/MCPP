@@ -20,7 +20,9 @@ invalid_move_penalty = -1.0
 
 [ppo]
 total_timesteps = 256
+policy_phase = "coverage"
 rollout_steps = 64
+num_envs = 2
 update_epochs = 2
 mini_batch_size = 32
 gamma = 0.98
@@ -34,6 +36,10 @@ hidden_dim = 64
 seed = 7
 device = "auto"
 
+[cuap]
+enabled = false
+
 [train]
 run_root = "runs"
 log_interval = 1
+cpu_threads = 4

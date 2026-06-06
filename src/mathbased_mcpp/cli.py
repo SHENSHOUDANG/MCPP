@@ -7,7 +7,7 @@ from pathlib import Path
 from .benchmark import benchmark_policy
 from .config import load_config
 from .env import GridCoverageEnv
-from .evaluation import evaluate_policy, resolve_runtime_config
+from .evaluation import evaluate_policy, evaluate_two_phase_policy, resolve_runtime_config
 from .imitation import pretrain_imitation
 from .rendering import render_trajectory
 from .training import train_ppo
@@ -22,10 +22,14 @@ def main() -> None:
         subparser.add_argument("--config", default="configs/smoke.toml")
         if name in {"evaluate", "render", "benchmark"}:
             subparser.add_argument("--checkpoint", required=True)
+            if name in {"evaluate", "render"}:
+                subparser.add_argument("--return-checkpoint", default=None)
         if name in {"train", "pretrain"}:
             subparser.add_argument("--course", default=None)
         if name == "train":
             subparser.add_argument("--previous-checkpoint", default=None)
+            subparser.add_argument("--resume-checkpoint", default=None)
+            subparser.add_argument("--policy-phase", choices=("coverage", "return", "joint"), default=None)
         if name == "pretrain":
             subparser.add_argument("--episodes", type=int, default=64)
             subparser.add_argument("--epochs", type=int, default=40)
@@ -108,9 +112,19 @@ def main() -> None:
         print(f"observation_dim={env.observation_dim}")
         print(f"state_dim={env.state_dim}")
         print(f"critic_mode=spatial")
+        use_joint_phase_model = (
+            config.ppo.policy_phase == "joint"
+            and config.env.use_depot
+            and config.env.require_return_to_depot
+        )
+        print(f"use_phase_critics={str(use_joint_phase_model).lower()}")
+        print(f"use_phase_actors={str(use_joint_phase_model).lower()}")
         print(f"state_shape={config.env.height}x{config.env.width}")
         print(f"action_dim={env.action_dim}")
         print(f"total_timesteps={config.ppo.total_timesteps}")
+        print(f"policy_phase={config.ppo.policy_phase}")
+        print(f"num_envs={config.ppo.num_envs}")
+        print(f"cpu_threads={config.train.cpu_threads}")
         print(f"use_graph_attention={str(config.ppo.use_graph_attention).lower()}")
         print(f"gat_num_heads={config.ppo.gat_num_heads}")
         print(f"gat_use_edge_features={str(config.ppo.gat_use_edge_features).lower()}")
@@ -120,6 +134,12 @@ def main() -> None:
         print(f"share_map_memory={str(config.env.share_map_memory).lower()}")
         print(f"use_coverage_messages={str(config.ppo.use_coverage_messages).lower()}")
         print(f"node_message_dim={env.node_message_dim if config.ppo.use_coverage_messages else 0}")
+        print(f"cuap_enabled={str(config.cuap.enabled).lower()}")
+        print(f"cuap_beta={config.cuap.beta}")
+        print(f"cuap_disable_in_return_phase={str(config.cuap.disable_in_return_phase).lower()}")
+        print(f"use_depot={str(config.env.use_depot).lower()}")
+        print(f"depot={env.depot_position}")
+        print(f"require_return_to_depot={str(config.env.require_return_to_depot).lower()}")
         if config.curriculum and config.curriculum.courses:
             print(f"curriculum_courses={len(config.curriculum.courses)}")
             for index, course in enumerate(config.curriculum.courses, start=1):
@@ -132,7 +152,14 @@ def main() -> None:
     if args.command == "train":
         if config.curriculum and config.curriculum.courses and not args.course:
             parser.error("curriculum configs require --course so each course can be trained separately")
-        checkpoint = train_ppo(config, course=args.course, previous_checkpoint=args.previous_checkpoint)
+        if args.policy_phase is not None:
+            config.ppo.policy_phase = args.policy_phase
+        checkpoint = train_ppo(
+            config,
+            course=args.course,
+            previous_checkpoint=args.previous_checkpoint,
+            resume_checkpoint=args.resume_checkpoint,
+        )
         print(f"checkpoint={checkpoint}")
         return
 
@@ -198,12 +225,27 @@ def main() -> None:
     run_dir = checkpoint_path.parent
     trajectory_path = run_dir / "trajectory.json"
     runtime_config = resolve_runtime_config(config, checkpoint_path)
-    summary = evaluate_policy(runtime_config, checkpoint_path, output_path=trajectory_path)
+    if args.return_checkpoint:
+        trajectory_path = run_dir / "two_phase_trajectory.json"
+        summary = evaluate_two_phase_policy(
+            runtime_config,
+            checkpoint_path,
+            args.return_checkpoint,
+            output_path=trajectory_path,
+        )
+    else:
+        summary = evaluate_policy(runtime_config, checkpoint_path, output_path=trajectory_path)
 
     if args.command == "evaluate":
         print(f"coverage_ratio={summary['coverage_ratio']:.3f}")
         print(f"path_length={summary['path_length']}")
         print(f"completed={str(summary['completed']).lower()}")
+        if "coverage_completed" in summary:
+            print(f"coverage_completed={str(summary['coverage_completed']).lower()}")
+        if "returned_to_depot" in summary:
+            print(f"returned_to_depot={str(summary['returned_to_depot']).lower()}")
+        if "phase_steps" in summary:
+            print(f"phase_steps={summary['phase_steps']}")
         print(f"coverage_auc={summary['coverage_auc']:.4f}")
         print(f"t90={summary['t90']}")
         print(f"t95={summary['t95']}")
@@ -214,7 +256,8 @@ def main() -> None:
         return
 
     if args.command == "render":
-        output = render_trajectory(runtime_config, summary["trajectory"], run_dir / "trajectory.png")
+        render_name = "two_phase_trajectory.png" if args.return_checkpoint else "trajectory.png"
+        output = render_trajectory(runtime_config, summary["trajectory"], run_dir / render_name)
         print(f"trajectory={trajectory_path}")
         print(f"render={output}")
         return

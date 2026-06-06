@@ -19,6 +19,7 @@ ACTIONS: dict[int, GridPosition] = {
 
 ACTION_BY_DELTA: dict[GridPosition, int] = {delta: action for action, delta in ACTIONS.items()}
 NONAVOIDABLE_REPEAT_WEIGHT = 0.1
+DEPOT_WAIT_ACTION = 0
 
 
 @dataclass(slots=True)
@@ -36,9 +37,11 @@ class GridCoverageEnv:
     observation_channels = 6
     legacy_observation_channels = 7
     explicit_observation_channels = 9
-    observation_metadata_dim = 12
+    base_observation_metadata_dim = 12
+    mission_metadata_dim = 7
     state_channels = 5
-    state_metadata_dim = 7
+    base_state_metadata_dim = 7
+    mission_state_metadata_dim = 5
     neighbor_feature_dim = 4
     coverage_message_base_dim = 15
 
@@ -71,6 +74,11 @@ class GridCoverageEnv:
         self.last_blocked_cells: set[GridPosition] = set()
         self.last_new_cells = 0
         self.last_collision_agents = 0
+        self.return_mode = False
+        self.broadcast_coverage_sent = False
+        self.broadcast_completion_sent = False
+        self.last_broadcast_coverage = False
+        self.last_broadcast_completion = False
         self._build_map()
         self._sync_legacy_aliases()
 
@@ -90,6 +98,10 @@ class GridCoverageEnv:
         return channel_dim + self.observation_metadata_dim
 
     @property
+    def observation_metadata_dim(self) -> int:
+        return self.base_observation_metadata_dim + (self.mission_metadata_dim if self.config.use_depot else 0)
+
+    @property
     def active_observation_channels(self) -> int:
         if self.config.use_explicit_map_memory:
             return self.explicit_observation_channels
@@ -105,6 +117,10 @@ class GridCoverageEnv:
     def state_dim(self) -> int:
         return self.config.height * self.config.width * self.state_channels + self.state_metadata_dim
 
+    @property
+    def state_metadata_dim(self) -> int:
+        return self.base_state_metadata_dim + (self.mission_state_metadata_dim if self.config.use_depot else 0)
+
     def reset(self, seed: int | None = None) -> np.ndarray:
         if seed is not None:
             self.random.seed(seed)
@@ -114,6 +130,9 @@ class GridCoverageEnv:
         self.positions = self._select_start_positions()
         self._configure_orientation(self.positions[0])
         self.teammate_positions = self._valid_teammate_positions(self.config.teammate_positions)
+        if self.config.initial_return_mode:
+            self.positions = self._select_return_start_positions()
+            self.start_positions = list(self.positions)
         self.covered = set(self.positions)
         self.covered_by_agent = [{position} for position in self.positions]
         self.known_free_by_agent = [set() for _ in self.positions]
@@ -127,6 +146,18 @@ class GridCoverageEnv:
         self.last_blocked_cells = set()
         self.last_new_cells = 0
         self.last_collision_agents = 0
+        self.return_mode = False
+        self.broadcast_coverage_sent = False
+        self.broadcast_completion_sent = False
+        self.last_broadcast_coverage = False
+        self.last_broadcast_completion = False
+        if self.config.initial_return_mode:
+            self.covered = set(self.free_cells)
+            self.covered_by_agent = [set(self.free_cells) for _ in self.positions]
+            self.known_team_covered_by_agent = [set(self.free_cells) for _ in self.positions]
+            self.return_mode = True
+            self.broadcast_coverage_sent = True
+            self.broadcast_completion_sent = True
         self._sync_legacy_aliases()
         self._refresh_explicit_map_memory()
         observations = self._observations()
@@ -148,6 +179,11 @@ class GridCoverageEnv:
         last_blocked_cells = set(self.last_blocked_cells)
         last_new_cells = self.last_new_cells
         last_collision_agents = self.last_collision_agents
+        return_mode = self.return_mode
+        broadcast_coverage_sent = self.broadcast_coverage_sent
+        broadcast_completion_sent = self.broadcast_completion_sent
+        last_broadcast_coverage = self.last_broadcast_coverage
+        last_broadcast_completion = self.last_broadcast_completion
         covered_by_agent = [set(cells) for cells in self.covered_by_agent]
         known_free_by_agent = [set(cells) for cells in self.known_free_by_agent]
         known_obstacles_by_agent = [set(cells) for cells in self.known_obstacles_by_agent]
@@ -178,6 +214,11 @@ class GridCoverageEnv:
         self.last_blocked_cells = last_blocked_cells
         self.last_new_cells = last_new_cells
         self.last_collision_agents = last_collision_agents
+        self.return_mode = return_mode
+        self.broadcast_coverage_sent = broadcast_coverage_sent
+        self.broadcast_completion_sent = broadcast_completion_sent
+        self.last_broadcast_coverage = last_broadcast_coverage
+        self.last_broadcast_completion = last_broadcast_completion
         self.obstacles = obstacles
         self.free_cells = free_cells
         self._sync_legacy_aliases()
@@ -188,6 +229,7 @@ class GridCoverageEnv:
         actions = [int(action)] if scalar_action else [int(item) for item in action]
         if len(actions) != self.num_agents:
             raise ValueError(f"expected {self.num_agents} actions, got {len(actions)}")
+        self._begin_step_events()
         if self.done:
             reward: float | np.ndarray = 0.0 if scalar_action else np.zeros(self.num_agents, dtype=np.float32)
             layers = self._canonical_layers()
@@ -211,6 +253,7 @@ class GridCoverageEnv:
                 float(max(self.path_lengths, default=0)) / max(self.config.max_steps, 1),
                 self.last_new_cells / max(self.num_agents, 1),
                 self.last_collision_agents / max(self.num_agents, 1),
+                *self._mission_state_metadata(),
             ],
             dtype=np.float32,
         )
@@ -260,13 +303,16 @@ class GridCoverageEnv:
         return [action for action in ACTIONS if self.peek(action, agent_index=agent_index)[1]]
 
     def action_masks(self) -> np.ndarray:
-        return np.asarray(
-            [
-                [self.peek(action, agent_index=agent_index)[1] for action in ACTIONS]
-                for agent_index in range(self.num_agents)
-            ],
-            dtype=bool,
-        )
+        masks: list[list[bool]] = []
+        for agent_index in range(self.num_agents):
+            if self.return_mode and self.config.use_depot and self.positions[agent_index] == self.depot_position:
+                wait_mask = [False for _ in ACTIONS]
+                wait_mask[DEPOT_WAIT_ACTION] = True
+                masks.append(wait_mask)
+                continue
+            base_mask = [self.peek(action, agent_index=agent_index)[1] for action in ACTIONS]
+            masks.append(self._depot_dispatch_mask(agent_index, base_mask))
+        return np.asarray(masks, dtype=bool)
 
     def safe_actions(self, agent_index: int = 0) -> list[int]:
         actions = []
@@ -286,6 +332,75 @@ class GridCoverageEnv:
 
     def coverage_ratio(self) -> float:
         return len(self.covered) / max(len(self.free_cells), 1)
+
+    @property
+    def depot_position(self) -> GridPosition:
+        return self.config.depot if self.config.depot is not None else self.config.start
+
+    def coverage_completed(self) -> bool:
+        return self.covered >= self.free_cells
+
+    def all_agents_at_depot(self) -> bool:
+        depot = self.depot_position
+        return all(position == depot for position in self.positions)
+
+    def _depot_dispatch_mask(self, agent_index: int, base_mask: list[bool]) -> list[bool]:
+        if not self._uses_depot_dispatch(agent_index):
+            return base_mask
+        if self._depot_dispatch_waiting(agent_index):
+            return [action == DEPOT_WAIT_ACTION for action in ACTIONS]
+        assigned_action = self._depot_dispatch_action(agent_index)
+        if assigned_action is None:
+            return [action == DEPOT_WAIT_ACTION for action in ACTIONS]
+        return [action == assigned_action for action in ACTIONS]
+
+    def _uses_depot_dispatch(self, agent_index: int) -> bool:
+        return (
+            self.config.depot_dispatch_enabled
+            and self.config.use_depot
+            and not self.return_mode
+            and self.num_agents > 1
+            and self.positions[agent_index] == self.depot_position
+        )
+
+    def _depot_dispatch_waiting(self, agent_index: int) -> bool:
+        if not self._uses_depot_dispatch(agent_index):
+            return False
+        launch_actions = self._depot_launch_actions(agent_index)
+        if not launch_actions:
+            return True
+        wave = agent_index // len(launch_actions)
+        if self.step_count < wave:
+            return True
+        assigned_action = launch_actions[agent_index % len(launch_actions)]
+        target, _ = self.peek(assigned_action, agent_index=agent_index)
+        return self._depot_exit_occupied(target, agent_index)
+
+    def _depot_dispatch_action(self, agent_index: int) -> int | None:
+        launch_actions = self._depot_launch_actions(agent_index)
+        if not launch_actions:
+            return None
+        return launch_actions[agent_index % len(launch_actions)]
+
+    def _depot_launch_actions(self, agent_index: int) -> list[int]:
+        if not self._uses_depot_dispatch(agent_index):
+            return []
+        return [action for action in ACTIONS if self.peek(action, agent_index=agent_index)[1]]
+
+    def _depot_exit_occupied(self, target: GridPosition, agent_index: int) -> bool:
+        depot = self.depot_position
+        return any(
+            other_index != agent_index and position != depot and position == target
+            for other_index, position in enumerate(self.positions)
+        )
+
+    def _is_depot_dispatch_wait(self, agent_index: int, action: int) -> bool:
+        return self._depot_dispatch_waiting(agent_index) and action == DEPOT_WAIT_ACTION
+
+    def mission_completed(self) -> bool:
+        if self.config.require_return_to_depot:
+            return self.coverage_completed() and self.all_agents_at_depot()
+        return self.coverage_completed()
 
     def neighbor_mask(self) -> np.ndarray:
         mask = np.eye(self.num_agents, dtype=bool)
@@ -318,9 +433,13 @@ class GridCoverageEnv:
     def _step_single(self, action: int, scalar_action: bool) -> StepResult:
         previous_position = self.position
         previous_covered = set(self.covered)
-        use_frontier_progress = self.config.reward.team_frontier_weight != 0.0
+        was_return_mode = self.return_mode
+        use_frontier_progress = self.config.reward.team_frontier_weight != 0.0 and not was_return_mode
         before_distance = self._distance_to_nearest_uncovered(previous_position, previous_covered) if use_frontier_progress else None
-        target, valid = self.peek(action)
+        if was_return_mode and previous_position == self.depot_position:
+            target, valid = previous_position, True
+        else:
+            target, valid = self.peek(action)
         reward_terms = self._single_reward_terms(previous_position=previous_position, target=target, valid=valid)
 
         self.step_count += 1
@@ -341,16 +460,24 @@ class GridCoverageEnv:
             self.last_new_cells = 0
             self.last_blocked_cells = {target}
 
-        completed = self.covered >= self.free_cells
+        self._refresh_task_events()
+        completed = self.coverage_completed()
         if valid:
             if completed:
                 reward_terms["finish"] = self.config.reward.finish_reward
         else:
             reward_terms["invalid"] = self.config.reward.invalid_move_penalty
 
-        self.done = completed or self.step_count >= self.config.max_steps
+        self.done = self.mission_completed() or self.step_count >= self.config.max_steps
         if not valid:
             reward = float(self.config.reward.invalid_move_penalty)
+        elif was_return_mode:
+            reward, reward_terms = self._return_reward(
+                previous_positions=[previous_position],
+                final_positions=[self.positions[0]],
+                invalid_agents=set(),
+                collision_agents=set(),
+            )
         else:
             frontier_progress = 0.0
             if use_frontier_progress:
@@ -410,7 +537,10 @@ class GridCoverageEnv:
     def _step_multi(self, actions: list[int]) -> StepResult:
         previous_positions = list(self.positions)
         previous_covered = set(self.covered)
-        use_frontier_progress = self.config.reward.team_frontier_weight != 0.0
+        was_return_mode = self.return_mode
+        depot = self.depot_position
+        depot_overlap_cell = depot if self.config.use_depot else None
+        use_frontier_progress = self.config.reward.team_frontier_weight != 0.0 and not was_return_mode
         before_distances = (
             self._distances_to_nearest_uncovered(previous_positions, previous_covered)
             if use_frontier_progress
@@ -418,8 +548,15 @@ class GridCoverageEnv:
         )
         targets: list[GridPosition] = []
         base_valid: list[bool] = []
+        depot_wait_agents: set[int] = set()
         for index, action in enumerate(actions):
-            target, valid = self.peek(action, agent_index=index)
+            if self._is_depot_dispatch_wait(index, action):
+                target, valid = depot, True
+                depot_wait_agents.add(index)
+            elif was_return_mode and previous_positions[index] == depot:
+                target, valid = depot, True
+            else:
+                target, valid = self.peek(action, agent_index=index)
             targets.append(target)
             base_valid.append(valid)
 
@@ -429,9 +566,10 @@ class GridCoverageEnv:
         for index, target in enumerate(targets):
             if index in invalid_agents:
                 continue
-            target_to_agents.setdefault(target, []).append(index)
+            if target != depot_overlap_cell:
+                target_to_agents.setdefault(target, []).append(index)
             for other_index, other_position in enumerate(previous_positions):
-                if other_index != index and target == other_position:
+                if other_index != index and target == other_position and target != depot_overlap_cell:
                     collision_agents.add(index)
                     collision_agents.add(other_index)
         for agents in target_to_agents.values():
@@ -439,7 +577,12 @@ class GridCoverageEnv:
                 collision_agents.update(agents)
         for first in range(self.num_agents):
             for second in range(first + 1, self.num_agents):
-                if targets[first] == previous_positions[second] and targets[second] == previous_positions[first]:
+                if (
+                    targets[first] == previous_positions[second]
+                    and targets[second] == previous_positions[first]
+                    and previous_positions[first] != depot_overlap_cell
+                    and previous_positions[second] != depot_overlap_cell
+                ):
                     collision_agents.add(first)
                     collision_agents.add(second)
 
@@ -448,7 +591,7 @@ class GridCoverageEnv:
         final_positions = list(previous_positions)
         moved_agents: list[int] = []
         for index, target in enumerate(targets):
-            if index in blocked_agents:
+            if index in blocked_agents or index in depot_wait_agents:
                 continue
             final_positions[index] = target
             moved_agents.append(index)
@@ -473,6 +616,8 @@ class GridCoverageEnv:
             self.covered_by_agent[index].add(target)
         for index in blocked_agents:
             self.paths[index].append(previous_positions[index])
+        for index in depot_wait_agents:
+            self.paths[index].append(previous_positions[index])
         self.covered.update(new_cells)
         self.last_new_cells = len(new_cells)
         self.last_collision_agents = len(collision_agents)
@@ -486,41 +631,51 @@ class GridCoverageEnv:
             ]
             frontier_progress = float(np.clip(np.mean(progress_values), -1.0, 1.0)) if progress_values else 0.0
 
-        completed = self.covered >= self.free_cells
+        self._refresh_task_events()
+        completed = self.coverage_completed()
         uncovered_ratio = 1.0 - self.coverage_ratio()
         time_cost_scale = uncovered_ratio if self.config.reward.scale_time_cost_by_uncovered else 1.0
         finish_team_total = self.config.reward.finish_reward if completed else 0.0
         finish_reward = finish_team_total
         if completed and self.config.reward.normalize_team_finish_reward:
             finish_reward = finish_team_total / self.num_agents
-        reward_terms = {
-            "new_cells": float(len(new_cells)),
-            "frontier_progress": frontier_progress,
-            "avoidable_repeats": float(avoidable_repeats),
-            "repeated_cells": float(repeated_cells),
-            "nonavoidable_repeats": float(max(repeated_cells - avoidable_repeats, 0)),
-            "invalid_moves": float(len(invalid_agents)),
-            "collision_agents": float(len(collision_agents)),
-            "uncovered_ratio": uncovered_ratio,
-            "time_cost_scale": time_cost_scale,
-            "time": -self.config.reward.team_time_weight * time_cost_scale,
-            "finish": finish_reward,
-            "finish_team_total": finish_team_total,
-        }
-        repeat_penalty = -self.config.reward.team_repeat_weight * (
-            avoidable_repeats + NONAVOIDABLE_REPEAT_WEIGHT * reward_terms["nonavoidable_repeats"]
-        ) / self.num_agents
-        reward_terms["repeat"] = repeat_penalty
-        reward = float(
-            self.config.reward.team_new_cell_weight * len(new_cells) / self.num_agents
-            + self.config.reward.team_frontier_weight * frontier_progress
-            + repeat_penalty
-            - self.config.reward.team_invalid_weight * len(invalid_agents) / self.num_agents
-            - self.config.reward.team_collision_weight * len(collision_agents) / self.num_agents
-            + reward_terms["time"]
-            + finish_reward
-        )
-        self.done = completed or self.step_count >= self.config.max_steps
+        if was_return_mode:
+            reward, reward_terms = self._return_reward(
+                previous_positions=previous_positions,
+                final_positions=final_positions,
+                invalid_agents=invalid_agents,
+                collision_agents=collision_agents,
+            )
+        else:
+            reward_terms = {
+                "new_cells": float(len(new_cells)),
+                "frontier_progress": frontier_progress,
+                "avoidable_repeats": float(avoidable_repeats),
+                "repeated_cells": float(repeated_cells),
+                "nonavoidable_repeats": float(max(repeated_cells - avoidable_repeats, 0)),
+                "invalid_moves": float(len(invalid_agents)),
+                "collision_agents": float(len(collision_agents)),
+                "depot_waiting_agents": float(len(depot_wait_agents)),
+                "uncovered_ratio": uncovered_ratio,
+                "time_cost_scale": time_cost_scale,
+                "time": -self.config.reward.team_time_weight * time_cost_scale,
+                "finish": finish_reward,
+                "finish_team_total": finish_team_total,
+            }
+            repeat_penalty = -self.config.reward.team_repeat_weight * (
+                avoidable_repeats + NONAVOIDABLE_REPEAT_WEIGHT * reward_terms["nonavoidable_repeats"]
+            ) / self.num_agents
+            reward_terms["repeat"] = repeat_penalty
+            reward = float(
+                self.config.reward.team_new_cell_weight * len(new_cells) / self.num_agents
+                + self.config.reward.team_frontier_weight * frontier_progress
+                + repeat_penalty
+                - self.config.reward.team_invalid_weight * len(invalid_agents) / self.num_agents
+                - self.config.reward.team_collision_weight * len(collision_agents) / self.num_agents
+                + reward_terms["time"]
+                + finish_reward
+            )
+        self.done = self.mission_completed() or self.step_count >= self.config.max_steps
         self._sync_legacy_aliases()
         self._refresh_explicit_map_memory()
         layers = self._canonical_layers()
@@ -698,6 +853,7 @@ class GridCoverageEnv:
                 self.coverage_ratio(),
                 self._agent_density(),
                 *self._communication_metadata(agent_index),
+                *self._mission_metadata(agent_index),
             ],
             dtype=np.float32,
         )
@@ -732,6 +888,7 @@ class GridCoverageEnv:
                 len(self.covered_by_agent[agent_index]) / max(self.config.width * self.config.height, 1),
                 self.num_agents / max(self.config.width * self.config.height, 1),
                 *([0.0] * 8),
+                *self._mission_metadata(agent_index),
             ],
             dtype=np.float32,
         )
@@ -776,6 +933,7 @@ class GridCoverageEnv:
                 self._known_coverage_ratio(agent_index),
                 len(known_free) / max(self.config.height * self.config.width, 1),
                 *message[:8],
+                *self._mission_metadata(agent_index),
             ],
             dtype=np.float32,
         )
@@ -993,6 +1151,38 @@ class GridCoverageEnv:
             float(np.mean([intent[1] for intent in intents])),
         ]
 
+    def _mission_metadata(self, agent_index: int) -> list[float]:
+        if not self.config.use_depot:
+            return []
+        depot = self.depot_position
+        position = self.positions[agent_index]
+        row_scale = max(self.config.height - 1, 1)
+        col_scale = max(self.config.width - 1, 1)
+        distance_scale = max(self.config.height + self.config.width - 2, 1)
+        return [
+            float(self.return_mode),
+            float(self.last_broadcast_coverage),
+            float(self.last_broadcast_completion),
+            float(position == depot),
+            (depot[0] - position[0]) / row_scale,
+            (depot[1] - position[1]) / col_scale,
+            self._manhattan(position, depot) / distance_scale,
+        ]
+
+    def _mission_state_metadata(self) -> list[float]:
+        if not self.config.use_depot:
+            return []
+        depot = self.depot_position
+        distances = [self._manhattan(position, depot) for position in self.positions]
+        distance_scale = max(self.config.height + self.config.width - 2, 1)
+        return [
+            float(self.return_mode),
+            float(self.broadcast_coverage_sent),
+            float(self.broadcast_completion_sent),
+            float(np.mean(distances) / distance_scale),
+            float(self.all_agents_at_depot()),
+        ]
+
     def _last_move_vector(self, agent_index: int) -> tuple[float, float]:
         path = self.paths[agent_index]
         if len(path) < 2:
@@ -1024,6 +1214,63 @@ class GridCoverageEnv:
 
         return all_agents, uncovered, team_covered, obstacles, blocked
 
+    def _begin_step_events(self) -> None:
+        self.last_broadcast_coverage = False
+        self.last_broadcast_completion = False
+
+    def _refresh_task_events(self) -> None:
+        if not self.config.use_depot:
+            return
+        coverage = self.coverage_ratio()
+        threshold = min(max(self.config.broadcast_coverage_threshold, 0.0), 1.0)
+        if coverage >= threshold and not self.broadcast_coverage_sent:
+            self.broadcast_coverage_sent = True
+            self.last_broadcast_coverage = True
+        if self.coverage_completed() and not self.broadcast_completion_sent:
+            self.broadcast_completion_sent = True
+            self.last_broadcast_completion = True
+        if self.config.require_return_to_depot and self.coverage_completed():
+            self.return_mode = True
+
+    def _return_reward(
+        self,
+        previous_positions: Sequence[GridPosition],
+        final_positions: Sequence[GridPosition],
+        invalid_agents: set[int],
+        collision_agents: set[int],
+    ) -> tuple[float, dict[str, float]]:
+        depot = self.depot_position
+        distance_scale = max(self.config.height + self.config.width - 2, 1)
+        before = np.asarray([self._manhattan(position, depot) for position in previous_positions], dtype=np.float32)
+        after = np.asarray([self._manhattan(position, depot) for position in final_positions], dtype=np.float32)
+        progress = float(np.mean((before - after) / distance_scale))
+        wrong_way = float(np.mean(np.maximum(after - before, 0.0) / distance_scale))
+        arrivals = sum(
+            1
+            for before_position, after_position in zip(previous_positions, final_positions)
+            if before_position != depot and after_position == depot
+        )
+        all_arrived = float(self.all_agents_at_depot())
+        reward_terms = {
+            "return_progress": progress,
+            "return_wrong_way": wrong_way,
+            "return_arrivals": float(arrivals),
+            "return_all_arrived": all_arrived,
+            "invalid_moves": float(len(invalid_agents)),
+            "collision_agents": float(len(collision_agents)),
+            "time": -self.config.reward.return_time_weight,
+        }
+        reward = float(
+            self.config.reward.return_progress_weight * progress
+            - self.config.reward.return_wrong_way_weight * wrong_way
+            + self.config.reward.return_arrival_reward * arrivals / max(self.num_agents, 1)
+            + self.config.reward.return_all_arrived_reward * all_arrived
+            - self.config.reward.team_invalid_weight * len(invalid_agents) / max(self.num_agents, 1)
+            - self.config.reward.team_collision_weight * len(collision_agents) / max(self.num_agents, 1)
+            + reward_terms["time"]
+        )
+        return reward, reward_terms
+
     def _info(self, reward_terms: dict[str, float]) -> dict[str, Any]:
         return {
             "position": self.position,
@@ -1034,7 +1281,13 @@ class GridCoverageEnv:
             "path_length": self.path_length,
             "path_lengths": list(self.path_lengths),
             "step_count": self.step_count,
-            "completed": self.covered >= self.free_cells,
+            "completed": self.mission_completed(),
+            "coverage_completed": self.coverage_completed(),
+            "return_mode": self.return_mode,
+            "depot": self.depot_position,
+            "all_at_depot": self.all_agents_at_depot(),
+            "broadcast_coverage": self.last_broadcast_coverage,
+            "broadcast_completion": self.last_broadcast_completion,
             "teammate_positions": list(self.teammate_positions),
             "reward_terms": reward_terms,
             "last_blocked_cells": list(self.last_blocked_cells),
@@ -1060,7 +1313,7 @@ class GridCoverageEnv:
         rng = random.Random(self._current_random_obstacle_seed())
         all_cells = {(row, col) for row in range(self.config.height) for col in range(self.config.width)}
         corner_positions = set(self._corner_positions()) if self.config.random_corner_start else set()
-        protected = {self.config.start, *self.config.start_positions, *corner_positions}
+        protected = {self.config.start, *self.config.start_positions, self.depot_position, *corner_positions}
         obstacles = {cell for cell in base_obstacles if cell in all_cells}
         candidates = [cell for cell in all_cells if cell not in obstacles and cell not in protected]
         rng.shuffle(candidates)
@@ -1109,6 +1362,13 @@ class GridCoverageEnv:
         return self._select_start_positions()[0]
 
     def _select_start_positions(self) -> list[GridPosition]:
+        if self.config.use_depot:
+            depot = self.depot_position
+            if depot not in self.free_cells:
+                raise ValueError(f"depot must be a free cell, got {depot}")
+            self.start_positions = [depot for _ in range(self.num_agents)]
+            return list(self.start_positions)
+
         selected: list[GridPosition] = []
         for position in self.config.start_positions:
             if position in self.free_cells and position not in selected:
@@ -1136,6 +1396,82 @@ class GridCoverageEnv:
 
         self.start_positions = selected
         return selected
+
+    def _select_return_start_positions(self) -> list[GridPosition]:
+        depot = self.depot_position
+        selected: list[GridPosition] = []
+        for position in self.config.return_start_positions:
+            if position in self.free_cells and position not in selected:
+                selected.append(position)
+            if len(selected) == self.num_agents:
+                return selected
+
+        strategy = self.config.return_start_strategy.strip().lower()
+        if strategy in {"diverse", "region_cycle"}:
+            return self._fill_return_start_positions_from_region(selected)
+        if strategy not in {"farthest", "distance"}:
+            raise ValueError(f"unknown return_start_strategy: {self.config.return_start_strategy}")
+
+        candidates = sorted(
+            (cell for cell in self.free_cells if cell != depot and cell not in selected),
+            key=lambda cell: (self._manhattan(cell, depot), cell),
+            reverse=True,
+        )
+        for candidate in candidates:
+            selected.append(candidate)
+            if len(selected) == self.num_agents:
+                return selected
+        while len(selected) < self.num_agents:
+            selected.append(depot)
+        return selected
+
+    def _fill_return_start_positions_from_region(self, selected: list[GridPosition]) -> list[GridPosition]:
+        depot = self.depot_position
+        candidates = [cell for cell in self.free_cells if cell != depot and cell not in selected]
+        if not candidates:
+            while len(selected) < self.num_agents:
+                selected.append(depot)
+            return selected
+
+        targets = self._return_start_region_targets()
+        target = targets[(max(self.reset_count, 1) - 1) % len(targets)]
+        ordered = sorted(
+            candidates,
+            key=lambda cell: (
+                self._manhattan(cell, target),
+                -self._manhattan(cell, depot),
+                cell,
+            ),
+        )
+        for candidate in ordered:
+            selected.append(candidate)
+            if len(selected) == self.num_agents:
+                return selected
+        while len(selected) < self.num_agents:
+            selected.append(depot)
+        return selected
+
+    def _return_start_region_targets(self) -> list[GridPosition]:
+        last_row = self.config.height - 1
+        last_col = self.config.width - 1
+        mid_row = self.config.height // 2
+        mid_col = self.config.width // 2
+        raw_targets = [
+            (last_row, last_col),
+            (0, last_col),
+            (last_row, 0),
+            (mid_row, mid_col),
+            (mid_row, last_col),
+            (last_row, mid_col),
+            (0, mid_col),
+            (mid_row, 0),
+        ]
+        targets: list[GridPosition] = []
+        for target in raw_targets:
+            if target == self.depot_position or target in targets:
+                continue
+            targets.append(target)
+        return targets or [self.depot_position]
 
     def _valid_teammate_positions(self, positions: list[GridPosition]) -> list[GridPosition]:
         valid_positions: list[GridPosition] = []

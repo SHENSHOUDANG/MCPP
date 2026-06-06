@@ -7,11 +7,41 @@ The formal curriculum is run one course at a time. Each course writes its own ch
 ## Quick Start
 
 ```powershell
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp doctor --config configs/smoke.toml
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/smoke.toml
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 64 --epochs 40
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent
+.\.venv\Scripts\python.exe -m mathbased_mcpp doctor --config configs/smoke.toml
+.\.venv\Scripts\python.exe -m mathbased_mcpp train --config configs/smoke.toml
+.\.venv\Scripts\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 64 --epochs 40
+.\.venv\Scripts\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent --policy-phase coverage
+.\.venv\Scripts\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent --policy-phase return
+.\.venv\Scripts\python.exe -m mathbased_mcpp evaluate --config configs/formal_v1.toml --checkpoint <coverage-policy.pt> --return-checkpoint <return-policy.pt>
 ```
+
+## Full Depot-Return Pipeline
+
+Use `tools/run_depot_return_pipeline.py` to execute the full training flow in order:
+
+1. behavior-cloning warm start on course 1;
+2. coverage PPO curriculum for courses 1, 2, 3, and 4;
+3. return PPO curriculum for courses 1, 2, 3, and 4.
+
+Check the plan without writing outputs:
+
+```powershell
+.\.venv\Scripts\python.exe tools\run_depot_return_pipeline.py --config configs\formal_v1.toml --dry-run
+```
+
+Run the whole pipeline:
+
+```powershell
+.\.venv\Scripts\python.exe tools\run_depot_return_pipeline.py --config configs\formal_v1.toml
+```
+
+By default, the script writes under `<train.run_root>\depot_return_pipeline`, with coverage checkpoints under `coverage\` and return checkpoints under `return\`. To choose a different output directory:
+
+```powershell
+.\.venv\Scripts\python.exe tools\run_depot_return_pipeline.py --config configs\formal_v1.toml --run-root "outputs\formal_depot_return"
+```
+
+The coverage phase is forced to `policy_phase = "coverage"` and trains without return termination. The return phase is forced to `policy_phase = "return"`, starts episodes directly in return mode, and trains the separate return model/reward. If a run is interrupted, rerun the same command with `--resume`; completed courses are skipped and the interrupted course reloads its `last_policy.pt` checkpoint. Use `--skip-pretrain`, `--skip-coverage`, or `--skip-return` only when resuming or debugging a partial run.
 
 ## Recent Change Recap
 
@@ -22,6 +52,9 @@ The recent training line now includes these changes:
 - PPO can optionally use range-limited multi-head graph attention communication between neighboring agents.
 - `team_frontier_weight = 0.0` disables frontier-distance shaping, and the environment skips the associated distance-search work.
 - Course-level PPO rollout sizes increase with task difficulty.
+- PPO training can collect synchronized rollouts from multiple environment instances through `num_envs`, then run one batched policy inference/update on the selected device.
+- Runtime CPU thread pools are capped by `train.cpu_threads`, clamped to at most 4 so training leaves headroom for normal desktop use.
+- Formal and map-intent configs now include a depot-return task: agents spawn at the depot, receive one broadcast at the coverage threshold and one at full coverage, then enter return mode and must finish at the depot.
 - The formal curriculum is capped at 20x20 maps. Obstacle density is a per-course experiment knob, not a curriculum difficulty axis.
 - A low-cost imitation warm start is available through a boustrophedon obstacle-avoidance expert and behavior cloning pretraining.
 - PPO, evaluation, benchmarking, and imitation pretraining share the same `use_action_mask` setting from the active course config.
@@ -36,6 +69,52 @@ The recent training line now includes these changes:
 - `tier-4-20x20-4agents`: 20x20 map, 500 episode steps, 4 agents, 4400000 PPO timesteps, initialized from tier 3.
 
 All formal tiers use `observation_radius = 2`, so the actor receives a 5x5 local observation window. The largest formal course is fixed at 20x20 to keep training and ablation experiments manageable. Each course has its own explicit `obstacle_ratio`, so you can change course 2, 3, or 4 independently without changing the others.
+
+The formal config uses `num_envs = 4`. This is synchronous multi-environment sampling in one Python process, not threaded environment stepping. It avoids shared mutable environment state, shared RNG, and concurrent CSV/TensorBoard writes while still giving the model larger GPU-friendly batches. With the current settings, one PPO update uses roughly `rollout_steps x num_envs` agent transitions before minibatching.
+
+## Depot Return Task
+
+When `use_depot = true`, all agents spawn at `depot`. Multiple agents may occupy the depot at the same time, and depot overlap is not counted as a collision. Away from the depot, ordinary same-target, occupied-cell, and swap collisions still apply.
+
+When coverage reaches `broadcast_coverage_threshold`, the environment emits a one-step coverage broadcast to all actor observations. When all free cells are covered, it emits a one-step completion broadcast and switches to return mode if `require_return_to_depot = true`. In return mode, coverage rewards are replaced by a separate return reward that encourages reducing distance to the depot, penalizes moving away, gives arrival credit, and gives a terminal team reward when all agents are back at the depot. Agents already at the depot wait there during return mode, so they are not forced to leave because the action space has no explicit no-op.
+
+The recommended training path is phase-separated. Train a coverage policy with `--policy-phase coverage`, train a return policy with `--policy-phase return`, then pass both checkpoints to `evaluate` or `render` with `--return-checkpoint`. The high-level controller is a deterministic task state machine: it uses the coverage model until the environment enters `return_mode`, then switches to the return model. The optional `policy_phase = "joint"` mode still exists for experiments with shared backbones and phase-specific heads, but it is not the default.
+
+## CUAP Action Prior
+
+CUAP, or Coverage Utility Action Prior, is an optional coverage-stage action prior. It does not change the action space, reward, critic, or GAT module. At action selection time it computes a per-agent, per-action utility from the agent's own explicit map memory and communication-neighbor intent, then adds it as a soft logits bias:
+
+```text
+final_logits = actor_logits + beta * cuap_logits
+final_logits = apply_action_mask(final_logits, action_mask)
+```
+
+CUAP is agent-agnostic. The implementation may loop over `agent_index` to fetch each agent's local memory, but the index is not encoded into observations, node messages, edge features, CUAP features, or network inputs. CUAP also avoids global coverage truth: novelty, repeat, and frontier terms use `known_free_by_agent`, `known_team_covered_by_agent`, and `known_obstacles_by_agent`, while conflict uses communication-neighbor intent regions from coverage messages.
+
+CUAP is enabled with:
+
+```toml
+[cuap]
+enabled = true
+beta = 0.3
+disable_in_return_phase = true
+w_novelty = 1.0
+w_frontier = 0.5
+w_repeat = 0.7
+w_conflict = 0.5
+normalize = true
+clip = 2.0
+```
+
+The trainer stores the scaled `beta * cuap_logits` in the PPO rollout batch and reuses that same prior during PPO update, so `old_log_prob` and `new_log_prob` refer to the same policy distribution definition. During return mode, CUAP returns a zero prior by default so it does not pull agents back into exploration.
+
+The main ablation groups are:
+
+- `configs/ablation_mapmsg_gat_off.toml`: explicit-memory baseline without GAT and without CUAP.
+- `configs/ablation_mapmsg_gat_on.toml`: explicit-memory GAT baseline without CUAP.
+- `configs/ablation_mapmsg_gat_on_cuap.toml`: same GAT baseline with CUAP enabled.
+
+Use `configs/cuap_smoke.toml` for a short implementation smoke test before launching the full ablation.
 
 ## Imitation Warm Start
 
@@ -53,7 +132,7 @@ When `use_action_mask = true`, behavior cloning uses the same one-step action ma
 Run behavior cloning for one curriculum course:
 
 ```powershell
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 64 --epochs 40
+.\.venv\Scripts\python.exe -m mathbased_mcpp pretrain --config configs/formal_v1.toml --course tier-1-8x8-1agent --episodes 64 --epochs 40
 ```
 
 The command writes:
@@ -72,7 +151,7 @@ Do not judge the warm start from a tiny `16 episodes / 4 epochs` run. On the cou
 Use the produced checkpoint as a PPO warm start:
 
 ```powershell
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent --previous-checkpoint "E:\test plot\imitation\<run>\bc_policy.pt"
+.\.venv\Scripts\python.exe -m mathbased_mcpp train --config configs/formal_v1.toml --course tier-1-8x8-1agent --previous-checkpoint "outputs\formal_v1\imitation\<run>\bc_policy.pt"
 ```
 
 After course 1, the existing curriculum transfer remains unchanged: train course 2 from course 1, course 3 from course 2, and course 4 from course 3. The imitation checkpoint is meant to reduce early PPO exploration cost, not to replace PPO or claim large-map zero-shot generalization.
@@ -110,7 +189,7 @@ Each course writes:
 - `trajectory.png`
 - `course_config.json`
 
-The formal curriculum output root defaults to `E:\test plot`.
+The formal curriculum output root defaults to `outputs\formal_v1` inside this repository, so it works on machines without an `E:` drive.
 
 ## Memory And Communication
 
@@ -206,13 +285,23 @@ The formal config uses:
 observation_radius = 2
 recent_path_length = 8
 communication_radius = 4
+use_depot = true
+depot = [0, 0]
+require_return_to_depot = true
+broadcast_coverage_threshold = 0.90
 
 [ppo]
+num_envs = 4
+mini_batch_size = 512
 use_graph_attention = true
 gat_num_heads = 4
 gat_use_edge_features = true
 gat_residual = true
 gat_attention_dropout = 0.0
+
+[train]
+cpu_threads = 4
+float32_matmul_precision = "high"
 ```
 
 The formal reward config globally disables distance-based frontier shaping:
@@ -347,7 +436,7 @@ This direction should be described carefully. It is not claiming to invent count
 ## TensorBoard
 
 ```powershell
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m tensorboard.main --logdir "E:\test plot\<run>\01-tier-1-8x8-1agent\tensorboard"
+.\.venv\Scripts\python.exe -m tensorboard.main --logdir "outputs\formal_v1\<run>\01-tier-1-8x8-1agent\tensorboard"
 ```
 
 Point TensorBoard at the course-specific `tensorboard` directory to inspect train/eval reward, coverage, path length, completion, and step metrics.
@@ -453,7 +542,7 @@ device = "auto"
 The trainer resolves this to CUDA when `torch.cuda.is_available()` is true, otherwise CPU. To verify the active PyTorch environment:
 
 ```powershell
-E:\miniconda3\envs\two-stage-mcpp\python.exe -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu')"
+.\.venv\Scripts\python.exe -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu')"
 ```
 
 GPU acceleration may be modest for small maps because environment stepping is still CPU-side, but it should help more as `rollout_steps`, batch size, hidden size, and GAT computation grow. If the installed PyTorch build supports CUDA, PyCharm does not need a different training command; keep the same interpreter and leave `device = "auto"`, or set `device = "cuda"` explicitly for later experiments.
@@ -549,24 +638,24 @@ Train the GAT-on arm:
 
 ```text
 train --config configs/ablation_gat_on.toml --course tier-1-8x8-1agent
-train --config configs/ablation_gat_on.toml --course tier-2-13x13-2agents --previous-checkpoint "E:\test plot\ablation_gat_on\<run>\01-tier-1-8x8-1agent\best_policy.pt"
-train --config configs/ablation_gat_on.toml --course tier-3-18x18-3agents --previous-checkpoint "E:\test plot\ablation_gat_on\<run>\02-tier-2-13x13-2agents\best_policy.pt"
-train --config configs/ablation_gat_on.toml --course tier-4-20x20-4agents --previous-checkpoint "E:\test plot\ablation_gat_on\<run>\03-tier-3-18x18-3agents\best_policy.pt"
+train --config configs/ablation_gat_on.toml --course tier-2-13x13-2agents --previous-checkpoint "outputs\ablation_gat_on\<run>\01-tier-1-8x8-1agent\best_policy.pt"
+train --config configs/ablation_gat_on.toml --course tier-3-18x18-3agents --previous-checkpoint "outputs\ablation_gat_on\<run>\02-tier-2-13x13-2agents\best_policy.pt"
+train --config configs/ablation_gat_on.toml --course tier-4-20x20-4agents --previous-checkpoint "outputs\ablation_gat_on\<run>\03-tier-3-18x18-3agents\best_policy.pt"
 ```
 
 Train the GAT-off arm:
 
 ```text
 train --config configs/ablation_gat_off.toml --course tier-1-8x8-1agent
-train --config configs/ablation_gat_off.toml --course tier-2-13x13-2agents --previous-checkpoint "E:\test plot\ablation_gat_off\<run>\01-tier-1-8x8-1agent\best_policy.pt"
-train --config configs/ablation_gat_off.toml --course tier-3-18x18-3agents --previous-checkpoint "E:\test plot\ablation_gat_off\<run>\02-tier-2-13x13-2agents\best_policy.pt"
-train --config configs/ablation_gat_off.toml --course tier-4-20x20-4agents --previous-checkpoint "E:\test plot\ablation_gat_off\<run>\03-tier-3-18x18-3agents\best_policy.pt"
+train --config configs/ablation_gat_off.toml --course tier-2-13x13-2agents --previous-checkpoint "outputs\ablation_gat_off\<run>\01-tier-1-8x8-1agent\best_policy.pt"
+train --config configs/ablation_gat_off.toml --course tier-3-18x18-3agents --previous-checkpoint "outputs\ablation_gat_off\<run>\02-tier-2-13x13-2agents\best_policy.pt"
+train --config configs/ablation_gat_off.toml --course tier-4-20x20-4agents --previous-checkpoint "outputs\ablation_gat_off\<run>\03-tier-3-18x18-3agents\best_policy.pt"
 ```
 
 After both arms finish, compare them on the same held-out seeds and obstacle ratios:
 
 ```text
-gat-ablation --gat-on-config configs/ablation_gat_on.toml --gat-on-checkpoint "E:\test plot\ablation_gat_on\<run>\04-tier-4-20x20-4agents\best_policy.pt" --gat-off-config configs/ablation_gat_off.toml --gat-off-checkpoint "E:\test plot\ablation_gat_off\<run>\04-tier-4-20x20-4agents\best_policy.pt" --seeds 20260601,20260602,20260603,20260604,20260605 --obstacle-ratios 0.05,0.10,0.15,0.20 --output "E:\test plot\gat_ablation_summary.csv"
+gat-ablation --gat-on-config configs/ablation_gat_on.toml --gat-on-checkpoint "outputs\ablation_gat_on\<run>\04-tier-4-20x20-4agents\best_policy.pt" --gat-off-config configs/ablation_gat_off.toml --gat-off-checkpoint "outputs\ablation_gat_off\<run>\04-tier-4-20x20-4agents\best_policy.pt" --seeds 20260601,20260602,20260603,20260604,20260605 --obstacle-ratios 0.05,0.10,0.15,0.20 --output "outputs\gat_ablation_summary.csv"
 ```
 
 The summary CSV contains `gat_on`, `gat_off`, and `delta_on_minus_off`. The primary fields are `coverage_at_<budget>_mean`, `coverage_auc_mean`, `t90/t95/t99_mean_reached`, `t90/t95/t99_reach_rate`, and `stall_termination_coverage_mean`. Use `repeat_ratio_after_90_mean`, `inter_agent_overlap_ratio_mean`, `completion_rate`, and `path_length_mean` as supporting diagnostics. Results from archived legacy checkpoints must be labeled as legacy truth-observation results, not decentralized baseline results.
@@ -586,7 +675,7 @@ Use the same project settings for all four courses:
 
 ```text
 Project root: <this repository root>
-Interpreter:   E:\miniconda3\envs\two-stage-mcpp\python.exe
+Interpreter:   <this repository root>\.venv\Scripts\python.exe
 Working dir:   <this repository root>
 Run target:    module `mathbased_mcpp`
 ```
@@ -599,6 +688,31 @@ If you prefer a script path instead of a module, use:
 
 For every run configuration below, keep the working directory and interpreter the same. Only the script parameters change.
 
+For the current depot-return/CUAP workflow, the simplest PyCharm run configuration is a Python script:
+
+```text
+Script path:  <this repository root>\tools\run_depot_return_pipeline.py
+Parameters:   --config configs\ablation_mapmsg_gat_on_cuap.toml
+Working dir:  <this repository root>
+Interpreter:  <this repository root>\.venv\Scripts\python.exe
+```
+
+Use `--dry-run` first to verify the courses and output folders. Replace the config with `configs\ablation_mapmsg_gat_off.toml` for no-GAT/no-CUAP, or `configs\ablation_mapmsg_gat_on.toml` for GAT/no-CUAP.
+
+If PyCharm, Windows, or a manual stop interrupts training, rerun with the same config and add `--resume`:
+
+```text
+--config configs\ablation_mapmsg_gat_on_cuap.toml --resume
+```
+
+Desktop CPU thread control lives in `[train]`:
+
+```toml
+cpu_threads = 4
+```
+
+Training periodically saves `last_policy.pt`, which includes the model weights, optimizer state, timestep, and update index, so `--resume` continues the same course instead of restarting from scratch.
+
 ### Course 1
 
 Training:
@@ -610,13 +724,13 @@ train --config configs/formal_v1.toml --course tier-1-8x8-1agent
 Testing:
 
 ```text
-evaluate --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\01-tier-1-8x8-1agent\policy.pt"
+evaluate --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\01-tier-1-8x8-1agent\policy.pt"
 ```
 
 Final path drawing:
 
 ```text
-render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\01-tier-1-8x8-1agent\policy.pt"
+render --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\01-tier-1-8x8-1agent\policy.pt"
 ```
 
 ### Course 2
@@ -624,19 +738,19 @@ render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\01-tier-
 Training:
 
 ```text
-train --config configs/formal_v1.toml --course tier-2-13x13-2agents --previous-checkpoint "E:\test plot\<run>\01-tier-1-8x8-1agent\best_policy.pt"
+train --config configs/formal_v1.toml --course tier-2-13x13-2agents --previous-checkpoint "outputs\formal_v1\<run>\01-tier-1-8x8-1agent\best_policy.pt"
 ```
 
 Testing:
 
 ```text
-evaluate --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\02-tier-2-13x13-2agents\policy.pt"
+evaluate --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\02-tier-2-13x13-2agents\policy.pt"
 ```
 
 Final path drawing:
 
 ```text
-render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\02-tier-2-13x13-2agents\policy.pt"
+render --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\02-tier-2-13x13-2agents\policy.pt"
 ```
 
 ### Course 3
@@ -644,19 +758,19 @@ render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\02-tier-
 Training:
 
 ```text
-train --config configs/formal_v1.toml --course tier-3-18x18-3agents --previous-checkpoint "E:\test plot\<run>\02-tier-2-13x13-2agents\best_policy.pt"
+train --config configs/formal_v1.toml --course tier-3-18x18-3agents --previous-checkpoint "outputs\formal_v1\<run>\02-tier-2-13x13-2agents\best_policy.pt"
 ```
 
 Testing:
 
 ```text
-evaluate --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\03-tier-3-18x18-3agents\policy.pt"
+evaluate --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\03-tier-3-18x18-3agents\policy.pt"
 ```
 
 Final path drawing:
 
 ```text
-render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\03-tier-3-18x18-3agents\policy.pt"
+render --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\03-tier-3-18x18-3agents\policy.pt"
 ```
 
 ### Course 4
@@ -664,19 +778,19 @@ render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\03-tier-
 Training:
 
 ```text
-train --config configs/formal_v1.toml --course tier-4-20x20-4agents --previous-checkpoint "E:\test plot\<run>\03-tier-3-18x18-3agents\best_policy.pt"
+train --config configs/formal_v1.toml --course tier-4-20x20-4agents --previous-checkpoint "outputs\formal_v1\<run>\03-tier-3-18x18-3agents\best_policy.pt"
 ```
 
 Testing:
 
 ```text
-evaluate --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\04-tier-4-20x20-4agents\policy.pt"
+evaluate --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\04-tier-4-20x20-4agents\policy.pt"
 ```
 
 Final path drawing:
 
 ```text
-render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\04-tier-4-20x20-4agents\policy.pt"
+render --config configs/formal_v1.toml --checkpoint "outputs\formal_v1\<run>\04-tier-4-20x20-4agents\policy.pt"
 ```
 
 ## Notes
@@ -692,5 +806,5 @@ render --config configs/formal_v1.toml --checkpoint "E:\test plot\<run>\04-tier-
 ## Tests
 
 ```powershell
-E:\miniconda3\envs\two-stage-mcpp\python.exe -m unittest tests.test_config_env tests.test_rewards tests.test_ppo_render
+.\.venv\Scripts\python.exe -m unittest tests.test_config_env tests.test_rewards tests.test_ppo_render
 ```

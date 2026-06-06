@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ import numpy as np
 import torch
 
 from .config import ExperimentConfig, load_config
+from .cuap import scaled_cuap_prior
 from .env import GridCoverageEnv
 from .ppo import ActorCritic
 from .utils import agent_observations, serialize_trajectory
@@ -47,6 +49,9 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
     gat_residual = bool(payload.get("gat_residual", config.ppo.gat_residual))
     gat_attention_dropout = float(payload.get("gat_attention_dropout", config.ppo.gat_attention_dropout))
     node_message_dim = int(payload.get("node_message_dim", 0))
+    use_phase_critics = bool(payload.get("use_phase_critics", False))
+    use_phase_actors = bool(payload.get("use_phase_actors", False))
+    phase_metadata_index = int(payload.get("phase_metadata_index", GridCoverageEnv.base_state_metadata_dim))
     if critic_type == "spatial" or "state_shape" in payload:
         model = ActorCritic(
             observation_dim=observation_dim,
@@ -61,6 +66,9 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             gat_residual=gat_residual,
             gat_attention_dropout=gat_attention_dropout,
             node_message_dim=node_message_dim,
+            use_phase_critics=use_phase_critics,
+            use_phase_actors=use_phase_actors,
+            phase_metadata_index=phase_metadata_index,
         )
     else:
         model = ActorCritic(
@@ -74,8 +82,11 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             gat_residual=gat_residual,
             gat_attention_dropout=gat_attention_dropout,
             node_message_dim=node_message_dim,
+            use_phase_critics=use_phase_critics,
+            use_phase_actors=use_phase_actors,
+            phase_metadata_index=phase_metadata_index,
         )
-    model.load_state_dict(payload["model_state_dict"])
+    model.load_compatible_state_dict(payload["model_state_dict"])
     model.eval()
     return model
 
@@ -90,6 +101,7 @@ def evaluate_policy(
 ) -> dict[str, Any]:
     config = resolve_runtime_config(config, checkpoint_path)
     env = GridCoverageEnv(config.env)
+    _validate_cuap_config(config, env)
     model = load_policy(config, checkpoint_path)
     observation = agent_observations(env.reset(seed=config.env.seed))
     state = env.global_state()
@@ -114,6 +126,7 @@ def evaluate_policy(
             else None
         )
         action_mask = torch.as_tensor(env.action_masks(), dtype=torch.bool) if config.ppo.use_action_mask else None
+        action_prior = _action_prior_tensor(config, env)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -122,6 +135,7 @@ def evaluate_policy(
                 edge_features=edge_features,
                 node_messages=node_messages,
                 action_mask=action_mask,
+                action_prior_logits=action_prior,
                 deterministic=deterministic,
             )
         result = env.step(actions.cpu().numpy().tolist())
@@ -141,6 +155,104 @@ def evaluate_policy(
         "path_length": env.path_length,
         "path_lengths": list(env.path_lengths),
         "completed": bool(info.get("completed", False)),
+        "steps": info.get("step_count", env.step_count),
+        "trajectory": trajectories[0] if env.num_agents == 1 else trajectories,
+        "trajectories": trajectories,
+    }
+    summary.update(
+        coverage_efficiency_metrics(
+            trajectories=trajectories,
+            coverage_curve=coverage_curve,
+            max_steps=env.config.max_steps,
+            budgets=budgets,
+            stall_steps=stall_steps,
+        )
+    )
+    if output_path is not None:
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        serializable = dict(summary)
+        serializable["trajectory"] = serialize_trajectory(summary["trajectory"])
+        serializable["trajectories"] = [[list(cell) for cell in trajectory] for trajectory in trajectories]
+        path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
+    return summary
+
+
+def evaluate_two_phase_policy(
+    config: ExperimentConfig,
+    coverage_checkpoint_path: str | Path,
+    return_checkpoint_path: str | Path,
+    output_path: str | Path | None = None,
+    deterministic: bool = True,
+    budgets: list[int] | None = None,
+    stall_steps: int = 50,
+) -> dict[str, Any]:
+    config = resolve_runtime_config(copy.deepcopy(config), coverage_checkpoint_path)
+    config.env.use_depot = True
+    config.env.require_return_to_depot = True
+    config.env.initial_return_mode = False
+    env = GridCoverageEnv(config.env)
+    _validate_cuap_config(config, env)
+    coverage_model = load_policy(config, coverage_checkpoint_path)
+    return_model = load_policy(config, return_checkpoint_path)
+    observation = agent_observations(env.reset(seed=config.env.seed))
+    state = env.global_state()
+    trajectories = [[position] for position in env.positions]
+    coverage_curve = [env.coverage_ratio()]
+    total_reward = 0.0
+    done = False
+    info: dict[str, Any] = {}
+    phase_steps = {"coverage": 0, "return": 0}
+
+    while not done:
+        model = return_model if env.return_mode else coverage_model
+        phase_steps["return" if env.return_mode else "coverage"] += 1
+        obs_tensor = torch.as_tensor(observation, dtype=torch.float32)
+        state_tensor = torch.as_tensor(state, dtype=torch.float32)
+        neighbor_mask = torch.as_tensor(env.neighbor_mask(), dtype=torch.bool)
+        edge_features = (
+            torch.as_tensor(env.neighbor_features(), dtype=torch.float32)
+            if model.use_graph_attention and model.gat_edge_dim > 0
+            else None
+        )
+        node_messages = (
+            torch.as_tensor(env.node_messages(), dtype=torch.float32)
+            if model.node_message_dim > 0
+            else None
+        )
+        action_mask = torch.as_tensor(env.action_masks(), dtype=torch.bool) if config.ppo.use_action_mask else None
+        action_prior = _action_prior_tensor(config, env)
+        with torch.no_grad():
+            actions, _, _ = model.act_batch(
+                obs_tensor,
+                state_tensor,
+                neighbor_mask=neighbor_mask,
+                edge_features=edge_features,
+                node_messages=node_messages,
+                action_mask=action_mask,
+                action_prior_logits=action_prior,
+                deterministic=deterministic,
+            )
+        result = env.step(actions.cpu().numpy().tolist())
+        rewards = np.asarray(result.reward, dtype=np.float32)
+        total_reward += float(rewards.mean() if rewards.ndim > 0 else rewards)
+        observation = agent_observations(result.observation)
+        state = result.state
+        done = result.done
+        info = result.info
+        for index, position in enumerate(env.positions):
+            trajectories[index].append(position)
+        coverage_curve.append(env.coverage_ratio())
+
+    summary = {
+        "total_reward": total_reward,
+        "coverage_ratio": info.get("coverage_ratio", env.coverage_ratio()),
+        "path_length": env.path_length,
+        "path_lengths": list(env.path_lengths),
+        "completed": bool(info.get("completed", False)),
+        "coverage_completed": bool(info.get("coverage_completed", False)),
+        "returned_to_depot": bool(info.get("all_at_depot", False)),
+        "phase_steps": phase_steps,
         "steps": info.get("step_count", env.step_count),
         "trajectory": trajectories[0] if env.num_agents == 1 else trajectories,
         "trajectories": trajectories,
@@ -209,6 +321,22 @@ def coverage_efficiency_metrics(
     metrics["stall_coverage"] = stall_coverage
     metrics["stall_termination_coverage"] = float(stall_coverage if stall_coverage is not None else terminal_coverage)
     return metrics
+
+
+def _validate_cuap_config(config: ExperimentConfig, env: GridCoverageEnv) -> None:
+    if not config.cuap.enabled:
+        return
+    if not config.ppo.use_action_mask:
+        raise ValueError("CUAP requires ppo.use_action_mask=true so the action mask is applied after the prior")
+    if not env.config.use_explicit_map_memory:
+        raise ValueError("CUAP requires env.use_explicit_map_memory=true to avoid global coverage truth leakage")
+
+
+def _action_prior_tensor(config: ExperimentConfig, env: GridCoverageEnv) -> torch.Tensor | None:
+    prior = scaled_cuap_prior(env, config.cuap, phase="return" if env.return_mode else "coverage")
+    if prior is None:
+        return None
+    return torch.as_tensor(prior, dtype=torch.float32)
 
 
 def _normalize_budgets(budgets: list[int] | None, max_steps: int) -> list[int]:

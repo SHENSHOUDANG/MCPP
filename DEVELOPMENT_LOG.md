@@ -2,6 +2,19 @@
 
 本文件用于记录项目代码、配置、实验流程与评估方式的重要变化。日期按实际修改或实验完成日期记录；尚未提交到 Git 的内容会明确标注。
 
+## 2026-06-05
+
+- 新增训练加速路径：
+  - `ppo.num_envs` 支持同步多环境 rollout，策略推理和 PPO 更新按 `[env, agent, dim]` 批量送入模型，再展平为 PPO minibatch。
+  - `train.cpu_threads` 统一限制 PyTorch/BLAS 线程池，代码层面夹到最多 4 线程，避免占满 16GB 内存机器上的桌面/游戏资源。
+  - 保持环境 step 单进程同步执行，暂不引入 Python 多线程共享 env，规避共享 RNG、可变环境状态、日志写入竞争和复现性问题。
+- 新增 depot-return 任务机制：
+  - `use_depot=true` 时所有 agent 从 depot 出生，depot 内重叠不算碰撞，非 depot 区域碰撞规则保持不变。
+  - 覆盖率达到阈值和全覆盖时分别向所有 agent 发送一次任务播报。
+  - 全覆盖后可进入 return mode，改用单独的返回 depot 奖励函数，并要求所有 agent 返回 depot 后才算任务完成。
+  - 推荐路径改为覆盖策略和返回策略分开训练：`--policy-phase coverage` 训练覆盖模型，`--policy-phase return` 训练返航模型，评估/渲染时由高层状态机根据 `return_mode` 切换 checkpoint。
+  - 保留 `policy_phase = "joint"` 作为可选实验模式，可在单模型里使用覆盖/返回两套 actor head 与两套 critic，但不作为默认路线。
+
 ## 2026-05-16
 
 - `d2b1737 Keep random obstacle maps connected`

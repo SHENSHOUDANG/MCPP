@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import copy
+import math
 import re
 import shutil
 from dataclasses import asdict
@@ -15,6 +17,7 @@ import torch
 from torch import nn
 
 from .config import ExperimentConfig, build_course_config, select_curriculum_course
+from .cuap import scaled_cuap_prior
 from .env import GridCoverageEnv
 from .ppo import ActorCritic, RolloutBatch
 from .utils import (
@@ -36,6 +39,7 @@ def train_ppo(
     run_dir: str | Path | None = None,
     course: str | None = None,
     previous_checkpoint: str | Path | None = None,
+    resume_checkpoint: str | Path | None = None,
 ) -> Path:
     if config.curriculum and config.curriculum.courses:
         if course is not None:
@@ -44,9 +48,10 @@ def train_ppo(
                 course_name=course,
                 run_dir=run_dir,
                 previous_checkpoint=previous_checkpoint,
+                resume_checkpoint=resume_checkpoint,
             )
         return _train_curriculum(config, run_dir=run_dir)
-    return _train_single_course(config, env=env, run_dir=run_dir)
+    return _train_single_course(config, env=env, run_dir=run_dir, resume_checkpoint_path=resume_checkpoint)
 
 
 def _train_curriculum(config: ExperimentConfig, run_dir: str | Path | None = None) -> Path:
@@ -76,28 +81,38 @@ def _train_single_curriculum_course(
     course_name: str,
     run_dir: str | Path | None = None,
     previous_checkpoint: str | Path | None = None,
+    resume_checkpoint: str | Path | None = None,
 ) -> Path:
     assert config.curriculum is not None
     course_index, course = select_curriculum_course(config, course_name=course_name)
     course_config = build_course_config(config, course)
-    checkpoint_path = _resolve_previous_checkpoint(
-        config=config,
-        course_index=course_index,
-        explicit_checkpoint=previous_checkpoint,
-    )
-    if course_index > 0 and course.load_previous and checkpoint_path is None:
+    resume_checkpoint_path = _resolve_existing_path(resume_checkpoint, "resume checkpoint")
+    checkpoint_path = None
+    if resume_checkpoint_path is None:
+        checkpoint_path = _resolve_previous_checkpoint(
+            config=config,
+            course_index=course_index,
+            explicit_checkpoint=previous_checkpoint,
+        )
+    if resume_checkpoint_path is None and course_index > 0 and course.load_previous and checkpoint_path is None:
         previous_course = config.curriculum.courses[course_index - 1]
         raise FileNotFoundError(
             f"{course.name} requires a checkpoint from {previous_course.name}; "
             "train the previous course first or pass --previous-checkpoint"
         )
-    run_base = Path(run_dir) if run_dir is not None else make_run_dir(config.train.run_root)
+    if run_dir is not None:
+        run_base = Path(run_dir)
+    elif resume_checkpoint_path is not None:
+        run_base = resume_checkpoint_path.parent.parent
+    else:
+        run_base = make_run_dir(config.train.run_root)
     course_run_dir = run_base / f"{course_index + 1:02d}-{_slugify(course.name)}"
     course_run_dir.mkdir(parents=True, exist_ok=True)
     checkpoint = _train_single_course(
         course_config,
         run_dir=course_run_dir,
         checkpoint_path=checkpoint_path,
+        resume_checkpoint_path=resume_checkpoint_path,
     )
     _update_curriculum_state(config, course.name, course_run_dir / "best_policy.pt", course_run_dir, state_root=run_base)
     return checkpoint
@@ -108,71 +123,95 @@ def _train_single_course(
     env: GridCoverageEnv | None = None,
     run_dir: str | Path | None = None,
     checkpoint_path: str | Path | None = None,
+    resume_checkpoint_path: str | Path | None = None,
 ) -> Path:
+    config = _prepare_policy_phase_config(config)
+    _configure_training_runtime(config)
     set_seed(config.ppo.seed)
-    env = env or GridCoverageEnv(config.env)
-    if config.ppo.use_coverage_messages and not env.config.use_explicit_map_memory:
+    rollout_envs = [env] if env is not None else _make_rollout_envs(config)
+    reference_env = rollout_envs[0]
+    if config.ppo.use_coverage_messages and not reference_env.config.use_explicit_map_memory:
         raise ValueError("use_coverage_messages requires use_explicit_map_memory=true")
-    run_path = Path(run_dir) if run_dir is not None else make_run_dir(config.train.run_root)
+    _validate_cuap_config(config, reference_env)
+    if run_dir is not None:
+        run_path = Path(run_dir)
+    elif resume_checkpoint_path is not None:
+        run_path = Path(resume_checkpoint_path).parent
+    else:
+        run_path = make_run_dir(config.train.run_root)
     run_path.mkdir(parents=True, exist_ok=True)
     _write_config_snapshot(config, run_path)
     writer = make_tensorboard_writer(run_path, config.train.tensorboard_dir) if config.train.use_tensorboard else None
 
     device = resolve_device(config.ppo.device)
     model = ActorCritic(
-        env.observation_dim,
-        env.action_dim,
+        reference_env.observation_dim,
+        reference_env.action_dim,
         config.ppo.hidden_dim,
-        state_shape=(env.config.height, env.config.width),
-        state_channels=env.state_channels,
-        state_metadata_dim=env.state_metadata_dim,
+        state_shape=(reference_env.config.height, reference_env.config.width),
+        state_channels=reference_env.state_channels,
+        state_metadata_dim=reference_env.state_metadata_dim,
         use_graph_attention=config.ppo.use_graph_attention,
         gat_num_heads=config.ppo.gat_num_heads,
-        gat_edge_dim=env.neighbor_feature_dim if config.ppo.gat_use_edge_features else 0,
+        gat_edge_dim=reference_env.neighbor_feature_dim if config.ppo.gat_use_edge_features else 0,
         gat_residual=config.ppo.gat_residual,
         gat_attention_dropout=config.ppo.gat_attention_dropout,
-        node_message_dim=env.node_message_dim if config.ppo.use_coverage_messages else 0,
+        node_message_dim=reference_env.node_message_dim if config.ppo.use_coverage_messages else 0,
+        use_phase_critics=_uses_joint_phase_model(config),
+        use_phase_actors=_uses_joint_phase_model(config),
+        phase_metadata_index=reference_env.base_state_metadata_dim,
     ).to(device)
-    if checkpoint_path is not None:
-        _load_checkpoint_weights(model, checkpoint_path)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ppo.learning_rate)
+    resume_state: dict[str, object] = {}
+    if resume_checkpoint_path is not None:
+        resume_state = _load_training_checkpoint(model, optimizer, resume_checkpoint_path, device)
+    elif checkpoint_path is not None:
+        _load_checkpoint_weights(model, checkpoint_path)
 
-    observation = agent_observations(env.reset(seed=config.env.seed))
-    state = env.global_state()
-    timestep = 0
-    update_index = 0
-    episode_index = 0
-    episode_reward = 0.0
-    episode_start_length = env.path_length
+    observation = np.asarray(
+        [agent_observations(worker.reset(seed=worker.config.seed)) for worker in rollout_envs],
+        dtype=np.float32,
+    )
+    state = np.asarray([worker.global_state() for worker in rollout_envs], dtype=np.float32)
+    timestep = int(resume_state.get("timestep", 0))
+    update_index = int(resume_state.get("update_index", 0))
+    episode_index = int(resume_state.get("episode_index", 0))
+    episode_rewards = np.zeros(len(rollout_envs), dtype=np.float32)
+    episode_start_lengths = [worker.path_length for worker in rollout_envs]
     metric_rows: list[dict[str, float | int]] = []
     best_score: tuple[float, int, float, float] | None = None
     best_checkpoint_path = run_path / "best_policy.pt"
     last_checkpoint_path = run_path / "last_policy.pt"
     eval_interval = max(config.train.eval_interval or config.train.log_interval, 1)
     checkpoint_interval = max(config.train.checkpoint_interval or config.train.log_interval, 1)
+    training_complete_marker = run_path / "training_complete.json"
+    if training_complete_marker.exists():
+        training_complete_marker.unlink()
 
     try:
         while timestep < config.ppo.total_timesteps:
             batch, observation, state, rollout_metrics = _collect_rollout(
                 config=config,
-                env=env,
+                envs=rollout_envs,
                 model=model,
                 observation=observation,
                 state=state,
-                max_steps=max(1, min(config.ppo.rollout_steps, config.ppo.total_timesteps - timestep) // env.num_agents),
+                max_steps=_rollout_env_steps(config, reference_env, len(rollout_envs), timestep),
                 episode_index=episode_index,
-                episode_reward=episode_reward,
-                episode_start_length=episode_start_length,
+                episode_rewards=episode_rewards,
+                episode_start_lengths=episode_start_lengths,
             )
             episode_index = int(rollout_metrics.pop("episode_index"))
-            episode_reward = float(rollout_metrics.pop("episode_reward"))
-            episode_start_length = int(rollout_metrics.pop("episode_start_length"))
+            episode_rewards = np.asarray(rollout_metrics.pop("episode_rewards"), dtype=np.float32)
+            episode_start_lengths = [int(item) for item in rollout_metrics.pop("episode_start_lengths")]
             new_metric_rows = rollout_metrics.pop("metric_rows")
             metric_rows.extend(new_metric_rows)
-            timestep += int(batch.actions.numel())
+            batch_transition_count = int(batch.actions.numel())
+            timestep += batch_transition_count
             update_index += 1
 
             _update_policy(config, model, optimizer, batch)
+            del batch
 
             if metric_rows:
                 append_metrics(run_path / "metrics.csv", metric_rows)
@@ -181,7 +220,19 @@ def _train_single_course(
                 metric_rows.clear()
 
             if update_index % checkpoint_interval == 0:
-                torch.save(_checkpoint_payload(config, model), last_checkpoint_path)
+                torch.save(
+                    _checkpoint_payload(
+                        config,
+                        model,
+                        optimizer=optimizer,
+                        training_state={
+                            "timestep": timestep,
+                            "update_index": update_index,
+                            "episode_index": episode_index,
+                        },
+                    ),
+                    last_checkpoint_path,
+                )
 
             if update_index % eval_interval == 0:
                 eval_row = _evaluate_model(config, model, update_index)
@@ -193,14 +244,62 @@ def _train_single_course(
                 score = _metric_score(eval_row)
                 if best_score is None or score > best_score:
                     best_score = score
-                    torch.save(_checkpoint_payload(config, model), best_checkpoint_path)
+                    torch.save(
+                        _checkpoint_payload(
+                            config,
+                            model,
+                            optimizer=optimizer,
+                            training_state={
+                                "timestep": timestep,
+                                "update_index": update_index,
+                                "episode_index": episode_index,
+                            },
+                        ),
+                        best_checkpoint_path,
+                    )
 
-        torch.save(_checkpoint_payload(config, model), last_checkpoint_path)
+        torch.save(
+            _checkpoint_payload(
+                config,
+                model,
+                optimizer=optimizer,
+                training_state={
+                    "timestep": timestep,
+                    "update_index": update_index,
+                    "episode_index": episode_index,
+                },
+            ),
+            last_checkpoint_path,
+        )
         if not best_checkpoint_path.exists():
-            torch.save(_checkpoint_payload(config, model), best_checkpoint_path)
+            torch.save(
+                _checkpoint_payload(
+                    config,
+                    model,
+                    optimizer=optimizer,
+                    training_state={
+                        "timestep": timestep,
+                        "update_index": update_index,
+                        "episode_index": episode_index,
+                    },
+                ),
+                best_checkpoint_path,
+            )
         shutil.copyfile(best_checkpoint_path, run_path / "policy.pt")
 
         _finalize_course_outputs(config, run_path, best_checkpoint_path)
+        training_complete_marker.write_text(
+            json.dumps(
+                {
+                    "completed": True,
+                    "timestep": timestep,
+                    "update_index": update_index,
+                    "checkpoint": str(run_path / "policy.pt"),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         return run_path / "policy.pt"
     finally:
         if writer is not None:
@@ -220,7 +319,9 @@ def _write_config_snapshot(config: ExperimentConfig, run_path: Path) -> None:
 
 
 def _curriculum_state_path(config: ExperimentConfig, state_root: str | Path | None = None) -> Path:
-    return Path(state_root) / "_curriculum_state.json" if state_root is not None else Path(config.train.run_root) / "_curriculum_state.json"
+    phase = _policy_phase(config)
+    filename = "_curriculum_state.json" if phase == "coverage" else f"_curriculum_state_{phase}.json"
+    return Path(state_root) / filename if state_root is not None else Path(config.train.run_root) / filename
 
 
 def _resolve_previous_checkpoint(
@@ -293,6 +394,7 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
         edge_features = _edge_features_tensor(env, model, device)
         node_messages = _node_messages_tensor(env, model, device)
         action_mask = _action_mask_tensor(config, env, device)
+        action_prior = _action_prior_tensor(config, env, device)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -301,6 +403,7 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
                 edge_features=edge_features,
                 node_messages=node_messages,
                 action_mask=action_mask,
+                action_prior_logits=action_prior,
                 deterministic=True,
             )
         result = env.step(actions.cpu().numpy().tolist())
@@ -322,7 +425,39 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
 
 def _load_checkpoint_weights(model: ActorCritic, checkpoint_path: str | Path) -> None:
     payload = torch.load(checkpoint_path, map_location="cpu")
-    model.load_state_dict(payload["model_state_dict"])
+    model.load_compatible_state_dict(payload["model_state_dict"])
+
+
+def _load_training_checkpoint(
+    model: ActorCritic,
+    optimizer: torch.optim.Optimizer,
+    checkpoint_path: str | Path,
+    device: torch.device,
+) -> dict[str, object]:
+    payload = torch.load(checkpoint_path, map_location="cpu")
+    model.load_compatible_state_dict(payload["model_state_dict"])
+    optimizer_state = payload.get("optimizer_state_dict")
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
+        _move_optimizer_state(optimizer, device)
+    training_state = payload.get("training_state", {})
+    return training_state if isinstance(training_state, dict) else {}
+
+
+def _move_optimizer_state(optimizer: torch.optim.Optimizer, device: torch.device) -> None:
+    for state in optimizer.state.values():
+        for key, value in list(state.items()):
+            if torch.is_tensor(value):
+                state[key] = value.to(device)
+
+
+def _resolve_existing_path(path: str | Path | None, label: str) -> Path | None:
+    if path is None:
+        return None
+    resolved = Path(path)
+    if not resolved.exists():
+        raise FileNotFoundError(f"{label} not found: {resolved}")
+    return resolved
 
 
 def _metric_score(row: dict[str, float | int]) -> tuple[float, int, float, float]:
@@ -333,16 +468,90 @@ def _metric_score(row: dict[str, float | int]) -> tuple[float, int, float, float
     return coverage, completed, -path_length, reward
 
 
-def _collect_rollout(
+def _prepare_policy_phase_config(config: ExperimentConfig) -> ExperimentConfig:
+    phase = _policy_phase(config)
+    prepared = copy.deepcopy(config)
+    prepared.ppo.policy_phase = phase
+    if phase == "coverage":
+        prepared.env.initial_return_mode = False
+        prepared.env.require_return_to_depot = False
+    elif phase == "return":
+        prepared.env.use_depot = True
+        prepared.env.require_return_to_depot = True
+        prepared.env.initial_return_mode = True
+    elif phase == "joint":
+        prepared.env.initial_return_mode = False
+    else:
+        raise ValueError(f"unknown policy_phase: {phase}")
+    return prepared
+
+
+def _policy_phase(config: ExperimentConfig) -> str:
+    return str(config.ppo.policy_phase).strip().lower()
+
+
+def _uses_joint_phase_model(config: ExperimentConfig) -> bool:
+    return _policy_phase(config) == "joint" and config.env.use_depot and config.env.require_return_to_depot
+
+
+def _configure_training_runtime(config: ExperimentConfig) -> None:
+    threads = configure_runtime(config.train.cpu_threads)
+    torch.set_num_threads(threads)
+    try:
+        torch.set_num_interop_threads(max(1, min(threads, 2)))
+    except RuntimeError:
+        pass
+    if hasattr(torch, "set_float32_matmul_precision"):
+        precision = config.train.float32_matmul_precision
+        if precision in {"highest", "high", "medium"}:
+            torch.set_float32_matmul_precision(precision)
+
+
+def _validate_cuap_config(config: ExperimentConfig, env: GridCoverageEnv) -> None:
+    if not config.cuap.enabled:
+        return
+    if not config.ppo.use_action_mask:
+        raise ValueError("CUAP requires ppo.use_action_mask=true so the action mask is applied after the prior")
+    if not env.config.use_explicit_map_memory:
+        raise ValueError("CUAP requires env.use_explicit_map_memory=true to avoid global coverage truth leakage")
+
+
+def _make_rollout_envs(config: ExperimentConfig) -> list[GridCoverageEnv]:
+    num_envs = max(int(config.ppo.num_envs), 1)
+    envs: list[GridCoverageEnv] = []
+    for index in range(num_envs):
+        env_config = copy.deepcopy(config.env)
+        if index > 0:
+            offset = 1009 * index
+            env_config.seed += offset
+            env_config.random_obstacle_seed += offset
+            env_config.random_obstacle_seeds = [seed + offset for seed in env_config.random_obstacle_seeds]
+        envs.append(GridCoverageEnv(env_config))
+    return envs
+
+
+def _rollout_env_steps(
     config: ExperimentConfig,
     env: GridCoverageEnv,
+    num_envs: int,
+    timestep: int,
+) -> int:
+    per_env_steps = max(1, config.ppo.rollout_steps // max(env.num_agents, 1))
+    remaining = max(config.ppo.total_timesteps - timestep, 1)
+    remaining_steps = max(1, math.ceil(remaining / max(num_envs * env.num_agents, 1)))
+    return min(per_env_steps, remaining_steps)
+
+
+def _collect_rollout(
+    config: ExperimentConfig,
+    envs: list[GridCoverageEnv],
     model: ActorCritic,
     observation: np.ndarray,
     state: np.ndarray,
     max_steps: int,
     episode_index: int,
-    episode_reward: float,
-    episode_start_length: int,
+    episode_rewards: np.ndarray,
+    episode_start_lengths: list[int],
 ) -> tuple[RolloutBatch, np.ndarray, np.ndarray, dict[str, object]]:
     observations: list[np.ndarray] = []
     states: list[np.ndarray] = []
@@ -355,23 +564,38 @@ def _collect_rollout(
     edge_features: list[np.ndarray] = []
     node_messages: list[np.ndarray] = []
     action_masks: list[np.ndarray] = []
+    action_prior_logits: list[np.ndarray] = []
     metric_rows: list[dict[str, float | int]] = []
     device = _model_device(model)
+    num_envs = len(envs)
+    num_agents = envs[0].num_agents
 
     for _ in range(max_steps):
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
         state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
-        neighbor_mask = env.neighbor_mask()
+        neighbor_mask = np.asarray([worker.neighbor_mask() for worker in envs], dtype=bool)
         neighbor_mask_tensor = torch.as_tensor(neighbor_mask, dtype=torch.bool, device=device)
-        action_mask = env.action_masks() if config.ppo.use_action_mask else None
+        action_mask = np.asarray([worker.action_masks() for worker in envs], dtype=bool) if config.ppo.use_action_mask else None
         action_mask_tensor = (
             torch.as_tensor(action_mask, dtype=torch.bool, device=device) if action_mask is not None else None
         )
-        edge_feature_array = env.neighbor_features() if _uses_edge_features(model) else None
+        action_prior_array = _action_prior_array(config, envs)
+        action_prior_tensor = (
+            torch.as_tensor(action_prior_array, dtype=torch.float32, device=device) if action_prior_array is not None else None
+        )
+        edge_feature_array = (
+            np.asarray([worker.neighbor_features() for worker in envs], dtype=np.float32)
+            if _uses_edge_features(model)
+            else None
+        )
         edge_feature_tensor = (
             torch.as_tensor(edge_feature_array, dtype=torch.float32, device=device) if edge_feature_array is not None else None
         )
-        node_message_array = env.node_messages() if model.node_message_dim > 0 else None
+        node_message_array = (
+            np.asarray([worker.node_messages() for worker in envs], dtype=np.float32)
+            if model.node_message_dim > 0
+            else None
+        )
         node_message_tensor = (
             torch.as_tensor(node_message_array, dtype=torch.float32, device=device) if node_message_array is not None else None
         )
@@ -383,51 +607,68 @@ def _collect_rollout(
                 edge_features=edge_feature_tensor,
                 node_messages=node_message_tensor,
                 action_mask=action_mask_tensor,
+                action_prior_logits=action_prior_tensor,
             )
 
-        result = env.step(action_tensor.cpu().numpy().tolist())
-        reward_array = agent_rewards(env.num_agents, result.reward)
         observations.append(observation)
         states.append(state)
-        actions.append(action_tensor.cpu().numpy())
+        action_array = action_tensor.cpu().numpy()
+        actions.append(action_array)
         log_probs.append(log_prob_tensor.cpu().numpy())
-        rewards.append(reward_array)
-        dones.append(np.full(env.num_agents, float(result.done), dtype=np.float32))
         values.append(value_tensor.cpu().numpy())
         neighbor_masks.append(neighbor_mask)
         if action_mask is not None:
             action_masks.append(action_mask)
+        if action_prior_array is not None:
+            action_prior_logits.append(action_prior_array)
         if edge_feature_array is not None:
             edge_features.append(edge_feature_array)
         if node_message_array is not None:
             node_messages.append(node_message_array)
-        episode_reward += float(np.mean(reward_array))
-        observation = agent_observations(result.observation)
-        state = result.state
 
-        if result.done:
-            metric_rows.append(
-                {
-                    "episode": episode_index,
-                    "reward": episode_reward,
-                    "coverage_ratio": result.info["coverage_ratio"],
-                    "path_length": result.info["path_length"] - episode_start_length,
-                    "completed": int(result.info["completed"]),
-                    "steps": result.info["step_count"],
-                }
-            )
-            episode_index += 1
-            episode_reward = 0.0
-            observation = agent_observations(env.reset())
-            state = env.global_state()
-            episode_start_length = env.path_length
+        step_rewards = np.zeros((num_envs, num_agents), dtype=np.float32)
+        step_dones = np.zeros((num_envs, num_agents), dtype=np.float32)
+        next_observation = np.empty_like(observation)
+        next_state = np.empty_like(state)
+        for env_index, worker in enumerate(envs):
+            result = worker.step(action_array[env_index].tolist())
+            reward_array = agent_rewards(worker.num_agents, result.reward)
+            step_rewards[env_index] = reward_array
+            step_dones[env_index] = float(result.done)
+            episode_rewards[env_index] += float(np.mean(reward_array))
+            if result.done:
+                metric_rows.append(
+                    {
+                        "episode": episode_index,
+                        "env_index": env_index,
+                        "reward": float(episode_rewards[env_index]),
+                        "coverage_ratio": result.info["coverage_ratio"],
+                        "path_length": result.info["path_length"] - episode_start_lengths[env_index],
+                        "completed": int(result.info["completed"]),
+                        "coverage_completed": int(result.info.get("coverage_completed", result.info["completed"])),
+                        "returned_to_depot": int(result.info.get("all_at_depot", False)),
+                        "steps": result.info["step_count"],
+                    }
+                )
+                episode_index += 1
+                episode_rewards[env_index] = 0.0
+                next_observation[env_index] = agent_observations(worker.reset())
+                next_state[env_index] = worker.global_state()
+                episode_start_lengths[env_index] = worker.path_length
+            else:
+                next_observation[env_index] = agent_observations(result.observation)
+                next_state[env_index] = result.state
+        rewards.append(step_rewards)
+        dones.append(step_dones)
+        observation = next_observation
+        state = next_state
 
     with torch.no_grad():
-        if dones and bool(dones[-1][0]):
-            next_values = np.zeros(env.num_agents, dtype=np.float32)
-        else:
-            next_value = model.value(torch.as_tensor(state, dtype=torch.float32, device=device))
-            next_values = next_value.expand(env.num_agents).cpu().numpy()
+        next_value = model.value(torch.as_tensor(state, dtype=torch.float32, device=device))
+        next_values = next_value.unsqueeze(-1).expand(num_envs, num_agents).cpu().numpy()
+        if dones:
+            last_done = np.asarray(dones[-1], dtype=bool)
+            next_values = np.where(last_done, np.zeros_like(next_values), next_values)
 
     returns, advantages = _gae_array(
         rewards=np.asarray(rewards, dtype=np.float32),
@@ -438,43 +679,56 @@ def _collect_rollout(
         gae_lambda=config.ppo.gae_lambda,
     )
 
-    observation_array = np.asarray(observations, dtype=np.float32)
-    state_array = np.asarray(states, dtype=np.float32)
-    action_array = np.asarray(actions, dtype=np.int64)
-    log_prob_array = np.asarray(log_probs, dtype=np.float32)
-    value_array = np.asarray(values, dtype=np.float32)
+    observation_array = _flatten_time_env(np.asarray(observations, dtype=np.float32))
+    state_array = _flatten_time_env(np.asarray(states, dtype=np.float32))
+    action_array = _flatten_time_env(np.asarray(actions, dtype=np.int64))
+    log_prob_array = _flatten_time_env(np.asarray(log_probs, dtype=np.float32))
+    value_array = _flatten_time_env(np.asarray(values, dtype=np.float32))
+    return_array = _flatten_time_env(returns)
+    advantage_array = _flatten_time_env(advantages)
     batch = RolloutBatch(
         observations=torch.as_tensor(observation_array, dtype=torch.float32, device=device),
         states=torch.as_tensor(state_array, dtype=torch.float32, device=device),
         actions=torch.as_tensor(action_array, dtype=torch.long, device=device),
         log_probs=torch.as_tensor(log_prob_array, dtype=torch.float32, device=device),
-        returns=torch.as_tensor(returns, dtype=torch.float32, device=device),
-        advantages=torch.as_tensor(advantages, dtype=torch.float32, device=device),
+        returns=torch.as_tensor(return_array, dtype=torch.float32, device=device),
+        advantages=torch.as_tensor(advantage_array, dtype=torch.float32, device=device),
         values=torch.as_tensor(value_array, dtype=torch.float32, device=device),
-        neighbor_masks=torch.as_tensor(np.asarray(neighbor_masks, dtype=bool), dtype=torch.bool, device=device),
+        neighbor_masks=torch.as_tensor(_flatten_time_env(np.asarray(neighbor_masks, dtype=bool)), dtype=torch.bool, device=device),
         action_masks=(
-            torch.as_tensor(np.asarray(action_masks, dtype=bool), dtype=torch.bool, device=device)
+            torch.as_tensor(_flatten_time_env(np.asarray(action_masks, dtype=bool)), dtype=torch.bool, device=device)
             if action_masks
             else None
         ),
         edge_features=(
-            torch.as_tensor(np.asarray(edge_features, dtype=np.float32), dtype=torch.float32, device=device)
+            torch.as_tensor(_flatten_time_env(np.asarray(edge_features, dtype=np.float32)), dtype=torch.float32, device=device)
             if edge_features
             else None
         ),
         node_messages=(
-            torch.as_tensor(np.asarray(node_messages, dtype=np.float32), dtype=torch.float32, device=device)
+            torch.as_tensor(_flatten_time_env(np.asarray(node_messages, dtype=np.float32)), dtype=torch.float32, device=device)
             if node_messages
+            else None
+        ),
+        action_prior_logits=(
+            torch.as_tensor(_flatten_time_env(np.asarray(action_prior_logits, dtype=np.float32)), dtype=torch.float32, device=device)
+            if action_prior_logits
             else None
         ),
     )
     metrics = {
         "episode_index": episode_index,
-        "episode_reward": episode_reward,
-        "episode_start_length": episode_start_length,
+        "episode_rewards": episode_rewards.tolist(),
+        "episode_start_lengths": list(episode_start_lengths),
         "metric_rows": metric_rows,
     }
     return batch, observation, state, metrics
+
+
+def _flatten_time_env(array: np.ndarray) -> np.ndarray:
+    if array.ndim < 2:
+        return array
+    return array.reshape(array.shape[0] * array.shape[1], *array.shape[2:])
 
 
 def _model_device(model: ActorCritic) -> torch.device:
@@ -510,7 +764,7 @@ def _gae_array(
     gae_lambda: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     advantages = np.zeros_like(rewards, dtype=np.float32)
-    last_advantage = np.zeros(rewards.shape[1], dtype=np.float32)
+    last_advantage = np.zeros(rewards.shape[1:], dtype=np.float32)
     for index in reversed(range(rewards.shape[0])):
         next_non_terminal = 1.0 - dones[index]
         next_value = next_values if index == rewards.shape[0] - 1 else values[index + 1]
@@ -538,6 +792,7 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
             edge_features = batch.edge_features[mb_tensor] if batch.edge_features is not None else None
             node_messages = batch.node_messages[mb_tensor] if batch.node_messages is not None else None
             action_mask = batch.action_masks[mb_tensor] if batch.action_masks is not None else None
+            action_prior = batch.action_prior_logits[mb_tensor] if batch.action_prior_logits is not None else None
             log_probs, entropy, values = model.evaluate_actions(
                 batch.observations[mb_tensor],
                 batch.states[mb_tensor],
@@ -546,6 +801,7 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
                 edge_features=edge_features,
                 node_messages=node_messages,
                 action_mask=action_mask,
+                action_prior_logits=action_prior,
             )
             ratio = torch.exp(log_probs - batch.log_probs[mb_tensor])
             clipped = torch.clamp(ratio, 1.0 - config.ppo.clip_ratio, 1.0 + config.ppo.clip_ratio) * advantages[mb_tensor]
@@ -560,8 +816,18 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
             optimizer.step()
 
 
-def _checkpoint_payload(config: ExperimentConfig, model: ActorCritic) -> dict[str, object]:
-    return checkpoint_model_metadata(config, model)
+def _checkpoint_payload(
+    config: ExperimentConfig,
+    model: ActorCritic,
+    optimizer: torch.optim.Optimizer | None = None,
+    training_state: dict[str, object] | None = None,
+) -> dict[str, object]:
+    payload = checkpoint_model_metadata(config, model)
+    if optimizer is not None:
+        payload["optimizer_state_dict"] = optimizer.state_dict()
+    if training_state is not None:
+        payload["training_state"] = dict(training_state)
+    return payload
 
 
 def _edge_features_tensor(env: GridCoverageEnv, model: ActorCritic, device: torch.device) -> torch.Tensor | None:
@@ -584,6 +850,26 @@ def _action_mask_tensor(config: ExperimentConfig, env: GridCoverageEnv, device: 
     if not config.ppo.use_action_mask:
         return None
     return torch.as_tensor(env.action_masks(), dtype=torch.bool, device=device)
+
+
+def _action_prior_tensor(config: ExperimentConfig, env: GridCoverageEnv, device: torch.device) -> torch.Tensor | None:
+    prior = scaled_cuap_prior(env, config.cuap, phase=_env_phase(env))
+    if prior is None:
+        return None
+    return torch.as_tensor(prior, dtype=torch.float32, device=device)
+
+
+def _action_prior_array(config: ExperimentConfig, envs: list[GridCoverageEnv]) -> np.ndarray | None:
+    if not config.cuap.enabled:
+        return None
+    return np.asarray(
+        [scaled_cuap_prior(worker, config.cuap, phase=_env_phase(worker)) for worker in envs],
+        dtype=np.float32,
+    )
+
+
+def _env_phase(env: GridCoverageEnv) -> str:
+    return "return" if env.return_mode else "coverage"
 
 
 def _slugify(text: str) -> str:

@@ -32,10 +32,10 @@ from mathbased_mcpp.utils import agent_observations
 
 
 DEFAULT_GAT_ON = Path(
-    r"E:\test plot\ablation_mapmsg_gat_on\20260526-113831\04-tier-4-20x20-4agents\best_policy.pt"
+    ROOT / "outputs" / "ablation_mapmsg_gat_on" / "RUN_ID" / "04-tier-4-20x20-4agents" / "best_policy.pt"
 )
 DEFAULT_GAT_OFF = Path(
-    r"E:\test plot\ablation_mapmsg_gat_off\20260527-210103\04-tier-4-20x20-4agents\best_policy.pt"
+    ROOT / "outputs" / "ablation_mapmsg_gat_off" / "RUN_ID" / "04-tier-4-20x20-4agents" / "best_policy.pt"
 )
 
 
