@@ -1,0 +1,80 @@
+[env]
+width = 4
+height = 4
+max_steps = 16
+seed = 23
+start = [0, 0]
+num_agents = 2
+start_positions = [[0, 0], [3, 3]]
+obstacles = [[1, 1]]
+random_obstacle_count = 0
+random_obstacle_seed = 23
+danger_radius = 0
+observation_radius = 1
+communication_radius = 4
+use_explicit_map_memory = true
+share_map_memory = true
+intent_grid_size = 3
+
+[reward]
+finish_reward = 10.0
+normalize_team_finish_reward = true
+team_new_cell_weight = 1.0
+team_repeat_weight = 0.5
+team_invalid_weight = 0.8
+team_time_weight = 0.05
+scale_time_cost_by_uncovered = false
+
+[ppo]
+total_timesteps = 64
+policy_phase = "coverage"
+rollout_steps = 16
+num_envs = 2
+update_epochs = 1
+mini_batch_size = 16
+gamma = 0.98
+gae_lambda = 0.95
+clip_ratio = 0.2
+learning_rate = 0.0003
+value_coef = 0.5
+entropy_coef = 0.01
+max_grad_norm = 0.5
+hidden_dim = 32
+seed = 23
+device = "auto"
+use_graph_attention = true
+gat_num_heads = 4
+gat_use_edge_features = true
+gat_residual = true
+gat_attention_dropout = 0.0
+use_coverage_messages = true
+use_action_mask = true
+
+[cuap]
+enabled = true
+gated = true
+beta = 0.5
+disable_in_return_phase = true
+w_novelty = 1.0
+w_frontier = 0.5
+w_repeat = 0.7
+w_conflict = 0.5
+eval_radius = 1
+normalize = false
+clip = 2.0
+use_density_features = false
+tau = 1.0
+confidence_tau = 1.0
+gate_hidden_dim = 32
+gate_init_prob = 0.1
+gate_detach_actor_features = true
+recent_window = 10
+stagnation_normalizer = 20.0
+score_scale = 2.0
+gate_regularization = 0.0
+
+[train]
+run_root = "runs"
+log_interval = 1
+cpu_threads = 4
+use_tensorboard = false

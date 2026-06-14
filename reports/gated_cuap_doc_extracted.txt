@@ -1,0 +1,440 @@
+[SOURCE] C:\Users\qsedr\Downloads\Gated_CUAP_GAT_MAPPO_技术实施说明书 (1).docx
+可学习门控 CUAP
+GAT-MAPPO 技术实施说明书
+面向未知灾后开放区域多智能体搜索覆盖与返航任务
+用途：供 Codex 阅读、修改代码、规避潜在实现错误并完成最后一轮结构验证
+版本：V1.0　日期：2026-06-07
+[Heading1] 文档控制与实施结论
+[TABLE]
+项目项 | 固定结论
+应用场景 | 灾后开放区域快速搜索覆盖与返航：多智能体从临时应急 depot 出发，在未知、稀疏障碍区域内完成搜索覆盖，收到阶段广播后返回 depot。
+基础模型 | 当前训练良好的 GAT-ON / GAT-MAPPO 模型；共享策略、局部观测、显式记忆、有限通信，不使用 agent_id。
+唯一结构改动 | 将固定强度 CUAP 改为“可学习标量门控 CUAP”。不改 GAT、critic、reward、动作空间或返航规则。
+初始化方式 | 从 GAT-ON checkpoint 加载 actor、critic、GAT；新建门控网络，初始 gate 约为 0.1；不从固定 CUAP checkpoint 续训。
+最终公式 | final_logits = actor_logits + beta × phase_mask × gate(context) × cuap_prior
+失败判据 | 若 gate 长期趋近 0，说明 CUAP 无价值；若趋近 1 但表现仍不优于 GAT-ON，说明原始 CUAP 机制不成立，应删除 CUAP。
+[/TABLE]
+[TABLE]
+给 Codex 的最高优先级硬约束Rollout 中存储的是 cuap_prior、gate_context 和 phase_mask，而不是存死的 gate 输出。PPO update 必须在有梯度的情况下重新计算 gate；否则门控网络不会学习。Rollout 与 update 必须基于相同形式的最终策略分布计算 log_prob。
+[/TABLE]
+[Heading2] 必须保持不变的系统边界
+[ListBullet] 不得把 agent_id、固定编号、one-hot identity 或按编号分支规则输入 actor、GAT 或门控网络。程序循环索引仅用于取数据，不属于模型特征。
+[ListBullet] 不得读取全局真实未覆盖地图、全局真实 frontier 或未来状态。CUAP 仅能使用当前 agent 的局部观测、显式记忆、历史统计和通信范围内邻居意图。
+[ListBullet] 所有 agent 共用同一个 actor、同一个 GAT 和同一个 CUAPGate，保持对 agent 排列的等变性和不同 agent 数量下的泛化能力。
+[ListBullet] CUAP 只在 coverage phase 启用；return phase 中 applied_gate 强制为 0。
+[ListBullet] 不增加新 reward、不修改 critic、不增加第二个动作头、不改变上/下/左/右原始动作空间。
+[Heading1] 目录
+1. 背景、失败诊断与本次目标
+2. 应用场景与 Dec-POMDP 边界
+3. 可学习门控 CUAP 的数学结构
+4. CUAP prior 的安全构造
+5. 门控上下文特征设计
+6. 推荐的软件结构与张量接口
+7. 文件级修改清单
+8. Rollout 与 PPO update 的一致性实现
+9. 从 GAT-ON checkpoint 初始化与优化器策略
+10. 训练日志、单元测试与故障诊断
+11. 最后一轮实验方案与接受/放弃标准
+12. 潜在坑总表
+附录 A. Codex 可直接执行的任务提示词
+附录 B. 提交前验收清单
+[Heading1] 1. 背景、失败诊断与本次目标
+[Heading2] 1.1 固定 CUAP 的实验问题
+现有固定 CUAP 采用固定 beta，将 Novelty、Frontier、Repeat 和 Conflict 形成的局部动作效用持续叠加到 actor logits。三模型消融结果表明，它在部分障碍压力场景中能够改善 Coverage-AUC 或重复访问，但整体收益不稳定，且部分场景的智能体间重叠和大地图多智能体迁移表现变差。
+根本原因不是单一权重未调好，而是固定 CUAP 对所有状态、所有覆盖阶段和所有局部拓扑使用同一干预强度。局部启发式可能在开阔前期有效，却会在队友观测相似、残余补漏或必要跨越已覆盖区域时误导 actor。
+[Heading2] 1.2 本次结构修正的唯一目的
+[TABLE]
+目标让策略自己学习“当前状态下是否应该相信 CUAP，以及相信多少”，而不是继续人工调多套 beta 或多套权重。
+[/TABLE]
+本次不是重新设计 CUAP，也不是增加新的任务分配模块。原始 CUAP 评分先保持不变，只将固定干预改为可学习标量门控，并取消危险的逐状态 z-score 放大。
+[Heading2] 1.3 本次明确不做的改动
+[ListBullet] 不引入区域分配、分层策略、异构图、反事实优势或新 critic。
+[ListBullet] 不更改 depot 触发逻辑、返航奖励、任务终止条件。
+[ListBullet] 不为不同地图、不同 agent 数量或不同阶段手工设置不同 CUAP 权重。
+[ListBullet] 不删除固定 CUAP 表现不好的困难场景，也不在测试集上反复调参。
+[Heading1] 2. 应用场景与 Dec-POMDP 边界
+[Heading2] 2.1 具体应用场景
+本项目对应“灾后开放区域快速搜索覆盖与返航”规划层任务。临时应急指挥车、移动基站或安全起降点作为 depot，多架同构无人机或移动机器人从 depot 同点/邻近位置出发。在没有完整先验地图的情况下，智能体依靠局部感知、显式记忆与有限范围通信搜索覆盖目标区域；覆盖达到阈值或收到基地阶段广播后进入返航阶段，并返回 depot。
+该场景仅研究覆盖路径规划与协同决策，不宣称实现人员识别、目标检测、SLAM、连续动力学控制或完整灾后救援系统。栅格单元表示一个需要被传感器扫描/搜索的任务单元。
+[Heading2] 2.2 模型可用与不可用信息
+[TABLE]
+类别 | 允许使用 | 禁止使用
+局部状态 | 本体位置或相对坐标、5×5局部观测、合法动作掩码、最近路径/覆盖统计 | 绝对 agent 编号、测试地图标签
+显式记忆 | 当前 agent 已知 free、obstacle、covered、unknown、frontier | 环境全局真值未覆盖图、未来地图
+通信 | 通信范围内邻居的无序消息集合、相对位置、覆盖 intent | 固定按 agent_id 排列的专属通道、范围外信息
+任务阶段 | coverage/return 广播信号、depot 相对位置 | 用 agent 编号指定分工
+全局信息 | 仅 critic 训练所需的原有 CTDE state；全局覆盖率可用于离线日志分桶 | 将全局覆盖率或全局真值输入执行期 gate
+[/TABLE]
+[Heading1] 3. 可学习门控 CUAP 的数学结构
+[Heading2] 3.1 核心公式
+gᵢ(t) = sigmoid(fψ(cᵢ(t))) ∈ [0,1]
+所有 agent 共享同一个 fψ；cᵢ(t) 不包含 agent_id。
+zᶠⁱⁿᵃˡᵢ(t) = zᵃᶜᵗᵒʳᵢ(t) + β · mᵖʰᵃˢᵉ(t) · gᵢ(t) · pᶜᵘᵃᵖᵢ(t)
+mphase=1 表示覆盖阶段；返航阶段为 0。
+门控为单个标量，形状为 [B,N,1]，仅决定“相信 CUAP 的程度”，不为四个动作分别输出 gate，避免门控网络变成第二个动作策略头。
+[Heading2] 3.2 为什么必须是标量 gate
+[TABLE]
+设计 | 优点 | 风险/结论
+标量 gate [B,N,1] | 只调节 CUAP 总强度；解释清晰；参数少；不改变 CUAP 动作排序 | 推荐 V1
+动作级 gate [B,N,A] | 表达能力更强 | 等价于第二策略头，训练更不稳定，难判断创新来自 actor 还是 gate；禁止本轮使用
+全局统一 gate | 实现简单 | 不能根据局部状态适配，退化成可学习 beta；不推荐
+[/TABLE]
+[Heading2] 3.3 参数初始化
+门控网络最后一层权重初始化为 0，bias 初始化为 logit(0.1)≈-2.197，使所有样本初始 gate≈0.1。这样从 GAT-ON checkpoint 开始时，模型行为接近原基线，而不是立刻被 CUAP 接管。
+[NoSpacing] init_prob = 0.1
+last_linear.weight.data.zero_()
+last_linear.bias.data.fill_(math.log(init_prob / (1.0 - init_prob)))
+图 1  可学习门控 CUAP 在共享策略中的位置
+[Heading1] 4. CUAP prior 的安全构造
+[Heading2] 4.1 原始效用分数
+Uᵢ(a)=wₙNᵢ(a)+w_fFᵢ(a)-w_rRᵢ(a)-w_cCᵢ(a)
+第一轮门控实验保持当前 Novelty、Frontier、Repeat、Conflict 的定义与权重不变，避免同时改变评分和门控后无法归因。若现有固定 CUAP 已经实现上述四项，则直接复用原始分数计算函数。
+[Heading2] 4.2 删除逐状态 z-score
+[TABLE]
+必须删除不得再使用 (scores-mean)/(std+eps)。当四个动作分数非常接近时，z-score 会把微小噪声放大为强动作偏好，这是固定 CUAP 可能恶化泛化的重要风险。
+[/TABLE]
+推荐只对合法动作求均值，然后使用有界的 center+tanh：
+μᵥ = mean{Uᵢ(a) | a 为合法动作}
+pᶜᵘᵃᵖᵢ(a)=tanh((Uᵢ(a)-μᵥ)/τ)
+默认 τ=1.0。合法动作少于 2 个时，整个 cuap_prior 设为 0，applied_gate 也设为 0；非法动作的 prior 始终置 0，随后仍由 action mask 统一屏蔽。
+[NoSpacing] def build_bounded_prior(raw_scores, action_mask, tau=1.0):
+    valid = action_mask.bool()
+    if valid.sum() <= 1:
+        return torch.zeros_like(raw_scores)
+    valid_mean = raw_scores[valid].mean()
+    prior = torch.tanh((raw_scores - valid_mean) / tau)
+    return torch.where(valid, prior, torch.zeros_like(prior))
+[Heading2] 4.3 默认参数
+[TABLE]
+参数 | 默认值 | 说明
+beta | 0.5 | 最大 CUAP 缩放；实际强度还乘 gate。初始有效强度约 0.05。
+tau | 1.0 | 控制 prior 饱和程度；本轮不做大范围搜索。
+w_novelty | 沿用当前值 | 第一轮不改原始 CUAP 权重。
+w_frontier | 沿用当前值 | 同上。
+w_repeat | 沿用当前值 | 同上。
+w_conflict | 沿用当前值 | 同上。
+[/TABLE]
+[Heading1] 5. 门控上下文特征设计
+推荐 gate_context 使用 9 个局部、无身份、可解释标量。所有比例必须裁剪到 [0,1]；CUAP 分数差异类特征也应按固定常数缩放后裁剪，训练与评估使用完全相同的归一化。
+[TABLE]
+序号 | 特征名 | 计算 | 范围 | 用途
+1 | cuap_margin | 合法动作最高分-次高分 | [0,1] | CUAP 对首选动作的置信度；不足2个合法动作时为0
+2 | cuap_spread | 合法动作 max-min | [0,1] | 四动作区分度；使用固定 scale 裁剪，不用样本 std 归一化
+3 | local_uncovered_ratio | 局部已知未覆盖/已知可通行 | [0,1] | 当前附近是否仍适合局部新覆盖启发
+4 | local_frontier_ratio | 局部 frontier/已知可通行 | [0,1] | 未知边界密度；仅来自本体显式记忆
+5 | local_covered_ratio | 局部已覆盖/已知可通行 | [0,1] | 局部是否进入高覆盖/转移状态
+6 | recent_new_rate | 最近K步新增覆盖次数/K | [0,1] | 当前行为是否持续有效；K默认10
+7 | stagnation_ratio | min(连续无新增步数/20,1) | [0,1] | 是否停滞；不人为规定 gate 增减方向
+8 | neighbor_density | 通信邻居数/max(num_agents-1,1) | [0,1] | 邻居多时局部启发式可能导致共同吸引
+9 | intent_conflict_mean | 四候选动作 conflict 均值或最大值 | [0,1] | 当前动作空间总体意图冲突程度
+[/TABLE]
+[Heading2] 5.1 不允许进入 gate_context 的信息
+[ListBullet] agent_id、agent 顺序位置、固定角色标签。
+[ListBullet] 环境全局 coverage ratio、全局未覆盖集合、全局真实 frontier。全局 coverage ratio 只允许用于日志分桶。
+[ListBullet] 未经过通信的其他 agent 状态。
+[ListBullet] 任务结果、未来奖励、未来记忆或下一时刻状态。
+[ListBullet] 地图尺寸/场景名称的 one-hot 标签；模型应从局部状态泛化。
+[Heading2] 5.2 无分母情况
+当局部已知可通行格子数为 0 时，uncovered/frontier/covered 比例统一返回 0，不得产生 NaN。neighbor_density 在单 agent 时返回 0。
+[Heading1] 6. 推荐的软件结构与张量接口
+[Heading2] 6.1 新增 cuap.py
+建议新增 src/mathbased_mcpp/cuap.py（若最新分支已有 CUAP 文件，则在原文件扩展），只负责从当前环境的局部信息构造不可学习的 raw_scores、bounded prior 和 gate_context。该文件不得包含 PPO 优化逻辑。
+[NoSpacing] @dataclass(slots=True)
+class CUAPStepInputs:
+    prior: np.ndarray          # [N, A], float32
+    gate_context: np.ndarray   # [N, D], float32
+    phase_mask: np.ndarray     # [N, 1], float32
+    raw_scores: np.ndarray     # [N, A], 仅用于日志/调试
+
+
+def build_cuap_step_inputs(env, config) -> CUAPStepInputs:
+    # 在 env.step 前，与当前 observation 对齐
+    # 只读取每个 agent 的局部记忆、历史和通信邻居 intent
+    ...
+[Heading2] 6.2 ActorCritic 内部新增共享 CUAPGate
+门控网络必须注册为 ActorCritic 的子模块，确保进入 model.parameters()、state_dict 和 checkpoint。所有策略分布入口必须调用同一个 _policy_logits 方法，避免 act_batch 与 evaluate_actions 公式不一致。
+[NoSpacing] class CUAPGate(nn.Module):
+    def __init__(self, input_dim: int, hidden_dim: int = 32, init_prob: float = 0.1):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1),
+        )
+        nn.init.zeros_(self.net[-1].weight)
+        nn.init.constant_(self.net[-1].bias, math.log(init_prob / (1-init_prob)))
+
+    def forward(self, context: torch.Tensor) -> torch.Tensor:
+        return torch.sigmoid(self.net(context))
+[NoSpacing] def _policy_logits(
+    self,
+    observations,
+    neighbor_mask=None,
+    edge_features=None,
+    node_messages=None,
+    cuap_prior=None,
+    gate_context=None,
+    phase_mask=None,
+):
+    features = self._actor_features(
+        observations,
+        neighbor_mask=neighbor_mask,
+        edge_features=edge_features,
+        node_messages=node_messages,
+    )
+    actor_logits = self.actor(features)
+
+    if not self.use_gated_cuap:
+        return actor_logits, None
+
+    if cuap_prior is None or gate_context is None or phase_mask is None:
+        raise ValueError('gated CUAP inputs are required')
+
+    gate = self.cuap_gate(gate_context)              # [..., 1]
+    applied_gate = gate * phase_mask                 # return phase -> 0
+    final_logits = actor_logits + self.cuap_beta * applied_gate * cuap_prior
+    return final_logits, applied_gate
+[Heading2] 6.3 张量形状
+[TABLE]
+变量 | Rollout 单步 | PPO batch | dtype
+actor_logits / final_logits | [N,A] | [T,N,A] 或 [MB,N,A] | float32
+cuap_prior | [N,A] | [T,N,A] | float32
+gate_context | [N,D] | [T,N,D] | float32
+phase_mask | [N,1] | [T,N,1] | float32
+action_mask | [N,A] | [T,N,A] | bool
+gate | [N,1] | [T,N,1] | float32
+actions / log_probs | [N] | [T,N] | long / float32
+[/TABLE]
+[TABLE]
+广播检查gate 与 phase_mask 最后一维必须为 1。不要 squeeze 成 [N] 后与 [N,A] 相乘，否则在某些 batch 形状下可能错误广播。
+[/TABLE]
+[Heading1] 7. 文件级修改清单
+以下路径基于当前项目常见结构；若 Codex 看到最新分支文件名不同，应按职责映射，不得机械新增重复实现。
+[TABLE]
+文件 | 必须修改的内容 | 禁止事项
+src/mathbased_mcpp/cuap.py（新增或扩展） | 构造 raw_scores、bounded prior、9维 gate_context、phase_mask；提供纯函数和单元测试入口 | 不放可学习参数；不访问全局真值
+src/mathbased_mcpp/ppo.py | 新增 CUAPGate；ActorCritic 注册 gate；集中实现 _policy_logits；act/distribution/evaluate_actions 全部走同一入口；RolloutBatch 增字段 | 不得仅在 act_batch 加 gate 而漏掉 evaluate_actions
+src/mathbased_mcpp/training.py | env.step 前构造并保存 prior/context/phase；update 时重新计算 gate；增加诊断日志；从 GAT-ON 初始化 | 不得存 gate 后在 update 直接复用；不得 update 时重新读取 env
+src/mathbased_mcpp/evaluation.py | 与训练 rollout 相同方式构造 gated policy；记录 gate 与有效偏置指标 | deterministic 模式也不能绕过 gate
+src/mathbased_mcpp/config.py | 增加 gated CUAP 配置字段和默认值；保持旧配置兼容 | 不得把不同场景硬编码为不同权重
+src/mathbased_mcpp/env.py | 仅在缺少访问接口时增加只读的局部记忆/历史/邻居 intent 提取方法 | 不改 reward，不把全局 truth 暴露给 CUAP
+configs/*.toml | 新增 gated_cuap 配置；保留 GAT-ON 与 fixed-CUAP 对照配置 | 不要覆盖原始基线配置
+tests/ | 增加门控、PPO一致性、无身份、return关闭、mask等测试 | 不得只做“代码能跑”测试
+[/TABLE]
+[Heading2] 7.1 配置字段建议
+[NoSpacing] [ppo]
+use_gated_cuap = true
+cuap_beta = 0.5
+cuap_tau = 1.0
+cuap_gate_input_dim = 9
+cuap_gate_hidden_dim = 32
+cuap_gate_init_prob = 0.1
+cuap_disable_in_return_phase = true
+cuap_recent_window = 10
+cuap_stagnation_normalizer = 20.0
+cuap_score_scale = 2.0
+cuap_gate_regularization = 0.0
+兼容性：当 use_gated_cuap=false 时，代码路径应与原 GAT-ON 完全一致，且不要求传入 cuap_prior/gate_context/phase_mask。
+[Heading1] 8. Rollout 与 PPO update 的一致性实现
+[Heading2] 8.1 Rollout 的正确顺序
+[ListNumber] 读取当前 observation、state、neighbor_mask、node_messages、action_mask。
+[ListNumber] 在 env.step 之前调用 build_cuap_step_inputs，保证 prior/context 与当前 observation 同步。
+[ListNumber] 将 prior、gate_context、phase_mask 转成 torch tensor，传入 model.act_batch。
+[ListNumber] 使用 final_logits 对应分布采样动作并保存 old_log_prob。
+[ListNumber] 把 observation、action、old_log_prob、cuap_prior、gate_context、phase_mask、action_mask 等同时存入 rollout buffer。
+[ListNumber] 执行 env.step，更新下一时刻状态。
+[NoSpacing] step_inputs = build_cuap_step_inputs(env, config)
+
+with torch.no_grad():
+    actions, old_log_probs, values = model.act_batch(
+        obs_tensor,
+        state_tensor,
+        neighbor_mask=neighbor_mask_tensor,
+        edge_features=edge_feature_tensor,
+        node_messages=node_message_tensor,
+        action_mask=action_mask_tensor,
+        cuap_prior=torch.as_tensor(step_inputs.prior, device=device),
+        gate_context=torch.as_tensor(step_inputs.gate_context, device=device),
+        phase_mask=torch.as_tensor(step_inputs.phase_mask, device=device),
+    )
+
+# buffer 中存 prior/context/phase，不存死 gate
+cuap_priors.append(step_inputs.prior)
+gate_contexts.append(step_inputs.gate_context)
+phase_masks.append(step_inputs.phase_mask)
+[Heading2] 8.2 PPO update 的正确顺序
+[TABLE]
+关键机制update 中必须把 batch_gate_context 送入当前门控网络，重新得到 new_gate。只有这样 PPO policy loss 的梯度才会更新 gate 参数。cuap_prior 是环境侧确定的非学习输入，可以从 rollout buffer 直接读取。
+[/TABLE]
+[NoSpacing] new_log_probs, entropy, values = model.evaluate_actions(
+    batch.observations[mb],
+    batch.states[mb],
+    batch.actions[mb],
+    neighbor_mask=batch.neighbor_masks[mb],
+    edge_features=batch.edge_features[mb],
+    node_messages=batch.node_messages[mb],
+    action_mask=batch.action_masks[mb],
+    cuap_prior=batch.cuap_priors[mb],
+    gate_context=batch.gate_contexts[mb],
+    phase_mask=batch.phase_masks[mb],
+)
+
+ratio = torch.exp(new_log_probs - batch.log_probs[mb])
+# 其余 PPO loss 保持原样
+[Heading2] 8.3 为什么不能存 gate 输出
+若 rollout 时把 gate 数值存入 buffer，update 时直接使用该数值，则 gate 与当前门控网络参数之间没有计算图，PPO loss 无法对 gate 参数反向传播。正确做法是存 gate_context，在 update 中重新前向计算 gate。
+[Heading2] 8.4 为什么不能 update 时重新计算 CUAP 环境特征
+PPO update 已经离开原始环境时刻，显式记忆和邻居 intent 可能已经变化。重新调用当前 env 会造成 prior 与 old_log_prob 对应的行为策略不一致，甚至引入未来信息。必须使用 rollout 当时保存的 prior 和 context。
+[Heading2] 8.5 Action mask 顺序
+actor logits → 加入 β·gate·prior → action mask → Categorical
+禁止在 mask 后再加 CUAP；禁止给非法动作保留非零 prior。若 action mask 全 false，沿用项目原有安全回退逻辑，但 CUAP prior 和 gate 必须置 0，并记录异常。
+[Heading1] 9. 从 GAT-ON checkpoint 初始化与优化器策略
+[Heading2] 9.1 加载模型
+使用训练最稳定的 GAT-ON checkpoint 初始化，而不是固定 CUAP checkpoint。固定 CUAP actor 可能已经学会抵消错误偏置，会污染门控实验。
+[NoSpacing] load_result = model.load_state_dict(gat_on_state_dict, strict=False)
+print('missing_keys:', load_result.missing_keys)
+print('unexpected_keys:', load_result.unexpected_keys)
+
+assert all(key.startswith('cuap_gate.') for key in load_result.missing_keys)
+assert not load_result.unexpected_keys
+如果 checkpoint 使用封装字典，先定位 model_state_dict/state_dict。不得因为 strict=False 而忽略 actor、critic、GAT 的意外缺失。
+[Heading2] 9.2 优化器
+推荐新建优化器，不加载旧 optimizer state，因为参数集合已经增加门控网络。V1 可使用单优化器，学习率设为原微调学习率；若 GAT-ON 性能迅速崩塌，再使用参数组降低已有 actor/GAT 的学习率。
+[NoSpacing] optimizer = torch.optim.Adam([
+    {'params': actor_and_gat_params, 'lr': base_lr * 0.5},
+    {'params': model.cuap_gate.parameters(), 'lr': base_lr},
+    {'params': critic_params, 'lr': critic_lr},
+])
+[Heading2] 9.3 不建议冻结 actor
+门控和 actor 最终共同决定策略，完全冻结 actor 可能限制适应。但若只做极短诊断，可先验证 gate 梯度，再进行联合微调。正式训练默认联合更新。
+[Heading2] 9.4 gate 正则
+第一版 gate_regularization=0，不增加人工监督或稀疏损失。只有 gate 快速饱和到 1 时，才考虑增加极小开启代价 λ·mean(gate)，建议 λ=1e-4，并作为额外消融而非默认。
+[Heading1] 10. 训练日志、单元测试与故障诊断
+[Heading2] 10.1 必须记录的门控指标
+[TABLE]
+指标 | 定义 | 诊断含义
+gate_mean/std/p10/p50/p90 | 仅 coverage phase 的 gate 分布 | 是否随状态变化，是否塌缩
+gate_near_zero_rate | gate<0.05 的比例 | 长期过高说明 CUAP 被拒绝
+gate_near_one_rate | gate>0.95 的比例 | 长期过高说明 CUAP 接管策略
+effective_bias_l1 | mean(|beta·gate·prior|) | CUAP 实际改变 logits 的幅度
+argmax_change_rate | argmax(actor_logits)≠argmax(final_logits) | CUAP 改变 actor 首选动作的比例
+prior_margin_mean | 合法动作 top1-top2 原始分数间隔 | CUAP 自身置信度
+coverage-bin gate | 按离线全局覆盖率分桶统计 gate | 只用于分析，不作为 gate 输入
+return_gate_max | return phase applied_gate 最大值 | 必须严格为0
+[/TABLE]
+[Heading2] 10.2 单元测试清单
+[TABLE]
+测试名 | 验收内容
+test_no_agent_identity | 搜索 observation、gate_context 和模型构造，确认没有 agent_id/one-hot identity。
+test_agent_permutation_equivariance | 交换 agent 维度及对应输入，gate/final logits 应按同样顺序交换。
+test_low_margin_prior_not_amplified | raw=[0.51,0.50,0.49,0.50] 时 bounded prior 接近0，不能产生 z-score 式强偏置。
+test_return_phase_disables_cuap | return phase 下 applied_gate、有效偏置均严格为0。
+test_illegal_action_remains_masked | 即使非法动作 raw score 很高，最终概率仍接近0。
+test_single_valid_action | 只有1个合法动作时 prior=0、gate applied=0，无 top2 或 NaN 错误。
+test_rollout_update_logprob_consistency | 参数不更新时，同一 batch 的 rollout log_prob 与 evaluate_actions 重算值近似一致。
+test_gate_receives_gradient | 使用合成 policy loss 反传，cuap_gate 参数 grad 非空、有限且至少一项非0。
+test_checkpoint_load_from_gat_on | 缺失键仅为 cuap_gate.*；GAT/actor/critic 权重完全加载。
+test_eval_uses_gated_policy | deterministic 和 stochastic evaluation 都调用统一 _policy_logits。
+[/TABLE]
+[Heading2] 10.3 故障诊断表
+[TABLE]
+现象 | 优先检查 | 解释/处理
+gate 始终≈0 | gate 梯度、update是否重算gate、初始化bias、优势是否正常 | 若实现无误且表现≈GAT-ON，说明 CUAP 无价值，停止投入
+gate 很快≈1 | 是否仍有z-score、beta是否过大、gate LR、init_prob | 先确认实现；必要时降低beta或加极小开启代价
+gate≈0但性能显著差于GAT-ON | checkpoint是否完整加载、optimizer LR、policy logits路径 | 理论上gate关闭应接近基线，明显下降通常是实现或微调问题
+KL/clip fraction异常升高 | old/new logprob公式、mask顺序、update输入 | 最常见是 rollout 与 update 策略分布不一致
+门控无梯度 | 是否存死gate；是否在update中no_grad；gate是否被detach | 必须存context并在update前向
+多agent重叠仍增大 | conflict特征、neighbor intent时效、argmax change rate | 若gate学会降低仍无效，说明CUAP排序本身不适配团队协同
+返航变差 | return phase applied_gate 是否严格0、统计是否混合覆盖/返航 | CUAP不应直接影响返航；若仍变差是覆盖结束位置间接变化
+[/TABLE]
+[Heading1] 11. 最后一轮实验方案与接受/放弃标准
+[Heading2] 11.1 对照组
+[TABLE]
+模型 | 用途
+GAT-ON | 主基线；从同一 checkpoint 与训练预算评估
+Fixed-CUAP | 已有固定先验结果，说明结构问题
+Gated-CUAP | 本次唯一新模型
+[/TABLE]
+[Heading2] 11.2 先进行短诊断
+[ListNumber] Smoke test：小地图、短 rollout，所有单元测试通过，无 NaN。
+[ListNumber] 从 GAT-ON checkpoint 微调少量 timesteps，检查初始 gate≈0.1、门控有梯度、KL 正常。
+[ListNumber] 在 1-2 个固定 seed 上画 gate_mean、effective_bias、argmax_change_rate 曲线，确认不是固定常数。
+[ListNumber] 只有诊断通过后才跑完整相同 seed 对照。
+[Heading2] 11.3 正式指标必须分阶段
+[TABLE]
+覆盖阶段主要指标 | 返航阶段指标 | 门控诊断
+Coverage-AUC、Final Coverage、T90/T95 reach rate、coverage-phase repeat、coverage-phase inter-agent overlap | Return success、Return steps、Mission success | gate分布、effective bias、argmax change、按覆盖进度分桶gate
+[/TABLE]
+[Heading2] 11.4 建议的最后接受标准
+[TABLE]
+接受 Gated-CUAP 的最低条件在相同 seed 的配对结果中：总体 Coverage-AUC 至少不低于 GAT-ON；coverage-phase inter-agent overlap 不恶化；30×30+6 agent 组合迁移不再出现明显负收益；return success 不明显下降；gate 不长期塌缩为0或1。
+[/TABLE]
+[Heading2] 11.5 明确停止条件
+[ListBullet] gate 长期接近 0：策略主动拒绝 CUAP。结论是 CUAP 对现有 GAT-ON 没有额外价值，删除 CUAP。
+[ListBullet] gate 长期接近 1，但覆盖/重叠仍不优于 GAT-ON：原始 CUAP 排序机制本身有问题，删除 CUAP。
+[ListBullet] gate 随状态变化，但困难场景仍显著恶化：局部动作先验无法稳定转化为团队收益，删除 CUAP。
+[ListBullet] 仅通过对不同测试场景设置不同 beta/权重才能变好：视为过拟合，不接受。
+[Heading1] 12. 潜在坑总表
+[TABLE]
+级别 | 坑 | 后果 | 规避
+P0 | Rollout存gate而不是context | gate不参与反向传播 | 存gate_context，update重新计算gate
+P0 | act_batch有gate，evaluate_actions无gate | PPO ratio错误、KL异常 | 所有入口统一调用_policy_logits
+P0 | update重新读取env计算prior | 时序错位/未来信息/行为策略不一致 | 保存rollout当时prior与context
+P0 | 从Fixed-CUAP checkpoint续训 | actor已学会抵消先验，结论污染 | 从GAT-ON初始化
+P0 | 把agent_id输入gate | 破坏共享策略与泛化 | 仅使用局部无身份特征
+P0 | 读取全局truth/frontier | 执行期信息泄露 | 仅用显式记忆与通信消息
+P1 | 继续使用z-score | 放大微小噪声 | center+tanh
+P1 | mask后再加prior | 非法动作可能复活 | 先融合，再mask
+P1 | return phase未关闭 | 返航被新覆盖/frontier吸引 | phase_mask强制0并测试
+P1 | gate维度被squeeze | 广播错误或不同batch行为不一致 | 保持[...,1]
+P1 | 加载旧optimizer state | 参数组不匹配/新gate无状态 | 新建optimizer
+P1 | deterministic评估绕过gate | 训练测试策略不同 | 统一policy logits入口
+P2 | 同时改CUAP权重、beta、reward | 无法做因果归因 | 第一轮只改门控和prior变换
+P2 | 只看全episode overlap | depot公共路径污染覆盖评价 | 报告coverage-phase-only指标
+P2 | 未达T90时RepeatAfter90记0 | 统计偏差 | 记NaN并单独报告T90 reach rate
+[/TABLE]
+[Heading1] 附录 A. Codex 可直接执行的任务提示词
+[NoSpacing] 请阅读本技术说明书，并在当前 MCPP 项目最新分支中完成“可学习标量门控 CUAP”改造。
+
+硬约束：
+1. 只增加共享、agent-agnostic 的标量 CUAPGate；不改 GAT、critic、reward、动作空间和 depot 返航逻辑。
+2. 不把 agent_id、全局真实 coverage/frontier、场景标签输入 actor 或 gate。
+3. 从 GAT-ON checkpoint 初始化，不从固定 CUAP checkpoint 续训。
+4. 删除逐状态 z-score，将 CUAP prior 改为合法动作中心化后 tanh 有界映射。
+5. final_logits = actor_logits + beta * phase_mask * gate(context) * cuap_prior；return phase phase_mask=0。
+6. Rollout buffer 存 cuap_prior、gate_context、phase_mask；不要存死 gate 输出。
+7. PPO update 必须重新前向计算 gate，并使用相同 final_logits 计算 new_log_prob、entropy 和 ratio。
+8. act_batch、distribution、evaluate_actions、deterministic evaluation 必须共用同一 _policy_logits 入口。
+9. 新建 optimizer 或确认新 gate 参数在 optimizer 中；打印 checkpoint missing/unexpected keys。
+10. 实现文档列出的单元测试和 gate 诊断日志。
+
+实施顺序：
+A. 先检查当前固定 CUAP 的实际代码和数据结构，列出将修改的文件和函数。
+B. 添加/重构 cuap.py 的纯函数输入构造。
+C. 在 ActorCritic 中加入 CUAPGate 和统一 _policy_logits。
+D. 扩展 RolloutBatch、rollout 采集、PPO update 和 evaluation。
+E. 从 GAT-ON checkpoint 加载并做 smoke test。
+F. 运行单元测试，重点验证 log_prob 一致性和 gate 梯度。
+G. 输出修改摘要、配置、测试结果、已知风险和最小实验命令。
+
+不要在未说明的情况下增加其他算法模块或手工阶段权重。
+[Heading1] 附录 B. 提交前验收清单
+☐ use_gated_cuap=false 时，与原 GAT-ON 路径一致。
+☐ 项目中没有新增 agent_id/identity 特征。
+☐ CUAP 不读取全局真值地图。
+☐ prior 使用 center+tanh，不使用逐样本 z-score。
+☐ gate 为共享标量 [..,1]，初始约 0.1。
+☐ return phase applied_gate 严格为 0。
+☐ Rollout 存 prior/context/phase，不存死 gate。
+☐ PPO update 重新计算 gate，且 gate 参数能获得非零梯度。
+☐ old/new log_prob 在参数未更新时一致。
+☐ 所有策略入口共用同一 final logits 逻辑。
+☐ action mask 在 CUAP 融合后应用，非法动作概率为 0。
+☐ 从 GAT-ON checkpoint 加载，missing keys 仅 gate。
+☐ 新 gate 参数已进入 optimizer 和 checkpoint。
+☐ 记录 gate_mean、saturation、effective_bias、argmax_change。
+☐ 覆盖与返航指标分阶段报告。
+☐ 困难场景和负结果不被删除。
+[TABLE]
+最终原则这次修改的价值不在于强行证明 CUAP 有效，而在于让策略通过可学习门控对 CUAP 做最后一次公平检验。若门控拒绝 CUAP或困难场景仍无改善，应据此结束该方向并保留更可靠的 GAT-ON 结果。
+[/TABLE]

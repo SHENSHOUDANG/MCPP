@@ -1,0 +1,2 @@
+seed,obstacle_ratio,obstacles,free_cells,total_reward,coverage_ratio,completed,steps,path_length,coverage_auc,coverage_at_100,coverage_at_200,coverage_at_300,coverage_at_400,coverage_at_500,t90,t95,t99,repeat_ratio,repeat_ratio_after_90,inter_agent_overlap_ratio,stalled,stall_coverage,stall_termination_coverage
+20260431,0.05,20,380,85.15624930523336,1.0,1,152,604,0.889921052631579,0.8842105263157894,1.0,1.0,1.0,1.0,103,118,142,0.3790849673202614,0.8061224489795918,0.3473684210526316,0,,1.0

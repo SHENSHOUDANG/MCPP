@@ -109,10 +109,26 @@ def checkpoint_model_metadata(config: object, model: object) -> dict[str, object
         "node_message_dim": model.node_message_dim,
         "use_coverage_messages": model.node_message_dim > 0,
         "use_action_mask": config.ppo.use_action_mask,
+        "intent_relation": {
+            "enabled": getattr(config.ppo, "use_intent_relation", False),
+            "beta_max": getattr(config.ppo, "intent_relation_beta_max", 2.0),
+            "detach": getattr(config.ppo, "intent_relation_detach", True),
+            "intent_grid_size": getattr(config.env, "intent_grid_size", 3),
+        },
         "cuap": {
             "enabled": getattr(config.cuap, "enabled", False),
+            "gated": getattr(config.cuap, "gated", False),
             "beta": getattr(config.cuap, "beta", 0.0),
             "disable_in_return_phase": getattr(config.cuap, "disable_in_return_phase", True),
+            "tau": getattr(config.cuap, "tau", 1.0),
+            "confidence_tau": getattr(config.cuap, "confidence_tau", 1.0),
+            "gate_hidden_dim": getattr(config.cuap, "gate_hidden_dim", 32),
+            "gate_init_prob": getattr(config.cuap, "gate_init_prob", 0.1),
+            "gate_detach_actor_features": getattr(config.cuap, "gate_detach_actor_features", True),
+            "recent_window": getattr(config.cuap, "recent_window", 10),
+            "stagnation_normalizer": getattr(config.cuap, "stagnation_normalizer", 20.0),
+            "score_scale": getattr(config.cuap, "score_scale", 2.0),
+            "gate_regularization": getattr(config.cuap, "gate_regularization", 0.0),
         },
     }
 

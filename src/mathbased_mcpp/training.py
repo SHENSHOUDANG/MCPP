@@ -17,7 +17,7 @@ import torch
 from torch import nn
 
 from .config import ExperimentConfig, build_course_config, select_curriculum_course
-from .cuap import scaled_cuap_prior
+from .cuap import build_cuap_step_inputs, scaled_cuap_prior
 from .env import GridCoverageEnv
 from .ppo import ActorCritic, RolloutBatch
 from .utils import (
@@ -133,6 +133,7 @@ def _train_single_course(
     if config.ppo.use_coverage_messages and not reference_env.config.use_explicit_map_memory:
         raise ValueError("use_coverage_messages requires use_explicit_map_memory=true")
     _validate_cuap_config(config, reference_env)
+    _validate_intent_relation_config(config, reference_env)
     if run_dir is not None:
         run_path = Path(run_dir)
     elif resume_checkpoint_path is not None:
@@ -160,6 +161,15 @@ def _train_single_course(
         use_phase_critics=_uses_joint_phase_model(config),
         use_phase_actors=_uses_joint_phase_model(config),
         phase_metadata_index=reference_env.base_state_metadata_dim,
+        use_gated_cuap=config.cuap.enabled and config.cuap.gated,
+        cuap_beta=config.cuap.beta,
+        cuap_gate_hidden_dim=config.cuap.gate_hidden_dim,
+        cuap_gate_init_prob=config.cuap.gate_init_prob,
+        cuap_gate_detach_actor_features=config.cuap.gate_detach_actor_features,
+        use_intent_relation=config.ppo.use_intent_relation,
+        intent_relation_beta_max=config.ppo.intent_relation_beta_max,
+        intent_relation_detach=config.ppo.intent_relation_detach,
+        intent_grid_size=reference_env.config.intent_grid_size,
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ppo.learning_rate)
     resume_state: dict[str, object] = {}
@@ -387,6 +397,8 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
     total_reward = 0.0
     done = False
     info = {}
+    cuap_diagnostics = _empty_cuap_diagnostics()
+    cir_diagnostics = _empty_cir_diagnostics()
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
         state_tensor = torch.as_tensor(state, dtype=torch.float32, device=device)
@@ -395,6 +407,7 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
         node_messages = _node_messages_tensor(env, model, device)
         action_mask = _action_mask_tensor(config, env, device)
         action_prior = _action_prior_tensor(config, env, device)
+        cuap_tensors = _cuap_step_tensors(config, env, device)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -404,8 +417,11 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
                 node_messages=node_messages,
                 action_mask=action_mask,
                 action_prior_logits=action_prior,
+                **cuap_tensors,
                 deterministic=True,
-            )
+        )
+        _record_cuap_diagnostics(model, cuap_diagnostics)
+        _record_cir_diagnostics(model, cir_diagnostics)
         result = env.step(actions.cpu().numpy().tolist())
         rewards = agent_rewards(env.num_agents, result.reward)
         total_reward += float(np.mean(rewards))
@@ -413,7 +429,7 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
         state = result.state
         done = result.done
         info = result.info
-    return {
+    row = {
         "episode": update_index,
         "reward": total_reward,
         "coverage_ratio": info.get("coverage_ratio", env.coverage_ratio()),
@@ -421,6 +437,9 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
         "completed": int(info.get("completed", False)),
         "steps": info.get("step_count", env.step_count),
     }
+    row.update(_summarize_cuap_diagnostics(cuap_diagnostics))
+    row.update(_summarize_cir_diagnostics(cir_diagnostics))
+    return row
 
 
 def _load_checkpoint_weights(model: ActorCritic, checkpoint_path: str | Path) -> None:
@@ -466,6 +485,93 @@ def _metric_score(row: dict[str, float | int]) -> tuple[float, int, float, float
     path_length = float(row["path_length"])
     reward = float(row["reward"])
     return coverage, completed, -path_length, reward
+
+
+def _empty_cuap_diagnostics() -> dict[str, list[float]]:
+    return {
+        "gate": [],
+        "effective_strength": [],
+        "argmax_change": [],
+        "prior_margin": [],
+        "prior_spread": [],
+    }
+
+
+def _record_cuap_diagnostics(model: ActorCritic, diagnostics: dict[str, list[float]]) -> None:
+    if model.latest_applied_gate is not None:
+        diagnostics["gate"].extend(_flatten_tensor_values(model.latest_applied_gate))
+    if model.latest_effective_strength is not None:
+        diagnostics["effective_strength"].extend(_flatten_tensor_values(model.latest_effective_strength))
+    if model.latest_argmax_change is not None:
+        diagnostics["argmax_change"].extend(_flatten_tensor_values(model.latest_argmax_change.float()))
+    if model.latest_cuap_confidence is not None:
+        confidence = model.latest_cuap_confidence.detach().cpu().numpy().reshape(-1, model.latest_cuap_confidence.shape[-1])
+        if confidence.shape[-1] >= 2:
+            diagnostics["prior_margin"].extend(float(item) for item in confidence[:, 0])
+            diagnostics["prior_spread"].extend(float(item) for item in confidence[:, 1])
+
+
+def _summarize_cuap_diagnostics(diagnostics: dict[str, list[float]]) -> dict[str, float]:
+    gate = np.asarray(diagnostics["gate"], dtype=np.float32)
+    if gate.size == 0:
+        return {}
+    effective_strength = np.asarray(diagnostics["effective_strength"], dtype=np.float32)
+    argmax_change = np.asarray(diagnostics["argmax_change"], dtype=np.float32)
+    prior_margin = np.asarray(diagnostics["prior_margin"], dtype=np.float32)
+    prior_spread = np.asarray(diagnostics["prior_spread"], dtype=np.float32)
+    return {
+        "gate_mean": float(gate.mean()),
+        "gate_std": float(gate.std()),
+        "gate_p10": float(np.percentile(gate, 10)),
+        "gate_p50": float(np.percentile(gate, 50)),
+        "gate_p90": float(np.percentile(gate, 90)),
+        "effective_strength": float(effective_strength.mean()) if effective_strength.size else 0.0,
+        "argmax_change_rate": float(argmax_change.mean()) if argmax_change.size else 0.0,
+        "prior_margin": float(prior_margin.mean()) if prior_margin.size else 0.0,
+        "prior_spread": float(prior_spread.mean()) if prior_spread.size else 0.0,
+    }
+
+
+def _flatten_tensor_values(tensor: torch.Tensor) -> list[float]:
+    return [float(item) for item in tensor.detach().cpu().reshape(-1)]
+
+
+def _empty_cir_diagnostics() -> dict[str, list[float]]:
+    return {
+        "beta": [],
+        "overlap": [],
+        "overlap_nonzero": [],
+        "attention_entropy": [],
+    }
+
+
+def _record_cir_diagnostics(model: ActorCritic, diagnostics: dict[str, list[float]]) -> None:
+    if model.latest_intent_beta is not None:
+        diagnostics["beta"].extend(_flatten_tensor_values(model.latest_intent_beta))
+    if model.latest_intent_overlap is not None:
+        overlap = model.latest_intent_overlap.detach()
+        mask = model.latest_intent_mask
+        if mask is not None:
+            overlap = overlap[mask.to(device=overlap.device, dtype=torch.bool)]
+        diagnostics["overlap"].extend(_flatten_tensor_values(overlap))
+        diagnostics["overlap_nonzero"].extend(_flatten_tensor_values((overlap > 1e-6).float()))
+    if model.latest_attention_entropy is not None:
+        diagnostics["attention_entropy"].extend(_flatten_tensor_values(model.latest_attention_entropy))
+
+
+def _summarize_cir_diagnostics(diagnostics: dict[str, list[float]]) -> dict[str, float]:
+    overlap = np.asarray(diagnostics["overlap"], dtype=np.float32)
+    if overlap.size == 0:
+        return {}
+    beta = np.asarray(diagnostics["beta"], dtype=np.float32)
+    overlap_nonzero = np.asarray(diagnostics["overlap_nonzero"], dtype=np.float32)
+    attention_entropy = np.asarray(diagnostics["attention_entropy"], dtype=np.float32)
+    return {
+        "cir_beta": float(beta.mean()) if beta.size else 0.0,
+        "intent_conflict_rate": float(overlap.mean()),
+        "intent_conflict_nonzero": float(overlap_nonzero.mean()) if overlap_nonzero.size else 0.0,
+        "attention_entropy": float(attention_entropy.mean()) if attention_entropy.size else 0.0,
+    }
 
 
 def _prepare_policy_phase_config(config: ExperimentConfig) -> ExperimentConfig:
@@ -514,6 +620,19 @@ def _validate_cuap_config(config: ExperimentConfig, env: GridCoverageEnv) -> Non
         raise ValueError("CUAP requires ppo.use_action_mask=true so the action mask is applied after the prior")
     if not env.config.use_explicit_map_memory:
         raise ValueError("CUAP requires env.use_explicit_map_memory=true to avoid global coverage truth leakage")
+
+
+def _validate_intent_relation_config(config: ExperimentConfig, env: GridCoverageEnv) -> None:
+    if not config.ppo.use_intent_relation:
+        return
+    if not config.ppo.use_graph_attention:
+        raise ValueError("use_intent_relation requires ppo.use_graph_attention=true")
+    if not config.ppo.use_coverage_messages:
+        raise ValueError("use_intent_relation requires ppo.use_coverage_messages=true")
+    if not env.config.use_explicit_map_memory:
+        raise ValueError("use_intent_relation requires env.use_explicit_map_memory=true")
+    if env.config.intent_grid_size <= 0:
+        raise ValueError("use_intent_relation requires env.intent_grid_size > 0")
 
 
 def _make_rollout_envs(config: ExperimentConfig) -> list[GridCoverageEnv]:
@@ -565,6 +684,9 @@ def _collect_rollout(
     node_messages: list[np.ndarray] = []
     action_masks: list[np.ndarray] = []
     action_prior_logits: list[np.ndarray] = []
+    cuap_priors: list[np.ndarray] = []
+    cuap_confidences: list[np.ndarray] = []
+    cuap_phase_masks: list[np.ndarray] = []
     metric_rows: list[dict[str, float | int]] = []
     device = _model_device(model)
     num_envs = len(envs)
@@ -582,6 +704,22 @@ def _collect_rollout(
         action_prior_array = _action_prior_array(config, envs)
         action_prior_tensor = (
             torch.as_tensor(action_prior_array, dtype=torch.float32, device=device) if action_prior_array is not None else None
+        )
+        cuap_step_arrays = _cuap_step_arrays(config, envs)
+        cuap_prior_tensor = (
+            torch.as_tensor(cuap_step_arrays["cuap_prior"], dtype=torch.float32, device=device)
+            if cuap_step_arrays
+            else None
+        )
+        cuap_confidence_tensor = (
+            torch.as_tensor(cuap_step_arrays["cuap_confidence"], dtype=torch.float32, device=device)
+            if cuap_step_arrays
+            else None
+        )
+        cuap_phase_mask_tensor = (
+            torch.as_tensor(cuap_step_arrays["cuap_phase_mask"], dtype=torch.float32, device=device)
+            if cuap_step_arrays
+            else None
         )
         edge_feature_array = (
             np.asarray([worker.neighbor_features() for worker in envs], dtype=np.float32)
@@ -608,6 +746,9 @@ def _collect_rollout(
                 node_messages=node_message_tensor,
                 action_mask=action_mask_tensor,
                 action_prior_logits=action_prior_tensor,
+                cuap_prior=cuap_prior_tensor,
+                cuap_confidence=cuap_confidence_tensor,
+                cuap_phase_mask=cuap_phase_mask_tensor,
             )
 
         observations.append(observation)
@@ -621,6 +762,10 @@ def _collect_rollout(
             action_masks.append(action_mask)
         if action_prior_array is not None:
             action_prior_logits.append(action_prior_array)
+        if cuap_step_arrays:
+            cuap_priors.append(cuap_step_arrays["cuap_prior"])
+            cuap_confidences.append(cuap_step_arrays["cuap_confidence"])
+            cuap_phase_masks.append(cuap_step_arrays["cuap_phase_mask"])
         if edge_feature_array is not None:
             edge_features.append(edge_feature_array)
         if node_message_array is not None:
@@ -715,6 +860,21 @@ def _collect_rollout(
             if action_prior_logits
             else None
         ),
+        cuap_priors=(
+            torch.as_tensor(_flatten_time_env(np.asarray(cuap_priors, dtype=np.float32)), dtype=torch.float32, device=device)
+            if cuap_priors
+            else None
+        ),
+        cuap_confidences=(
+            torch.as_tensor(_flatten_time_env(np.asarray(cuap_confidences, dtype=np.float32)), dtype=torch.float32, device=device)
+            if cuap_confidences
+            else None
+        ),
+        cuap_phase_masks=(
+            torch.as_tensor(_flatten_time_env(np.asarray(cuap_phase_masks, dtype=np.float32)), dtype=torch.float32, device=device)
+            if cuap_phase_masks
+            else None
+        ),
     )
     metrics = {
         "episode_index": episode_index,
@@ -793,6 +953,9 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
             node_messages = batch.node_messages[mb_tensor] if batch.node_messages is not None else None
             action_mask = batch.action_masks[mb_tensor] if batch.action_masks is not None else None
             action_prior = batch.action_prior_logits[mb_tensor] if batch.action_prior_logits is not None else None
+            cuap_prior = batch.cuap_priors[mb_tensor] if batch.cuap_priors is not None else None
+            cuap_confidence = batch.cuap_confidences[mb_tensor] if batch.cuap_confidences is not None else None
+            cuap_phase_mask = batch.cuap_phase_masks[mb_tensor] if batch.cuap_phase_masks is not None else None
             log_probs, entropy, values = model.evaluate_actions(
                 batch.observations[mb_tensor],
                 batch.states[mb_tensor],
@@ -802,6 +965,9 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
                 node_messages=node_messages,
                 action_mask=action_mask,
                 action_prior_logits=action_prior,
+                cuap_prior=cuap_prior,
+                cuap_confidence=cuap_confidence,
+                cuap_phase_mask=cuap_phase_mask,
             )
             ratio = torch.exp(log_probs - batch.log_probs[mb_tensor])
             clipped = torch.clamp(ratio, 1.0 - config.ppo.clip_ratio, 1.0 + config.ppo.clip_ratio) * advantages[mb_tensor]
@@ -809,6 +975,9 @@ def _update_policy(config: ExperimentConfig, model: ActorCritic, optimizer: torc
             value_loss = nn.functional.mse_loss(values, batch.returns[mb_tensor])
             entropy_loss = entropy.mean()
             loss = policy_loss + config.ppo.value_coef * value_loss - config.ppo.entropy_coef * entropy_loss
+            if config.cuap.enabled and config.cuap.gated and config.cuap.gate_regularization > 0:
+                if model.latest_applied_gate is not None:
+                    loss = loss + float(config.cuap.gate_regularization) * model.latest_applied_gate.mean()
 
             optimizer.zero_grad()
             loss.backward()
@@ -853,6 +1022,8 @@ def _action_mask_tensor(config: ExperimentConfig, env: GridCoverageEnv, device: 
 
 
 def _action_prior_tensor(config: ExperimentConfig, env: GridCoverageEnv, device: torch.device) -> torch.Tensor | None:
+    if config.cuap.gated:
+        return None
     prior = scaled_cuap_prior(env, config.cuap, phase=_env_phase(env))
     if prior is None:
         return None
@@ -860,12 +1031,38 @@ def _action_prior_tensor(config: ExperimentConfig, env: GridCoverageEnv, device:
 
 
 def _action_prior_array(config: ExperimentConfig, envs: list[GridCoverageEnv]) -> np.ndarray | None:
-    if not config.cuap.enabled:
+    if not config.cuap.enabled or config.cuap.gated:
         return None
     return np.asarray(
         [scaled_cuap_prior(worker, config.cuap, phase=_env_phase(worker)) for worker in envs],
         dtype=np.float32,
     )
+
+
+def _cuap_step_tensors(
+    config: ExperimentConfig,
+    env: GridCoverageEnv,
+    device: torch.device,
+) -> dict[str, torch.Tensor]:
+    if not config.cuap.enabled or not config.cuap.gated:
+        return {}
+    inputs = build_cuap_step_inputs(env, config.cuap, phase=_env_phase(env))
+    return {
+        "cuap_prior": torch.as_tensor(inputs.prior, dtype=torch.float32, device=device),
+        "cuap_confidence": torch.as_tensor(inputs.confidence, dtype=torch.float32, device=device),
+        "cuap_phase_mask": torch.as_tensor(inputs.phase_mask, dtype=torch.float32, device=device),
+    }
+
+
+def _cuap_step_arrays(config: ExperimentConfig, envs: list[GridCoverageEnv]) -> dict[str, np.ndarray] | None:
+    if not config.cuap.enabled or not config.cuap.gated:
+        return None
+    inputs = [build_cuap_step_inputs(worker, config.cuap, phase=_env_phase(worker)) for worker in envs]
+    return {
+        "cuap_prior": np.asarray([item.prior for item in inputs], dtype=np.float32),
+        "cuap_confidence": np.asarray([item.confidence for item in inputs], dtype=np.float32),
+        "cuap_phase_mask": np.asarray([item.phase_mask for item in inputs], dtype=np.float32),
+    }
 
 
 def _env_phase(env: GridCoverageEnv) -> str:

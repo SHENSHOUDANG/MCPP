@@ -114,6 +114,9 @@ class PPOConfig:
     gat_attention_dropout: float = 0.0
     use_coverage_messages: bool = False
     use_action_mask: bool = False
+    use_intent_relation: bool = False
+    intent_relation_beta_max: float = 2.0
+    intent_relation_detach: bool = True
 
 
 @dataclass(slots=True)
@@ -132,6 +135,7 @@ class TrainConfig:
 @dataclass(slots=True)
 class CUAPConfig:
     enabled: bool = False
+    gated: bool = False
     beta: float = 0.3
     disable_in_return_phase: bool = True
     w_novelty: float = 1.0
@@ -142,6 +146,16 @@ class CUAPConfig:
     normalize: bool = True
     clip: float = 2.0
     use_density_features: bool = False
+    tau: float = 1.0
+    confidence_tau: float = 1.0
+    gate_hidden_dim: int = 32
+    gate_init_prob: float = 0.1
+    gate_detach_actor_features: bool = True
+    gate_input_dim: int = 9
+    recent_window: int = 10
+    stagnation_normalizer: float = 20.0
+    score_scale: float = 2.0
+    gate_regularization: float = 0.0
 
 
 @dataclass(slots=True)

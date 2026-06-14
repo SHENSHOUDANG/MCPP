@@ -13,6 +13,7 @@ import numpy as np
 import torch
 
 from .config import ExperimentConfig
+from .cuap import build_cuap_step_inputs, scaled_cuap_prior
 from .env import GridCoverageEnv
 from .evaluation import coverage_efficiency_metrics, load_policy, resolve_runtime_config
 from .utils import agent_observations, agent_rewards
@@ -79,6 +80,8 @@ def _evaluate_trial(
     total_reward = 0.0
     done = False
     info: dict[str, Any] = {}
+    cuap_diagnostics = _empty_cuap_diagnostics()
+    cir_diagnostics = _empty_cir_diagnostics()
 
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32, device=device)
@@ -95,6 +98,8 @@ def _evaluate_trial(
             else None
         )
         action_mask = torch.as_tensor(env.action_masks(), dtype=torch.bool, device=device) if config.ppo.use_action_mask else None
+        action_prior = _action_prior_tensor(config, env, device)
+        cuap_tensors = _cuap_step_tensors(config, env, device)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -103,8 +108,12 @@ def _evaluate_trial(
                 edge_features=edge_features,
                 node_messages=node_messages,
                 action_mask=action_mask,
+                action_prior_logits=action_prior,
+                **cuap_tensors,
                 deterministic=deterministic,
             )
+        _record_cuap_diagnostics(model, cuap_diagnostics)
+        _record_cir_diagnostics(model, cir_diagnostics)
         result = env.step(actions.cpu().numpy().tolist())
         rewards = agent_rewards(env.num_agents, result.reward)
         total_reward += float(np.mean(rewards))
@@ -136,9 +145,129 @@ def _evaluate_trial(
             stall_steps=stall_steps,
         )
     )
+    row.update(_summarize_cuap_diagnostics(cuap_diagnostics))
+    row.update(_summarize_cir_diagnostics(cir_diagnostics))
     row.pop("metric_budgets")
     row.pop("stall_steps")
     return row
+
+
+def _action_prior_tensor(config: ExperimentConfig, env: GridCoverageEnv, device: torch.device) -> torch.Tensor | None:
+    if not config.cuap.enabled or config.cuap.gated:
+        return None
+    prior = scaled_cuap_prior(env, config.cuap, phase="return" if env.return_mode else "coverage")
+    if prior is None:
+        return None
+    return torch.as_tensor(prior, dtype=torch.float32, device=device)
+
+
+def _cuap_step_tensors(
+    config: ExperimentConfig,
+    env: GridCoverageEnv,
+    device: torch.device,
+) -> dict[str, torch.Tensor]:
+    if not config.cuap.enabled or not config.cuap.gated:
+        return {}
+    inputs = build_cuap_step_inputs(env, config.cuap, phase="return" if env.return_mode else "coverage")
+    return {
+        "cuap_prior": torch.as_tensor(inputs.prior, dtype=torch.float32, device=device),
+        "cuap_confidence": torch.as_tensor(inputs.confidence, dtype=torch.float32, device=device),
+        "cuap_phase_mask": torch.as_tensor(inputs.phase_mask, dtype=torch.float32, device=device),
+    }
+
+
+def _empty_cuap_diagnostics() -> dict[str, list[float]]:
+    return {
+        "gate": [],
+        "effective_strength": [],
+        "argmax_change": [],
+        "prior_margin": [],
+        "prior_spread": [],
+    }
+
+
+def _record_cuap_diagnostics(model: torch.nn.Module, diagnostics: dict[str, list[float]]) -> None:
+    applied_gate = getattr(model, "latest_applied_gate", None)
+    effective_strength = getattr(model, "latest_effective_strength", None)
+    argmax_change = getattr(model, "latest_argmax_change", None)
+    confidence_tensor = getattr(model, "latest_cuap_confidence", None)
+    if applied_gate is not None:
+        diagnostics["gate"].extend(_flatten_tensor_values(applied_gate))
+    if effective_strength is not None:
+        diagnostics["effective_strength"].extend(_flatten_tensor_values(effective_strength))
+    if argmax_change is not None:
+        diagnostics["argmax_change"].extend(_flatten_tensor_values(argmax_change.float()))
+    if confidence_tensor is not None:
+        confidence = confidence_tensor.detach().cpu().numpy().reshape(-1, confidence_tensor.shape[-1])
+        if confidence.shape[-1] >= 2:
+            diagnostics["prior_margin"].extend(float(item) for item in confidence[:, 0])
+            diagnostics["prior_spread"].extend(float(item) for item in confidence[:, 1])
+
+
+def _summarize_cuap_diagnostics(diagnostics: dict[str, list[float]]) -> dict[str, float]:
+    gate = np.asarray(diagnostics["gate"], dtype=np.float32)
+    if gate.size == 0:
+        return {}
+    effective_strength = np.asarray(diagnostics["effective_strength"], dtype=np.float32)
+    argmax_change = np.asarray(diagnostics["argmax_change"], dtype=np.float32)
+    prior_margin = np.asarray(diagnostics["prior_margin"], dtype=np.float32)
+    prior_spread = np.asarray(diagnostics["prior_spread"], dtype=np.float32)
+    return {
+        "gate_mean": float(gate.mean()),
+        "gate_std": float(gate.std()),
+        "gate_p10": float(np.percentile(gate, 10)),
+        "gate_p50": float(np.percentile(gate, 50)),
+        "gate_p90": float(np.percentile(gate, 90)),
+        "effective_strength": float(effective_strength.mean()) if effective_strength.size else 0.0,
+        "argmax_change_rate": float(argmax_change.mean()) if argmax_change.size else 0.0,
+        "prior_margin": float(prior_margin.mean()) if prior_margin.size else 0.0,
+        "prior_spread": float(prior_spread.mean()) if prior_spread.size else 0.0,
+    }
+
+
+def _empty_cir_diagnostics() -> dict[str, list[float]]:
+    return {
+        "beta": [],
+        "overlap": [],
+        "overlap_nonzero": [],
+        "attention_entropy": [],
+    }
+
+
+def _record_cir_diagnostics(model: torch.nn.Module, diagnostics: dict[str, list[float]]) -> None:
+    beta = getattr(model, "latest_intent_beta", None)
+    overlap = getattr(model, "latest_intent_overlap", None)
+    attention_entropy = getattr(model, "latest_attention_entropy", None)
+    if beta is not None:
+        diagnostics["beta"].extend(_flatten_tensor_values(beta))
+    if overlap is not None:
+        overlap_tensor = overlap.detach()
+        mask = getattr(model, "latest_intent_mask", None)
+        if mask is not None:
+            overlap_tensor = overlap_tensor[mask.to(device=overlap_tensor.device, dtype=torch.bool)]
+        diagnostics["overlap"].extend(_flatten_tensor_values(overlap_tensor))
+        diagnostics["overlap_nonzero"].extend(_flatten_tensor_values((overlap_tensor > 1e-6).float()))
+    if attention_entropy is not None:
+        diagnostics["attention_entropy"].extend(_flatten_tensor_values(attention_entropy))
+
+
+def _summarize_cir_diagnostics(diagnostics: dict[str, list[float]]) -> dict[str, float]:
+    overlap = np.asarray(diagnostics["overlap"], dtype=np.float32)
+    if overlap.size == 0:
+        return {}
+    beta = np.asarray(diagnostics["beta"], dtype=np.float32)
+    overlap_nonzero = np.asarray(diagnostics["overlap_nonzero"], dtype=np.float32)
+    attention_entropy = np.asarray(diagnostics["attention_entropy"], dtype=np.float32)
+    return {
+        "cir_beta": float(beta.mean()) if beta.size else 0.0,
+        "intent_conflict_rate": float(overlap.mean()),
+        "intent_conflict_nonzero": float(overlap_nonzero.mean()) if overlap_nonzero.size else 0.0,
+        "attention_entropy": float(attention_entropy.mean()) if attention_entropy.size else 0.0,
+    }
+
+
+def _flatten_tensor_values(tensor: torch.Tensor) -> list[float]:
+    return [float(item) for item in tensor.detach().cpu().reshape(-1)]
 
 
 def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float | int]:
@@ -173,6 +302,20 @@ def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float | int]:
         "stall_termination_coverage_mean": _mean(rows, "stall_termination_coverage"),
         "total_reward_mean": _mean(rows, "total_reward"),
     }
+    for field in (
+        "gate_mean",
+        "gate_std",
+        "gate_p10",
+        "gate_p50",
+        "gate_p90",
+        "effective_strength",
+        "argmax_change_rate",
+        "prior_margin",
+        "prior_spread",
+    ):
+        values = _numeric_values(rows, field)
+        if values:
+            summary[f"{field}_mean"] = float(np.mean(values))
     for field in ("t90", "t95", "t99"):
         values = _numeric_values(rows, field)
         summary[f"{field}_mean_reached"] = float(np.mean(values)) if values else 0.0

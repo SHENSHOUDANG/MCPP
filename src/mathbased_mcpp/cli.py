@@ -129,13 +129,19 @@ def main() -> None:
         print(f"gat_num_heads={config.ppo.gat_num_heads}")
         print(f"gat_use_edge_features={str(config.ppo.gat_use_edge_features).lower()}")
         print(f"gat_residual={str(config.ppo.gat_residual).lower()}")
+        print(f"use_intent_relation={str(config.ppo.use_intent_relation).lower()}")
+        print(f"intent_relation_beta_max={config.ppo.intent_relation_beta_max}")
+        print(f"intent_relation_detach={str(config.ppo.intent_relation_detach).lower()}")
         print(f"use_legacy_truth_coverage_observation={str(config.env.use_legacy_truth_coverage_observation).lower()}")
         print(f"use_explicit_map_memory={str(config.env.use_explicit_map_memory).lower()}")
         print(f"share_map_memory={str(config.env.share_map_memory).lower()}")
         print(f"use_coverage_messages={str(config.ppo.use_coverage_messages).lower()}")
         print(f"node_message_dim={env.node_message_dim if config.ppo.use_coverage_messages else 0}")
         print(f"cuap_enabled={str(config.cuap.enabled).lower()}")
+        print(f"cuap_gated={str(config.cuap.gated).lower()}")
         print(f"cuap_beta={config.cuap.beta}")
+        print(f"cuap_tau={config.cuap.tau}")
+        print(f"cuap_confidence_tau={config.cuap.confidence_tau}")
         print(f"cuap_disable_in_return_phase={str(config.cuap.disable_in_return_phase).lower()}")
         print(f"use_depot={str(config.env.use_depot).lower()}")
         print(f"depot={env.depot_position}")
@@ -150,8 +156,6 @@ def main() -> None:
         return
 
     if args.command == "train":
-        if config.curriculum and config.curriculum.courses and not args.course:
-            parser.error("curriculum configs require --course so each course can be trained separately")
         if args.policy_phase is not None:
             config.ppo.policy_phase = args.policy_phase
         checkpoint = train_ppo(

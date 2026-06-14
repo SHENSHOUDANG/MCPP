@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from .config import ExperimentConfig, load_config
-from .cuap import scaled_cuap_prior
+from .cuap import build_cuap_step_inputs, scaled_cuap_prior
 from .env import GridCoverageEnv
 from .ppo import ActorCritic
 from .utils import agent_observations, serialize_trajectory
@@ -52,6 +52,34 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
     use_phase_critics = bool(payload.get("use_phase_critics", False))
     use_phase_actors = bool(payload.get("use_phase_actors", False))
     phase_metadata_index = int(payload.get("phase_metadata_index", GridCoverageEnv.base_state_metadata_dim))
+    cuap_meta = payload.get("cuap", {})
+    if not isinstance(cuap_meta, dict):
+        cuap_meta = {}
+    use_gated_cuap = bool(cuap_meta.get("gated", payload.get("use_gated_cuap", False)))
+    cuap_beta = float(cuap_meta.get("beta", payload.get("cuap_beta", config.cuap.beta)))
+    cuap_gate_hidden_dim = int(
+        cuap_meta.get("gate_hidden_dim", payload.get("cuap_gate_hidden_dim", config.cuap.gate_hidden_dim))
+    )
+    cuap_gate_init_prob = float(
+        cuap_meta.get("gate_init_prob", payload.get("cuap_gate_init_prob", config.cuap.gate_init_prob))
+    )
+    cuap_gate_detach_actor_features = bool(
+        cuap_meta.get(
+            "gate_detach_actor_features",
+            payload.get("cuap_gate_detach_actor_features", config.cuap.gate_detach_actor_features),
+        )
+    )
+    intent_meta = payload.get("intent_relation", {})
+    if not isinstance(intent_meta, dict):
+        intent_meta = {}
+    use_intent_relation = bool(intent_meta.get("enabled", payload.get("use_intent_relation", False)))
+    intent_relation_beta_max = float(
+        intent_meta.get("beta_max", payload.get("intent_relation_beta_max", config.ppo.intent_relation_beta_max))
+    )
+    intent_relation_detach = bool(
+        intent_meta.get("detach", payload.get("intent_relation_detach", config.ppo.intent_relation_detach))
+    )
+    intent_grid_size = int(intent_meta.get("intent_grid_size", payload.get("intent_grid_size", config.env.intent_grid_size)))
     if critic_type == "spatial" or "state_shape" in payload:
         model = ActorCritic(
             observation_dim=observation_dim,
@@ -69,6 +97,15 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             use_phase_critics=use_phase_critics,
             use_phase_actors=use_phase_actors,
             phase_metadata_index=phase_metadata_index,
+            use_gated_cuap=use_gated_cuap,
+            cuap_beta=cuap_beta,
+            cuap_gate_hidden_dim=cuap_gate_hidden_dim,
+            cuap_gate_init_prob=cuap_gate_init_prob,
+            cuap_gate_detach_actor_features=cuap_gate_detach_actor_features,
+            use_intent_relation=use_intent_relation,
+            intent_relation_beta_max=intent_relation_beta_max,
+            intent_relation_detach=intent_relation_detach,
+            intent_grid_size=intent_grid_size,
         )
     else:
         model = ActorCritic(
@@ -85,6 +122,15 @@ def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorC
             use_phase_critics=use_phase_critics,
             use_phase_actors=use_phase_actors,
             phase_metadata_index=phase_metadata_index,
+            use_gated_cuap=use_gated_cuap,
+            cuap_beta=cuap_beta,
+            cuap_gate_hidden_dim=cuap_gate_hidden_dim,
+            cuap_gate_init_prob=cuap_gate_init_prob,
+            cuap_gate_detach_actor_features=cuap_gate_detach_actor_features,
+            use_intent_relation=use_intent_relation,
+            intent_relation_beta_max=intent_relation_beta_max,
+            intent_relation_detach=intent_relation_detach,
+            intent_grid_size=intent_grid_size,
         )
     model.load_compatible_state_dict(payload["model_state_dict"])
     model.eval()
@@ -110,6 +156,8 @@ def evaluate_policy(
     total_reward = 0.0
     done = False
     info: dict[str, Any] = {}
+    cuap_diagnostics = _empty_cuap_diagnostics()
+    cir_diagnostics = _empty_cir_diagnostics()
 
     while not done:
         obs_tensor = torch.as_tensor(observation, dtype=torch.float32)
@@ -127,6 +175,7 @@ def evaluate_policy(
         )
         action_mask = torch.as_tensor(env.action_masks(), dtype=torch.bool) if config.ppo.use_action_mask else None
         action_prior = _action_prior_tensor(config, env)
+        cuap_tensors = _cuap_step_tensors(config, env)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -136,8 +185,11 @@ def evaluate_policy(
                 node_messages=node_messages,
                 action_mask=action_mask,
                 action_prior_logits=action_prior,
+                **cuap_tensors,
                 deterministic=deterministic,
             )
+        _record_cuap_diagnostics(model, cuap_diagnostics)
+        _record_cir_diagnostics(model, cir_diagnostics)
         result = env.step(actions.cpu().numpy().tolist())
         rewards = np.asarray(result.reward, dtype=np.float32)
         total_reward += float(rewards.mean() if rewards.ndim > 0 else rewards)
@@ -168,6 +220,8 @@ def evaluate_policy(
             stall_steps=stall_steps,
         )
     )
+    summary.update(_summarize_cuap_diagnostics(cuap_diagnostics))
+    summary.update(_summarize_cir_diagnostics(cir_diagnostics))
     if output_path is not None:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -202,6 +256,8 @@ def evaluate_two_phase_policy(
     total_reward = 0.0
     done = False
     info: dict[str, Any] = {}
+    cuap_diagnostics = _empty_cuap_diagnostics()
+    cir_diagnostics = _empty_cir_diagnostics()
     phase_steps = {"coverage": 0, "return": 0}
 
     while not done:
@@ -222,6 +278,7 @@ def evaluate_two_phase_policy(
         )
         action_mask = torch.as_tensor(env.action_masks(), dtype=torch.bool) if config.ppo.use_action_mask else None
         action_prior = _action_prior_tensor(config, env)
+        cuap_tensors = _cuap_step_tensors(config, env)
         with torch.no_grad():
             actions, _, _ = model.act_batch(
                 obs_tensor,
@@ -231,8 +288,11 @@ def evaluate_two_phase_policy(
                 node_messages=node_messages,
                 action_mask=action_mask,
                 action_prior_logits=action_prior,
+                **cuap_tensors,
                 deterministic=deterministic,
             )
+        _record_cuap_diagnostics(model, cuap_diagnostics)
+        _record_cir_diagnostics(model, cir_diagnostics)
         result = env.step(actions.cpu().numpy().tolist())
         rewards = np.asarray(result.reward, dtype=np.float32)
         total_reward += float(rewards.mean() if rewards.ndim > 0 else rewards)
@@ -266,6 +326,8 @@ def evaluate_two_phase_policy(
             stall_steps=stall_steps,
         )
     )
+    summary.update(_summarize_cuap_diagnostics(cuap_diagnostics))
+    summary.update(_summarize_cir_diagnostics(cir_diagnostics))
     if output_path is not None:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -333,10 +395,110 @@ def _validate_cuap_config(config: ExperimentConfig, env: GridCoverageEnv) -> Non
 
 
 def _action_prior_tensor(config: ExperimentConfig, env: GridCoverageEnv) -> torch.Tensor | None:
+    if config.cuap.gated:
+        return None
     prior = scaled_cuap_prior(env, config.cuap, phase="return" if env.return_mode else "coverage")
     if prior is None:
         return None
     return torch.as_tensor(prior, dtype=torch.float32)
+
+
+def _cuap_step_tensors(config: ExperimentConfig, env: GridCoverageEnv) -> dict[str, torch.Tensor]:
+    if not config.cuap.enabled or not config.cuap.gated:
+        return {}
+    inputs = build_cuap_step_inputs(env, config.cuap, phase="return" if env.return_mode else "coverage")
+    return {
+        "cuap_prior": torch.as_tensor(inputs.prior, dtype=torch.float32),
+        "cuap_confidence": torch.as_tensor(inputs.confidence, dtype=torch.float32),
+        "cuap_phase_mask": torch.as_tensor(inputs.phase_mask, dtype=torch.float32),
+    }
+
+
+def _empty_cuap_diagnostics() -> dict[str, list[float]]:
+    return {
+        "gate": [],
+        "effective_strength": [],
+        "argmax_change": [],
+        "prior_margin": [],
+        "prior_spread": [],
+    }
+
+
+def _record_cuap_diagnostics(model: ActorCritic, diagnostics: dict[str, list[float]]) -> None:
+    if model.latest_applied_gate is not None:
+        diagnostics["gate"].extend(_flatten_tensor_values(model.latest_applied_gate))
+    if model.latest_effective_strength is not None:
+        diagnostics["effective_strength"].extend(_flatten_tensor_values(model.latest_effective_strength))
+    if model.latest_argmax_change is not None:
+        diagnostics["argmax_change"].extend(_flatten_tensor_values(model.latest_argmax_change.float()))
+    if model.latest_cuap_confidence is not None:
+        confidence = model.latest_cuap_confidence.detach().cpu().numpy().reshape(-1, model.latest_cuap_confidence.shape[-1])
+        if confidence.shape[-1] >= 2:
+            diagnostics["prior_margin"].extend(float(item) for item in confidence[:, 0])
+            diagnostics["prior_spread"].extend(float(item) for item in confidence[:, 1])
+
+
+def _summarize_cuap_diagnostics(diagnostics: dict[str, list[float]]) -> dict[str, float]:
+    gate = np.asarray(diagnostics["gate"], dtype=np.float32)
+    if gate.size == 0:
+        return {}
+    effective_strength = np.asarray(diagnostics["effective_strength"], dtype=np.float32)
+    argmax_change = np.asarray(diagnostics["argmax_change"], dtype=np.float32)
+    prior_margin = np.asarray(diagnostics["prior_margin"], dtype=np.float32)
+    prior_spread = np.asarray(diagnostics["prior_spread"], dtype=np.float32)
+    return {
+        "gate_mean": float(gate.mean()),
+        "gate_std": float(gate.std()),
+        "gate_p10": float(np.percentile(gate, 10)),
+        "gate_p50": float(np.percentile(gate, 50)),
+        "gate_p90": float(np.percentile(gate, 90)),
+        "effective_strength": float(effective_strength.mean()) if effective_strength.size else 0.0,
+        "argmax_change_rate": float(argmax_change.mean()) if argmax_change.size else 0.0,
+        "prior_margin": float(prior_margin.mean()) if prior_margin.size else 0.0,
+        "prior_spread": float(prior_spread.mean()) if prior_spread.size else 0.0,
+    }
+
+
+def _flatten_tensor_values(tensor: torch.Tensor) -> list[float]:
+    return [float(item) for item in tensor.detach().cpu().reshape(-1)]
+
+
+def _empty_cir_diagnostics() -> dict[str, list[float]]:
+    return {
+        "beta": [],
+        "overlap": [],
+        "overlap_nonzero": [],
+        "attention_entropy": [],
+    }
+
+
+def _record_cir_diagnostics(model: ActorCritic, diagnostics: dict[str, list[float]]) -> None:
+    if model.latest_intent_beta is not None:
+        diagnostics["beta"].extend(_flatten_tensor_values(model.latest_intent_beta))
+    if model.latest_intent_overlap is not None:
+        overlap = model.latest_intent_overlap.detach()
+        mask = model.latest_intent_mask
+        if mask is not None:
+            overlap = overlap[mask.to(device=overlap.device, dtype=torch.bool)]
+        diagnostics["overlap"].extend(_flatten_tensor_values(overlap))
+        diagnostics["overlap_nonzero"].extend(_flatten_tensor_values((overlap > 1e-6).float()))
+    if model.latest_attention_entropy is not None:
+        diagnostics["attention_entropy"].extend(_flatten_tensor_values(model.latest_attention_entropy))
+
+
+def _summarize_cir_diagnostics(diagnostics: dict[str, list[float]]) -> dict[str, float]:
+    overlap = np.asarray(diagnostics["overlap"], dtype=np.float32)
+    if overlap.size == 0:
+        return {}
+    beta = np.asarray(diagnostics["beta"], dtype=np.float32)
+    overlap_nonzero = np.asarray(diagnostics["overlap_nonzero"], dtype=np.float32)
+    attention_entropy = np.asarray(diagnostics["attention_entropy"], dtype=np.float32)
+    return {
+        "cir_beta": float(beta.mean()) if beta.size else 0.0,
+        "intent_conflict_rate": float(overlap.mean()),
+        "intent_conflict_nonzero": float(overlap_nonzero.mean()) if overlap_nonzero.size else 0.0,
+        "attention_entropy": float(attention_entropy.mean()) if attention_entropy.size else 0.0,
+    }
 
 
 def _normalize_budgets(budgets: list[int] | None, max_steps: int) -> list[int]:
