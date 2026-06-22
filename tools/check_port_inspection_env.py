@@ -25,7 +25,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Smoke-check the port inspection scheduling environment.")
-    parser.add_argument("--config", default="configs/port_shanghai_yangshan_v1.toml")
+    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
     parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
@@ -89,16 +89,29 @@ def _platforms_from_config(config: dict[str, object], depot: tuple[int, int]):
             prefix = str(profile.get("platform_type", profile_name.split("_", 1)[0])).upper()
             counts[prefix] = counts.get(prefix, 0) + 1
             platforms.append(platform_from_profile(f"{prefix}-{counts[prefix]}", profile_name, profile, depot))
+        _attach_platform_depots(platforms, config)
         return platforms
 
     platform_config = dict(config.get("platform", {}))
-    return create_platforms(
+    platforms = create_platforms(
         depot=depot,
         uav_count=int(config.get("uav_count", 1)),
         usv_count=int(config.get("usv_count", 1)),
         uav_config=dict(platform_config.get("uav", {})),
         usv_config=dict(platform_config.get("usv", {})),
     )
+    _attach_platform_depots(platforms, config)
+    return platforms
+
+
+def _attach_platform_depots(platforms, config: dict[str, object]) -> None:
+    platform_depots = dict(config.get("platform_depots", {}))
+    for platform in platforms:
+        depot = platform_depots.get(platform.platform_type.lower()) or platform_depots.get(platform.platform_type.upper())
+        if isinstance(depot, (list, tuple)) and len(depot) == 2:
+            platform.current_cell = (int(depot[0]), int(depot[1]))
+            platform.route = [platform.current_cell]
+            platform.metadata["depot_cell"] = list(platform.current_cell)
 
 
 def _load_config(path: str | Path) -> dict[str, object]:

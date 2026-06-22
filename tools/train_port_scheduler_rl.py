@@ -28,7 +28,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Train the frozen UAV-USV inspection scheduler with CTDE MAPPO.")
-    parser.add_argument("--config", default="configs/port_shanghai_yangshan_v1.toml")
+    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=20260615)
     args = parser.parse_args()

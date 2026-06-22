@@ -1,0 +1,73 @@
+{
+  "dataset_name": "yangshan_task_initial_v1",
+  "source_dir": "D:\\地图\\任务初版",
+  "grid_path": "data\\ports\\yangshan_task_initial_v1\\yangshan_task_initial_v1_grid.json",
+  "tasks_path": "data\\ports\\yangshan_task_initial_v1\\yangshan_task_initial_v1_tasks.json",
+  "config_path": "configs\\port_yangshan_task_initial_v1.toml",
+  "coordinate_resolution_m": 100.0,
+  "grid_shape": [
+    110,
+    159
+  ],
+  "fixed_task_count": 219,
+  "dynamic_seed_count": 3,
+  "task_count": 222,
+  "task_class_counts": {
+    "navigation_aid": 14,
+    "waterside_structure": 205,
+    "floating_object": 3
+  },
+  "risk_counts": {
+    "3": 66,
+    "1": 120,
+    "2": 36
+  },
+  "platform_depots": {
+    "UAV": [
+      73,
+      110
+    ],
+    "USV": [
+      73,
+      110
+    ]
+  },
+  "generated_depots": [
+    {
+      "depot_id": "COAST_AUTO_01",
+      "source_kind": "user_defined_coastline",
+      "placement_rule": "nearest source_port_coastline vertex to task centroid",
+      "x_utm": 413417.0708527102,
+      "y_utm": 3387038.834991322,
+      "cell": [
+        73,
+        110
+      ],
+      "platform_type": "UAV"
+    },
+    {
+      "depot_id": "COAST_AUTO_01",
+      "source_kind": "user_defined_coastline",
+      "placement_rule": "nearest source_port_coastline vertex to task centroid",
+      "x_utm": 413417.0708527102,
+      "y_utm": 3387038.834991322,
+      "cell": [
+        73,
+        110
+      ],
+      "platform_type": "USV"
+    }
+  ],
+  "source_layer_counts": {
+    "depots": 2,
+    "dynamic_event_zones": 5,
+    "navigation_aid_tasks": 14,
+    "port_area_reference": 2,
+    "simulated_dynamic_seed_tasks": 3,
+    "source_breakwaters": 8,
+    "source_piers": 35,
+    "source_port_coastline": 2,
+    "study_area": 1,
+    "waterside_structure_tasks": 205
+  }
+}

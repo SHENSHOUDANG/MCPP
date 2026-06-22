@@ -196,10 +196,10 @@ class PortInspectionSchedulingEnv:
         self.tasks = copy.deepcopy(self.base_tasks)
         self.platforms = copy.deepcopy(self.base_platforms)
         for platform in self.platforms:
-            platform.current_cell = self.grid.depot
+            platform.current_cell = self._platform_depot(platform)
             platform.energy = platform.energy_capacity
             platform.current_load = 0.0
-            platform.route = [self.grid.depot]
+            platform.route = [platform.current_cell]
             platform.mode = MODE_IDLE
             platform.current_task_id = None
             platform.current_stage = None
@@ -382,9 +382,10 @@ class PortInspectionSchedulingEnv:
             for candidate in candidates[: self.candidate_k]:
                 masks[platform_index, candidate.relative_position] = candidate.feasible
             masks[platform_index, self.wait_action] = True
-            masks[platform_index, self.return_action] = platform.current_cell != self.grid.depot
+            depot = self._platform_depot(platform)
+            masks[platform_index, self.return_action] = platform.current_cell != depot
             if not any(candidate.feasible for candidate in candidates) and self._must_return(platform):
-                masks[platform_index, self.return_action] = platform.current_cell != self.grid.depot
+                masks[platform_index, self.return_action] = platform.current_cell != depot
         return masks
 
     def flat_action_mask(self) -> np.ndarray:
@@ -679,7 +680,7 @@ class PortInspectionSchedulingEnv:
     def _must_return(self, platform: Platform) -> bool:
         return_energy = self._energy_for_travel(
             platform,
-            self._travel_distance(platform, platform.current_cell, self.grid.depot),
+            self._travel_distance(platform, platform.current_cell, self._platform_depot(platform)),
         )
         return platform.energy <= return_energy + platform.return_reserve_ratio
 
@@ -766,7 +767,7 @@ class PortInspectionSchedulingEnv:
                 self.total_energy += step_energy
                 energy_cost += step_energy
                 if platform.remaining_travel_time <= 0:
-                    platform.current_cell = self.grid.depot
+                    platform.current_cell = self._platform_depot(platform)
                     segment_length = int(pending.get("path_length", 0))
                     path_length += segment_length
                     self.total_path_length += segment_length
@@ -933,12 +934,13 @@ class PortInspectionSchedulingEnv:
 
     def _start_return(self, platform_index: int) -> None:
         platform = self.platforms[platform_index]
-        travel = self._travel_distance(platform, platform.current_cell, self.grid.depot)
+        depot = self._platform_depot(platform)
+        travel = self._travel_distance(platform, platform.current_cell, depot)
         energy = self._energy_for_travel(platform, travel)
         platform.mode = MODE_RETURN
         platform.current_task_id = None
         platform.current_stage = None
-        platform.target_cell = self.grid.depot
+        platform.target_cell = depot
         platform.remaining_travel_time = float(max(1 if travel > 0 else 0, int(ceil(travel))))
         platform.metadata["pending_cost"] = {
             "path_length": int(travel),
@@ -950,6 +952,8 @@ class PortInspectionSchedulingEnv:
     def _travel_distance(self, platform: Platform, start: GridCell, goal: GridCell) -> int:
         if start == goal:
             return 0
+        if self._uses_coordinate_distance():
+            return self._coordinate_distance(start, goal)
         if platform.platform_type == "UAV":
             return abs(start[0] - goal[0]) + abs(start[1] - goal[1])
         return max(len(shortest_path(self.grid, start, goal)) - 1, 0)
@@ -961,7 +965,21 @@ class PortInspectionSchedulingEnv:
         return minutes / max(float(platform.endurance_minutes), 1.0) * max(platform.energy_rate_per_cell, 0.1)
 
     def _cell_distance(self, left: GridCell, right: GridCell) -> int:
+        if self._uses_coordinate_distance():
+            return self._coordinate_distance(left, right)
         return abs(left[0] - right[0]) + abs(left[1] - right[1])
+
+    def _uses_coordinate_distance(self) -> bool:
+        return str(self.grid.metadata.get("distance_mode", "")).lower() == "utm_euclidean"
+
+    def _coordinate_distance(self, left: GridCell, right: GridCell) -> int:
+        return int(round(((left[0] - right[0]) ** 2 + (left[1] - right[1]) ** 2) ** 0.5))
+
+    def _platform_depot(self, platform: Platform) -> GridCell:
+        depot = platform.metadata.get("depot_cell")
+        if isinstance(depot, (list, tuple)) and len(depot) == 2:
+            return int(depot[0]), int(depot[1])
+        return self.grid.depot
 
     def _platform_features(self, platform: Platform) -> list[float]:
         height = max(self.grid.height - 1, 1)

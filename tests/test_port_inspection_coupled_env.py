@@ -27,7 +27,7 @@ import torch
 
 class PortInspectionCoupledEnvTests(unittest.TestCase):
     def test_screening_triggers_review_and_usv_closes_task(self) -> None:
-        config = _load_config(ROOT / "configs" / "port_dalian_water_v0.toml")
+        config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
         env = build_env(config)
         env.reset(seed=7)
 
@@ -38,18 +38,26 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertEqual(env.return_action, env.candidate_k + 2)
 
         uav_index = next(index for index, platform in enumerate(env.platforms) if platform.platform_type == "UAV")
-        screening = next(
-            candidate
-            for candidate in env.candidate_lists()[uav_index]
-            if candidate.task_stage == STAGE_SCREENING and env.tasks[candidate.task_index].risk >= 3
-        )
+        screening_position = min(
+            (
+                candidate
+                for candidate in env.candidate_lists()[uav_index]
+                if candidate.task_stage == STAGE_SCREENING and env.tasks[candidate.task_index].risk >= 3
+            ),
+            key=lambda candidate: candidate.estimated_finish_time,
+        ).relative_position
 
         actions = [env.wait_action for _ in env.platforms]
-        actions[uav_index] = screening.relative_position
-        env.step(actions)
+        actions[uav_index] = screening_position
+        result = env.step(actions)
+        accepted_screening = next(
+            accepted
+            for accepted in result.info["accepted_actions"]
+            if accepted["platform_id"] == env.platforms[uav_index].platform_id and accepted["stage"] == STAGE_SCREENING
+        )
+        task = next(task for task in env.tasks if task.task_id == accepted_screening["task_id"])
         self.assertTrue(env.action_masks()[uav_index, env.continue_action])
-        _continue_until(env, lambda: env.tasks[screening.task_index].state == TASK_AWAITING_REVIEW)
-        task = env.tasks[screening.task_index]
+        _continue_until(env, lambda: task.state == TASK_AWAITING_REVIEW)
         self.assertEqual(task.state, TASK_AWAITING_REVIEW)
         self.assertTrue(task.review_required)
         self.assertIsNotNone(task.screening_result)
@@ -74,7 +82,7 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertEqual(task.review_result, int(task.true_anomaly))
 
     def test_model_interface_exposes_local_state_masks_and_metrics(self) -> None:
-        config = _load_config(ROOT / "configs" / "port_dalian_water_v0.toml")
+        config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
         env = build_env(config)
 
         reset = env.reset_model(seed=11)
@@ -113,7 +121,7 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertIn("total_invalid_actions", step.info["metrics"])
 
     def test_heterogeneous_mappo_rollout_update_smoke(self) -> None:
-        config = _load_config(ROOT / "configs" / "port_dalian_water_v0.toml")
+        config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
         env = build_env(config)
         reset = env.reset_model(seed=19)
         model = HeterogeneousMappo(env.local_observation_dim, env.action_choices, hidden_dim=32)
@@ -147,7 +155,7 @@ def _load_config(path: Path) -> dict[str, object]:
         return tomllib.load(handle)
 
 
-def _continue_until(env, predicate, limit: int = 64) -> None:
+def _continue_until(env, predicate, limit: int = 128) -> None:
     for _ in range(limit):
         if predicate():
             return

@@ -34,14 +34,14 @@ from mathbased_mcpp.port_inspection.simple_planner import shortest_path
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Render an OSM-based port inspection scheduling result.")
-    parser.add_argument("--config", default="configs/port_shanghai_yangshan_v1.toml")
+    parser = argparse.ArgumentParser(description="Render a QGIS task-map port inspection scheduling result.")
+    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--steps", type=int, default=24)
     parser.add_argument("--strategy", choices=("legacy_order", "global_score"), default="global_score")
     parser.add_argument(
         "--output",
-        default="outputs/port_inspection/shanghai_yangshan_osm_v1/schedule_result_seed11.png",
+        default="outputs/port_inspection/yangshan_task_initial_v1/schedule_result_seed11.png",
     )
     args = parser.parse_args()
 

@@ -52,7 +52,7 @@ def estimate_task_cost(platform: Platform, task: InspectionTask, grid: PortGridM
 def point_task_path_proxy(platform: Platform, task: InspectionTask, grid: PortGridMap, stage: str | None = None) -> TaskCost:
     entry = task.entry_cell
     travel_len = _travel_distance(platform, grid, platform.current_cell, entry)
-    return_len = _travel_distance(platform, grid, entry, grid.depot)
+    return_len = _travel_distance(platform, grid, entry, _platform_depot(platform, grid))
     return _cost_from_lengths(platform, grid, task, travel_len, return_len, entry, entry, coverage_ratio=1.0, stage=stage)
 
 
@@ -64,7 +64,7 @@ def line_task_path_proxy(platform: Platform, task: InspectionTask, grid: PortGri
         path_len, entry, exit_cell = backward
     else:
         path_len, entry, exit_cell = forward
-    return_len = _travel_distance(platform, grid, exit_cell, grid.depot)
+    return_len = _travel_distance(platform, grid, exit_cell, _platform_depot(platform, grid))
     return _cost_from_lengths(platform, grid, task, path_len, return_len, entry, exit_cell, coverage_ratio=1.0, stage=stage)
 
 
@@ -76,7 +76,7 @@ def area_task_execute_stub(task: InspectionTask, platform: Platform, grid: PortG
     sweep_len = max(1, coverage_cells // max(platform.coverage_width_cells, 1))
     transfer_len = _travel_distance(platform, grid, entry, exit_cell)
     path_len = travel_len + sweep_len + transfer_len
-    return_len = _travel_distance(platform, grid, exit_cell, grid.depot)
+    return_len = _travel_distance(platform, grid, exit_cell, _platform_depot(platform, grid))
     return _cost_from_lengths(platform, grid, task, path_len, return_len, entry, exit_cell, coverage_ratio=task.coverage_threshold, stage=stage)
 
 
@@ -90,12 +90,29 @@ def _line_length(platform: Platform, grid: PortGridMap, start: GridCell, cells: 
 
 
 def _travel_distance(platform: Platform, grid: PortGridMap, start: GridCell, goal: GridCell) -> int:
+    if _uses_coordinate_distance(grid):
+        return _coordinate_distance(start, goal)
     if platform.platform_type == "UAV":
         return abs(start[0] - goal[0]) + abs(start[1] - goal[1])
     key = (grid.name, start, goal)
     if key not in _USV_DISTANCE_CACHE:
         _USV_DISTANCE_CACHE[key] = max(len(shortest_path(grid, start, goal)) - 1, 0)
     return _USV_DISTANCE_CACHE[key]
+
+
+def _uses_coordinate_distance(grid: PortGridMap) -> bool:
+    return str(grid.metadata.get("distance_mode", "")).lower() == "utm_euclidean"
+
+
+def _coordinate_distance(start: GridCell, goal: GridCell) -> int:
+    return int(round(((start[0] - goal[0]) ** 2 + (start[1] - goal[1]) ** 2) ** 0.5))
+
+
+def _platform_depot(platform: Platform, grid: PortGridMap) -> GridCell:
+    depot = platform.metadata.get("depot_cell")
+    if isinstance(depot, (list, tuple)) and len(depot) == 2:
+        return int(depot[0]), int(depot[1])
+    return grid.depot
 
 
 def _cost_from_lengths(

@@ -39,8 +39,8 @@ DEFAULT_BBOX = {
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Overlay UAV-USV scheduling on a real ArcGIS/OSM map image.")
-    parser.add_argument("--config", default="configs/port_shanghai_yangshan_v1.toml")
+    parser = argparse.ArgumentParser(description="Overlay UAV-USV scheduling on a map image.")
+    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
     parser.add_argument(
         "--background",
         default="outputs/real_map_tiles/yangshan_arcgis_world_imagery_export_hires.png",
@@ -51,7 +51,7 @@ def main() -> None:
     parser.add_argument("--show-all-tasks", action="store_true", help="Show every model task instead of only scheduled tasks.")
     parser.add_argument(
         "--output",
-        default="outputs/real_map_tiles/yangshan_arcgis_schedule_overlay_seed11.png",
+        default="outputs/real_map_tiles/yangshan_task_initial_schedule_overlay_seed11.png",
     )
     args = parser.parse_args()
 
