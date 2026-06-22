@@ -1,0 +1,58 @@
+[profiles.UAV_H_M350]
+platform_type = "UAV"
+speed_mps = 10.0
+max_speed_mps = 23.0
+endurance_min = 40.0
+nominal_endurance_min = 55.0
+return_reserve_ratio = 0.20
+energy_capacity = 1.0
+energy_rate = 1.0
+sensor_radius_m = 600.0
+payload_kg = 2.7
+coverage_width_cells = 3
+allowed_task_types = ["point"]
+preferred_task_types = ["point"]
+
+[profiles.UAV_M_M30]
+platform_type = "UAV"
+speed_mps = 9.0
+max_speed_mps = 23.0
+endurance_min = 30.0
+nominal_endurance_min = 41.0
+return_reserve_ratio = 0.20
+energy_capacity = 1.0
+energy_rate = 1.0
+sensor_radius_m = 400.0
+payload_kg = 1.0
+coverage_width_cells = 2
+allowed_task_types = ["point"]
+preferred_task_types = ["point"]
+
+[profiles.USV_P_M75]
+platform_type = "USV"
+speed_mps = 4.0
+max_speed_mps = 12.8
+endurance_min = 300.0
+return_reserve_ratio = 0.15
+energy_capacity = 1.0
+energy_rate = 1.0
+sensor_radius_m = 200.0
+payload_kg = 50.0
+coverage_width_cells = 1
+allowed_task_types = ["point"]
+preferred_task_types = ["point"]
+
+[profiles.USV_S_SURVEY]
+platform_type = "USV"
+speed_mps = 2.5
+max_speed_mps = 5.0
+endurance_min = 360.0
+optional_hybrid_endurance_min = 1440.0
+return_reserve_ratio = 0.15
+energy_capacity = 1.0
+energy_rate = 1.0
+sensor_radius_m = 150.0
+payload_kg = 80.0
+coverage_width_cells = 1
+allowed_task_types = ["point"]
+preferred_task_types = ["point"]

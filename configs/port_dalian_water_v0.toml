@@ -1,0 +1,51 @@
+grid_path = "data/ports/dalian_port_v0/dalian_port_v0_grid.json"
+tasks_path = "data/ports/dalian_port_v0/dalian_port_v0_tasks.json"
+output_dir = "outputs/port_inspection/dalian_port_v0"
+uav_count = 2
+usv_count = 2
+depot = [45, 5]
+
+[platform.uav]
+speed_mps = 18.0
+endurance_minutes = 35.0
+allowed_task_types = ["point"]
+
+[platform.usv]
+speed_mps = 5.0
+endurance_minutes = 180.0
+allowed_task_types = ["point"]
+
+[scheduling]
+risk_weight = 12.0
+distance_weight = 0.08
+load_weight = 0.35
+compatibility_bonus = 4.0
+
+[scheduler_rl]
+max_steps = 64
+candidate_k = 8
+
+[scheduler_rl.reward]
+team_close_reward = 8.0
+screen_progress_reward = 1.0
+review_progress_reward = 1.5
+energy_cost = 0.5
+time_cost = 0.01
+invalid_penalty = 5.0
+conflict_penalty = 1.0
+
+[review_trigger]
+confidence_threshold = 0.65
+mandatory_review_risk = 3
+base_review_deadline = 36.0
+risk_deadline_scale = 4.0
+confidence_deadline_scale = 3.0
+sensitivity = 0.85
+specificity = 0.80
+confidence_noise = 0.08
+uncertainty_base = 0.35
+
+[review_trigger.anomaly_probability_by_risk]
+1 = 0.10
+2 = 0.25
+3 = 0.45
