@@ -1,0 +1,14 @@
+{
+  "episode": 1082,
+  "steps": 259680,
+  "episode_reward": 3294.325782772905,
+  "completed_tasks": 62,
+  "risk_exposure_sum": 62640.0,
+  "late_tasks": 1,
+  "total_path_length": 2530,
+  "total_energy": 13.948434454191082,
+  "total_conflicts": 6,
+  "total_invalid_actions": 2,
+  "total_replenishments": 16,
+  "total_returns": 18
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+import copy
 import random
 from typing import Any, Sequence
 
@@ -65,6 +66,12 @@ class GridCoverageEnv:
         self.known_obstacles_by_agent: list[set[GridPosition]] = [set()]
         self.known_team_covered_by_agent: list[set[GridPosition]] = [{config.start}]
         self._node_message_cache: list[np.ndarray | None] = [None]
+        self._canonical_layers_cache: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None
+        self._global_state_cache: np.ndarray | None = None
+        self._observations_cache: np.ndarray | None = None
+        self._action_masks_cache: np.ndarray | None = None
+        self._neighbor_mask_cache: np.ndarray | None = None
+        self._neighbor_features_cache: np.ndarray | None = None
         self.last_novel_step_by_agent: list[int] = [0]
         self.path_lengths: list[int] = [0]
         self.path_length = 0
@@ -81,6 +88,76 @@ class GridCoverageEnv:
         self.last_broadcast_completion = False
         self._build_map()
         self._sync_legacy_aliases()
+
+    def state_dict(self) -> dict[str, Any]:
+        return {
+            "random_state": self.random.getstate(),
+            "start_position": self.start_position,
+            "start_positions": copy.deepcopy(self.start_positions),
+            "row_flip": self._row_flip,
+            "col_flip": self._col_flip,
+            "obstacles": copy.deepcopy(self.obstacles),
+            "free_cells": copy.deepcopy(self.free_cells),
+            "covered": copy.deepcopy(self.covered),
+            "positions": copy.deepcopy(self.positions),
+            "teammate_positions": copy.deepcopy(self.teammate_positions),
+            "paths": copy.deepcopy(self.paths),
+            "covered_by_agent": copy.deepcopy(self.covered_by_agent),
+            "known_free_by_agent": copy.deepcopy(self.known_free_by_agent),
+            "known_obstacles_by_agent": copy.deepcopy(self.known_obstacles_by_agent),
+            "known_team_covered_by_agent": copy.deepcopy(self.known_team_covered_by_agent),
+            "node_message_cache": copy.deepcopy(self._node_message_cache),
+            "last_novel_step_by_agent": copy.deepcopy(self.last_novel_step_by_agent),
+            "path_lengths": copy.deepcopy(self.path_lengths),
+            "step_count": self.step_count,
+            "reset_count": self.reset_count,
+            "done": self.done,
+            "last_blocked_cells": copy.deepcopy(self.last_blocked_cells),
+            "last_new_cells": self.last_new_cells,
+            "last_collision_agents": self.last_collision_agents,
+            "return_mode": self.return_mode,
+            "broadcast_coverage_sent": self.broadcast_coverage_sent,
+            "broadcast_completion_sent": self.broadcast_completion_sent,
+            "last_broadcast_coverage": self.last_broadcast_coverage,
+            "last_broadcast_completion": self.last_broadcast_completion,
+        }
+
+    def load_state_dict(self, state: dict[str, Any]) -> None:
+        random_state = state.get("random_state")
+        if random_state is not None:
+            self.random.setstate(random_state)
+        self.start_position = tuple(state["start_position"])  # type: ignore[assignment]
+        self.start_positions = [tuple(item) for item in state["start_positions"]]
+        self._row_flip = int(state["row_flip"])
+        self._col_flip = int(state["col_flip"])
+        self.obstacles = {tuple(item) for item in state["obstacles"]}
+        self.free_cells = {tuple(item) for item in state["free_cells"]}
+        self.covered = {tuple(item) for item in state["covered"]}
+        self.positions = [tuple(item) for item in state["positions"]]
+        self.teammate_positions = [tuple(item) for item in state["teammate_positions"]]
+        self.paths = [[tuple(cell) for cell in path] for path in state["paths"]]
+        self.covered_by_agent = [{tuple(cell) for cell in cells} for cells in state["covered_by_agent"]]
+        self.known_free_by_agent = [{tuple(cell) for cell in cells} for cells in state["known_free_by_agent"]]
+        self.known_obstacles_by_agent = [{tuple(cell) for cell in cells} for cells in state["known_obstacles_by_agent"]]
+        self.known_team_covered_by_agent = [
+            {tuple(cell) for cell in cells} for cells in state["known_team_covered_by_agent"]
+        ]
+        self._node_message_cache = copy.deepcopy(state.get("node_message_cache", [None for _ in self.positions]))
+        self.last_novel_step_by_agent = [int(item) for item in state["last_novel_step_by_agent"]]
+        self.path_lengths = [int(item) for item in state["path_lengths"]]
+        self.step_count = int(state["step_count"])
+        self.reset_count = int(state["reset_count"])
+        self.done = bool(state["done"])
+        self.last_blocked_cells = {tuple(item) for item in state["last_blocked_cells"]}
+        self.last_new_cells = int(state["last_new_cells"])
+        self.last_collision_agents = int(state["last_collision_agents"])
+        self.return_mode = bool(state["return_mode"])
+        self.broadcast_coverage_sent = bool(state["broadcast_coverage_sent"])
+        self.broadcast_completion_sent = bool(state["broadcast_completion_sent"])
+        self.last_broadcast_coverage = bool(state["last_broadcast_coverage"])
+        self.last_broadcast_completion = bool(state["last_broadcast_completion"])
+        self._sync_legacy_aliases()
+        self._clear_cached_views(clear_messages=False)
 
     @property
     def num_agents(self) -> int:
@@ -159,6 +236,7 @@ class GridCoverageEnv:
             self.broadcast_coverage_sent = True
             self.broadcast_completion_sent = True
         self._sync_legacy_aliases()
+        self._clear_cached_views(clear_messages=True)
         self._refresh_explicit_map_memory()
         observations = self._observations()
         return observations[0] if self.num_agents == 1 else observations
@@ -222,6 +300,7 @@ class GridCoverageEnv:
         self.obstacles = obstacles
         self.free_cells = free_cells
         self._sync_legacy_aliases()
+        self._clear_cached_views(clear_messages=False)
         return obs
 
     def step(self, action: int | Sequence[int]) -> StepResult:
@@ -240,7 +319,9 @@ class GridCoverageEnv:
         return self._step_multi(actions)
 
     def global_state(self) -> np.ndarray:
-        return self._global_state_from_layers(self._canonical_layers())
+        if self._global_state_cache is None:
+            self._global_state_cache = self._global_state_from_layers(self._canonical_layers())
+        return self._global_state_cache
 
     def _global_state_from_layers(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]) -> np.ndarray:
         all_agents, uncovered, team_covered, obstacles, blocked = layers
@@ -270,6 +351,7 @@ class GridCoverageEnv:
 
     def set_teammate_positions(self, positions: list[GridPosition]) -> None:
         self.teammate_positions = self._valid_teammate_positions(positions)
+        self._clear_cached_views(clear_messages=True)
 
     def peek(self, action: int, agent_index: int = 0) -> tuple[GridPosition, bool]:
         actual_action = self._actual_action(action)
@@ -303,6 +385,8 @@ class GridCoverageEnv:
         return [action for action in ACTIONS if self.peek(action, agent_index=agent_index)[1]]
 
     def action_masks(self) -> np.ndarray:
+        if self._action_masks_cache is not None:
+            return self._action_masks_cache
         masks: list[list[bool]] = []
         for agent_index in range(self.num_agents):
             if self.return_mode and self.config.use_depot and self.positions[agent_index] == self.depot_position:
@@ -312,7 +396,8 @@ class GridCoverageEnv:
                 continue
             base_mask = [self.peek(action, agent_index=agent_index)[1] for action in ACTIONS]
             masks.append(self._depot_dispatch_mask(agent_index, base_mask))
-        return np.asarray(masks, dtype=bool)
+        self._action_masks_cache = np.asarray(masks, dtype=bool)
+        return self._action_masks_cache
 
     def safe_actions(self, agent_index: int = 0) -> list[int]:
         actions = []
@@ -403,18 +488,24 @@ class GridCoverageEnv:
         return self.coverage_completed()
 
     def neighbor_mask(self) -> np.ndarray:
+        if self._neighbor_mask_cache is not None:
+            return self._neighbor_mask_cache
         mask = np.eye(self.num_agents, dtype=bool)
         radius = max(self.config.communication_radius, 0)
         if radius <= 0:
-            return mask
+            self._neighbor_mask_cache = mask
+            return self._neighbor_mask_cache
         for first in range(self.num_agents):
             for second in range(first + 1, self.num_agents):
                 if self._manhattan(self.positions[first], self.positions[second]) <= radius:
                     mask[first, second] = True
                     mask[second, first] = True
-        return mask
+        self._neighbor_mask_cache = mask
+        return self._neighbor_mask_cache
 
     def neighbor_features(self) -> np.ndarray:
+        if self._neighbor_features_cache is not None:
+            return self._neighbor_features_cache
         features = np.zeros((self.num_agents, self.num_agents, self.neighbor_feature_dim), dtype=np.float32)
         radius = max(self.config.communication_radius, 0)
         distance_scale = max(radius, 1)
@@ -428,7 +519,8 @@ class GridCoverageEnv:
                 features[source, target, 1] = (target_position[0] - source_position[0]) / row_scale
                 features[source, target, 2] = (target_position[1] - source_position[1]) / col_scale
                 features[source, target, 3] = 1.0 if connected else 0.0
-        return features
+        self._neighbor_features_cache = features
+        return self._neighbor_features_cache
 
     def _step_single(self, action: int, scalar_action: bool) -> StepResult:
         previous_position = self.position
@@ -528,6 +620,7 @@ class GridCoverageEnv:
             )
         self.last_collision_agents = 0
         self._sync_legacy_aliases()
+        self._clear_cached_views(clear_messages=True)
         self._refresh_explicit_map_memory()
         layers = self._canonical_layers()
         observation = self._observations(layers)
@@ -677,6 +770,7 @@ class GridCoverageEnv:
             )
         self.done = self.mission_completed() or self.step_count >= self.config.max_steps
         self._sync_legacy_aliases()
+        self._clear_cached_views(clear_messages=True)
         self._refresh_explicit_map_memory()
         layers = self._canonical_layers()
         rewards = np.full(self.num_agents, reward, dtype=np.float32)
@@ -813,9 +907,13 @@ class GridCoverageEnv:
         return np.stack(self._node_message_cache).astype(np.float32)
 
     def _observations(self, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
+        if layers is None and self._observations_cache is not None:
+            return self._observations_cache
         if layers is None:
             layers = self._canonical_layers()
-        return np.stack([self._observation(index, layers) for index in range(self.num_agents)]).astype(np.float32)
+        observations = np.stack([self._observation(index, layers) for index in range(self.num_agents)]).astype(np.float32)
+        self._observations_cache = observations
+        return observations
 
     def _observation(self, agent_index: int = 0, layers: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None) -> np.ndarray:
         if layers is None:
@@ -1192,6 +1290,8 @@ class GridCoverageEnv:
         return float(current[0] - previous[0]), float(current[1] - previous[1])
 
     def _canonical_layers(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        if self._canonical_layers_cache is not None:
+            return self._canonical_layers_cache
         all_agents = np.zeros((self.config.height, self.config.width), dtype=np.float32)
         uncovered = np.zeros_like(all_agents)
         team_covered = np.zeros_like(all_agents)
@@ -1212,7 +1312,18 @@ class GridCoverageEnv:
             if 0 <= row < self.config.height and 0 <= col < self.config.width:
                 blocked[row, col] = 1.0
 
-        return all_agents, uncovered, team_covered, obstacles, blocked
+        self._canonical_layers_cache = all_agents, uncovered, team_covered, obstacles, blocked
+        return self._canonical_layers_cache
+
+    def _clear_cached_views(self, *, clear_messages: bool) -> None:
+        self._canonical_layers_cache = None
+        self._global_state_cache = None
+        self._observations_cache = None
+        self._action_masks_cache = None
+        self._neighbor_mask_cache = None
+        self._neighbor_features_cache = None
+        if clear_messages:
+            self._node_message_cache = [None for _ in self.positions]
 
     def _begin_step_events(self) -> None:
         self.last_broadcast_coverage = False

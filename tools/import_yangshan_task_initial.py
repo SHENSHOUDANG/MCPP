@@ -346,6 +346,8 @@ def fixed_task(row: dict[str, str], origin: dict[str, float]) -> dict[str, Any]:
         "cell": cell,
         "risk": risk,
         "service_time": service_time(task_class, facility_type, risk),
+        "screening_workload": screening_workload(task_class, facility_type, risk),
+        "review_workload": review_workload(task_class, facility_type, risk),
         "max_interval": max_interval(risk),
         "deadline": max_interval(risk),
         "allowed_platforms": ["UAV", "USV"],
@@ -380,9 +382,11 @@ def dynamic_task(row: dict[str, str], origin: dict[str, float]) -> dict[str, Any
         "type": f"dynamic_{event_family}",
         "cell": cell,
         "risk": risk,
-        "service_time": 4,
-        "max_interval": max_interval(risk),
-        "deadline": max_interval(risk),
+        "service_time": 1,
+        "screening_workload": 1.0,
+        "review_workload": 3.0,
+        "max_interval": dynamic_max_interval(risk),
+        "deadline": dynamic_max_interval(risk),
         "allowed_platforms": ["UAV", "USV"],
         "metadata": {
             "source_task_class": event_family,
@@ -414,19 +418,39 @@ def fixed_risk(task_class: str, facility_type: str) -> int:
 
 
 def service_time(task_class: str, facility_type: str, risk: int) -> int:
-    if task_class == "navigation_aid":
-        return 4 if risk >= 3 else 3
+    return int(screening_workload(task_class, facility_type, risk))
+
+
+def screening_workload(task_class: str, facility_type: str, risk: int) -> float:
     if "breakwater" in facility_type or "bridge" in facility_type:
-        return 5
-    return 4 if risk >= 2 else 3
+        return 2.0
+    if task_class == "navigation_aid" and risk >= 3:
+        return 1.5
+    return 1.0
+
+
+def review_workload(task_class: str, facility_type: str, risk: int) -> float:
+    if "breakwater" in facility_type or "bridge" in facility_type:
+        return 4.0
+    if task_class == "navigation_aid" or risk >= 3:
+        return 3.0
+    return 2.0
 
 
 def max_interval(risk: int) -> int:
     if risk >= 3:
-        return 12
+        return 240
     if risk == 2:
-        return 24
-    return 36
+        return 480
+    return 720
+
+
+def dynamic_max_interval(risk: int) -> int:
+    if risk >= 3:
+        return 120
+    if risk == 2:
+        return 240
+    return 360
 
 
 def build_risk_grid(width: int, height: int, tasks: list[dict[str, Any]]) -> list[list[int]]:
@@ -454,20 +478,20 @@ platform_profiles_path = "configs/platform_profiles_cn_common.toml"
 uav_count = 4
 usv_count = 4
 
-[platform_depots]
-uav = {platform_depots.get("UAV", platform_depots.get("USV", [0, 0]))}
-usv = {platform_depots.get("USV", platform_depots.get("UAV", [0, 0]))}
-
 platform_profile_sequence = [
-  "UAV_H_M350",
-  "UAV_H_M350",
   "UAV_M_M30",
   "UAV_M_M30",
-  "USV_P_M75",
-  "USV_P_M75",
+  "UAV_M_M30",
+  "UAV_M_M30",
+  "USV_S_SURVEY",
+  "USV_S_SURVEY",
   "USV_S_SURVEY",
   "USV_S_SURVEY",
 ]
+
+[platform_depots]
+uav = {platform_depots.get("UAV", platform_depots.get("USV", [0, 0]))}
+usv = {platform_depots.get("USV", platform_depots.get("UAV", [0, 0]))}
 
 [scheduling]
 risk_weight = 14.0
@@ -476,7 +500,7 @@ load_weight = 0.28
 compatibility_bonus = 5.0
 
 [scheduler_rl]
-max_steps = 96
+max_steps = 240
 candidate_k = 12
 learning_rate = 0.0003
 gamma = 0.98
@@ -498,9 +522,10 @@ conflict_penalty = 1.0
 [review_trigger]
 confidence_threshold = 0.65
 mandatory_review_risk = 3
-base_review_deadline = 36.0
-risk_deadline_scale = 4.0
-confidence_deadline_scale = 3.0
+base_review_deadline = 180.0
+risk_deadline_scale = 15.0
+confidence_deadline_scale = 10.0
+replenish_steps = 6
 sensitivity = 0.85
 specificity = 0.80
 confidence_noise = 0.08

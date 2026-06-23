@@ -310,7 +310,7 @@ def build_scenario_config(base_config: ExperimentConfig, scenario: Scenario, cov
 
 
 def load_policy_for_shape(checkpoint_path: Path, config: ExperimentConfig) -> ActorCritic:
-    payload = torch.load(checkpoint_path, map_location="cpu")
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     gat_use_edge_features = bool(payload.get("gat_use_edge_features", config.ppo.gat_use_edge_features))
     cuap_meta = payload.get("cuap", {})
     if not isinstance(cuap_meta, dict):

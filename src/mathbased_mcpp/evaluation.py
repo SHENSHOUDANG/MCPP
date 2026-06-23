@@ -37,7 +37,7 @@ def resolve_runtime_config(config: ExperimentConfig, checkpoint_path: str | Path
 
 def load_policy(config: ExperimentConfig, checkpoint_path: str | Path) -> ActorCritic:
     config = resolve_runtime_config(config, checkpoint_path)
-    payload = torch.load(checkpoint_path, map_location="cpu")
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     hidden_dim = int(payload.get("hidden_dim", config.ppo.hidden_dim))
     observation_dim = int(payload["observation_dim"])
     action_dim = int(payload["action_dim"])

@@ -1,0 +1,27 @@
+{
+  "strategy": "legacy_order",
+  "steps": 240,
+  "episode_reward": -663.866956018519,
+  "completed_tasks": 28,
+  "task_count": 222,
+  "completion_rate": 0.12612612612612611,
+  "late_tasks": 2,
+  "late_task_ids": [
+    "E009",
+    "E012"
+  ],
+  "risk_exposure_sum": 74400.0,
+  "total_path_length": 1064,
+  "total_energy": 5.333912037037032,
+  "platform_loads": {
+    "UAV-1": 0.0,
+    "UAV-2": 0.0,
+    "UAV-3": 0.0,
+    "UAV-4": 0.0,
+    "USV-1": 0.0,
+    "USV-2": 0.0,
+    "USV-3": 0.0,
+    "USV-4": 0.0
+  },
+  "review_queue_length": 0
+}

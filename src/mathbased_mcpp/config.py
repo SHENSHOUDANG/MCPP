@@ -128,6 +128,10 @@ class TrainConfig:
     use_tensorboard: bool = True
     tensorboard_dir: str = "tensorboard"
     cpu_threads: int = 4
+    interop_threads: int = 1
+    rollout_workers: int = 2
+    gpu_memory_fraction: float | None = 0.35
+    process_priority: str = "below_normal"
     float32_matmul_precision: str = "high"
     compile_model: bool = False
 

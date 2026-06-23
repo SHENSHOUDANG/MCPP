@@ -196,7 +196,7 @@ def build_scenario_config(base_config: ExperimentConfig, scenario: Scenario, obs
 
 
 def load_policy_for_shape(checkpoint_path: Path, config: ExperimentConfig) -> ActorCritic:
-    payload = torch.load(checkpoint_path, map_location="cpu")
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     gat_use_edge_features = bool(payload.get("gat_use_edge_features", config.ppo.gat_use_edge_features))
     model = ActorCritic(
         observation_dim=int(payload["observation_dim"]),

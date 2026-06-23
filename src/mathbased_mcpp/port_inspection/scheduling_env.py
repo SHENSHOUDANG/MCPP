@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from dataclasses import dataclass
 from math import ceil
 from typing import Any
@@ -143,7 +144,12 @@ class PortInspectionSchedulingEnv:
         self.last_conflicts: list[dict[str, Any]] = []
         self.last_accepted: list[dict[str, Any]] = []
         self.rng = np.random.default_rng()
+        self._scenario_seed: int | None = None
         self._cost_cache: dict[tuple[Any, ...], TaskCost] = {}
+        self._view_cache: dict[str, Any] = {}
+        self._view_cache_signature: tuple[Any, ...] | None = None
+        self._local_observation_dim_value: int | None = None
+        self._global_state_dim_value: int | None = None
         self.reset()
 
     @property
@@ -180,19 +186,27 @@ class PortInspectionSchedulingEnv:
 
     @property
     def local_observation_dim(self) -> int:
+        if self._local_observation_dim_value is not None:
+            return self._local_observation_dim_value
         observations = self.local_observations()
         if not observations:
             return 0
-        return int(next(iter(observations.values())).shape[0])
+        self._local_observation_dim_value = int(next(iter(observations.values())).shape[0])
+        return self._local_observation_dim_value
 
     @property
     def global_state_dim(self) -> int:
-        return int(self.global_state().shape[0])
+        if self._global_state_dim_value is None:
+            self._global_state_dim_value = int(self.global_state().shape[0])
+        return self._global_state_dim_value
 
     def reset(self, seed: int | None = None) -> np.ndarray:
         if seed is not None:
+            self._scenario_seed = int(seed)
             self.rng = np.random.default_rng(seed)
             np.random.seed(seed)
+        else:
+            self._scenario_seed = None
         self.tasks = copy.deepcopy(self.base_tasks)
         self.platforms = copy.deepcopy(self.base_platforms)
         for platform in self.platforms:
@@ -248,6 +262,7 @@ class PortInspectionSchedulingEnv:
         self.last_conflicts = []
         self.last_accepted = []
         self._cost_cache = {}
+        self._clear_view_cache()
         return self.observation()
 
     def reset_model(self, seed: int | None = None) -> SchedulingModelReset:
@@ -261,6 +276,7 @@ class PortInspectionSchedulingEnv:
 
     def step(self, action: int | list[int] | tuple[int, ...] | np.ndarray) -> SchedulingStepResult:
         self.current_step += 1
+        self._clear_view_cache()
         self.last_conflicts = []
         self.last_accepted = []
         invalid = False
@@ -295,9 +311,14 @@ class PortInspectionSchedulingEnv:
                 continue
 
             if choice == self.wait_action:
+                if self._should_replenish_at_depot(platform):
+                    self._start_replenish(platform_index)
                 continue
             if choice == self.return_action:
-                self._start_return(platform_index)
+                if platform.current_cell == self._platform_depot(platform):
+                    self._start_replenish(platform_index)
+                else:
+                    self._start_return(platform_index)
                 continue
             if choice == self.continue_action:
                 invalid = True
@@ -351,8 +372,11 @@ class PortInspectionSchedulingEnv:
         )
         self.last_reward_terms = terms
         self._cost_cache = {}
+        self._clear_view_cache()
         done = len(self.completed_tasks) == len(self.tasks) or self.current_step >= self.max_steps
-        return SchedulingStepResult(self.observation(), float(terms["total"]), done, self.info())
+        observation = self.observation()
+        info = self.info()
+        return SchedulingStepResult(observation, float(terms["total"]), done, info)
 
     def step_model(self, actions: dict[str, int] | list[int] | tuple[int, ...] | np.ndarray | int) -> SchedulingModelStep:
         result = self.step(self._actions_from_mapping(actions))
@@ -369,10 +393,22 @@ class PortInspectionSchedulingEnv:
         )
 
     def candidate_lists(self) -> list[list[CandidateEntry]]:
-        return [self._build_candidates(index) for index in range(self.num_platforms)]
+        self._ensure_view_cache()
+        cached = self._view_cache.get("candidate_sets")
+        if cached is None:
+            cached = [self._build_candidates(index) for index in range(self.num_platforms)]
+            self._view_cache["candidate_sets"] = cached
+        return cached
 
     def action_masks(self, candidate_sets: list[list[CandidateEntry]] | None = None) -> np.ndarray:
-        candidate_sets = candidate_sets if candidate_sets is not None else self.candidate_lists()
+        self._ensure_view_cache()
+        if candidate_sets is None:
+            cached = self._view_cache.get("action_masks")
+            if cached is not None:
+                return cached
+            candidate_sets = self.candidate_lists()
+        else:
+            cached = None
         masks = np.zeros((self.num_platforms, self.action_choices), dtype=bool)
         for platform_index, candidates in enumerate(candidate_sets):
             platform = self.platforms[platform_index]
@@ -383,9 +419,11 @@ class PortInspectionSchedulingEnv:
                 masks[platform_index, candidate.relative_position] = candidate.feasible
             masks[platform_index, self.wait_action] = True
             depot = self._platform_depot(platform)
-            masks[platform_index, self.return_action] = platform.current_cell != depot
+            masks[platform_index, self.return_action] = platform.current_cell != depot or self._should_replenish_at_depot(platform)
             if not any(candidate.feasible for candidate in candidates) and self._must_return(platform):
-                masks[platform_index, self.return_action] = platform.current_cell != depot
+                masks[platform_index, self.return_action] = platform.current_cell != depot or self._should_replenish_at_depot(platform)
+        if cached is None and self._view_cache.get("candidate_sets") is candidate_sets:
+            self._view_cache["action_masks"] = masks
         return masks
 
     def flat_action_mask(self) -> np.ndarray:
@@ -399,6 +437,10 @@ class PortInspectionSchedulingEnv:
         }
 
     def local_observations(self) -> dict[str, np.ndarray]:
+        self._ensure_view_cache()
+        cached = self._view_cache.get("local_observations")
+        if cached is not None:
+            return cached
         candidate_sets = self.candidate_lists()
         masks = self.action_masks(candidate_sets)
         broadcast = self.aggregate_broadcast()
@@ -415,9 +457,14 @@ class PortInspectionSchedulingEnv:
                     values.extend([0.0] * CANDIDATE_FEATURE_DIM)
             values.extend(masks[platform_index].astype(np.float32).tolist())
             observations[platform.platform_id] = np.asarray(values, dtype=np.float32)
+        self._view_cache["local_observations"] = observations
         return observations
 
     def global_state(self) -> np.ndarray:
+        self._ensure_view_cache()
+        cached = self._view_cache.get("global_state")
+        if cached is not None:
+            return cached
         values: list[float] = []
         values.extend(self.aggregate_broadcast().tolist())
         for platform in self.platforms:
@@ -440,9 +487,15 @@ class PortInspectionSchedulingEnv:
                 float(metrics["anomaly_missed"]) / max(len(self.tasks), 1),
             ]
         )
-        return np.asarray(values, dtype=np.float32)
+        state = np.asarray(values, dtype=np.float32)
+        self._view_cache["global_state"] = state
+        return state
 
     def observation(self) -> np.ndarray:
+        self._ensure_view_cache()
+        cached = self._view_cache.get("observation")
+        if cached is not None:
+            return cached
         candidate_sets = self.candidate_lists()
         masks = self.action_masks(candidate_sets)
         values: list[float] = []
@@ -482,10 +535,14 @@ class PortInspectionSchedulingEnv:
                 self.total_energy,
             ]
         )
-        return np.asarray(values, dtype=np.float32)
+        observation = np.asarray(values, dtype=np.float32)
+        self._view_cache["observation"] = observation
+        return observation
 
     def info(self) -> dict[str, Any]:
         candidate_sets = self.candidate_lists()
+        masks = self.action_masks(candidate_sets)
+        metrics = self.metrics()
         return {
             "reward_terms": dict(self.last_reward_terms),
             "completed_tasks": sorted(self.completed_tasks),
@@ -498,16 +555,16 @@ class PortInspectionSchedulingEnv:
             "task_confidence": {task.task_id: task.screening_confidence for task in self.tasks if task.screened_by},
             "total_path_length": self.total_path_length,
             "total_energy": self.total_energy,
-            "risk_exposure_sum": total_risk_exposure(self.tasks),
-            "metrics": self.metrics(),
+            "risk_exposure_sum": metrics["risk_exposure_sum"],
+            "metrics": metrics,
             "platform_loads": {platform.platform_id: platform.current_load for platform in self.platforms},
-            "action_masks": self.action_masks(candidate_sets).astype(int).tolist(),
-            "candidate_mask": self.action_masks(candidate_sets)[:, : self.candidate_k].astype(int).tolist(),
+            "action_masks": masks.astype(int).tolist(),
+            "candidate_mask": masks[:, : self.candidate_k].astype(int).tolist(),
             "agent_mask": [1 if platform.alive else 0 for platform in self.platforms],
             "alive_mask": [1 if platform.alive else 0 for platform in self.platforms],
             "available_actions": {
-                platform_id: mask.astype(int).tolist()
-                for platform_id, mask in self.available_actions(candidate_sets).items()
+                platform.platform_id: masks[index].astype(int).tolist()
+                for index, platform in enumerate(self.platforms)
             },
             "aggregate_broadcast": self.aggregate_broadcast().tolist(),
             "local_observation_dim": self.local_observation_dim,
@@ -566,6 +623,62 @@ class PortInspectionSchedulingEnv:
             "total_path_length": self.total_path_length,
             "total_energy": self.total_energy,
         }
+
+    def _ensure_view_cache(self) -> None:
+        signature = self._view_signature()
+        if signature != self._view_cache_signature:
+            self._view_cache_signature = signature
+            self._view_cache = {}
+
+    def _clear_view_cache(self) -> None:
+        self._view_cache = {}
+        self._view_cache_signature = None
+
+    def _view_signature(self) -> tuple[Any, ...]:
+        platform_state = tuple(
+            (
+                platform.platform_id,
+                platform.current_cell,
+                platform.mode,
+                platform.current_task_id,
+                platform.current_stage,
+                platform.target_cell,
+                round(float(platform.energy), 8),
+                round(float(platform.remaining_travel_time), 8),
+                round(float(platform.remaining_service_time), 8),
+                round(float(platform.remaining_replenish_time), 8),
+                bool(platform.alive),
+            )
+            for platform in self.platforms
+        )
+        task_state = tuple(
+            (
+                task.task_id,
+                task.state,
+                bool(task.completed),
+                task.reserved_by,
+                round(float(task.uninspected_time), 8),
+                round(float(task.screening_confidence), 8),
+                round(float(task.review_deadline), 8),
+                round(float(task.generation_time), 8),
+            )
+            for task in self.tasks
+        )
+        counters = (
+            int(self.current_step),
+            int(self.total_path_length),
+            round(float(self.total_energy), 8),
+            int(self.total_conflicts),
+            int(self.total_invalid_actions),
+            int(self.total_replenishments),
+            int(self.total_returns),
+            int(self.total_screened),
+            int(self.total_reviewed),
+            int(self.total_anomaly_closed),
+            int(self.total_anomaly_missed),
+            tuple(sorted(self.completed_tasks)),
+        )
+        return counters + platform_state + task_state
 
     def _decode_actions(self, action: int | list[int] | tuple[int, ...] | np.ndarray) -> list[tuple[int, int]]:
         if isinstance(action, (list, tuple, np.ndarray)):
@@ -678,11 +791,12 @@ class PortInspectionSchedulingEnv:
         return self.current_step + ceil(cost.completion_time) <= deadline
 
     def _must_return(self, platform: Platform) -> bool:
+        return_safety_factor = self._return_safety_factor(platform)
         return_energy = self._energy_for_travel(
             platform,
             self._travel_distance(platform, platform.current_cell, self._platform_depot(platform)),
         )
-        return platform.energy <= return_energy + platform.return_reserve_ratio
+        return platform.energy <= return_safety_factor * return_energy + platform.return_reserve_ratio
 
     def _start_task_stage(self, task: InspectionTask, platform: Platform, stage: str, cost: TaskCost) -> None:
         self._reserve(task, platform, stage)
@@ -772,7 +886,7 @@ class PortInspectionSchedulingEnv:
                     path_length += segment_length
                     self.total_path_length += segment_length
                     platform.mode = MODE_REPLENISH
-                    platform.remaining_replenish_time = float(max(int(self.review_trigger.get("replenish_steps", 2)), 1))
+                    platform.remaining_replenish_time = float(self._replenish_steps(platform))
                     platform.metadata.pop("pending_cost", None)
                     self.total_replenishments += 1
                 continue
@@ -821,7 +935,14 @@ class PortInspectionSchedulingEnv:
         for proposal in proposals:
             platform = self.platforms[proposal.platform_index]
             energy_ratio = platform.energy / max(platform.energy_capacity, 1e-6)
-            ranked.append((proposal.cost.travel_time, -energy_ratio, float(self.rng.random()), proposal))
+            tie_break = self._stable_uniform(
+                "conflict_tie",
+                self.current_step,
+                proposal.candidate.task_id,
+                proposal.candidate.task_stage,
+                platform.platform_id,
+            )
+            ranked.append((proposal.cost.travel_time, -energy_ratio, tie_break, proposal))
         ranked.sort(key=lambda item: (item[0], item[1], item[2]))
         return ranked[0][3]
 
@@ -883,12 +1004,12 @@ class PortInspectionSchedulingEnv:
         specificity = float(self.review_trigger["specificity"])
         noise = float(self.review_trigger["confidence_noise"])
         if task.true_anomaly:
-            result = int(self.rng.random() < sensitivity)
+            result = int(self._stable_uniform("screening_result", task.task_id) < sensitivity)
             mean = sensitivity if result else 1.0 - sensitivity
         else:
-            result = int(self.rng.random() < (1.0 - specificity))
+            result = int(self._stable_uniform("screening_result", task.task_id) < (1.0 - specificity))
             mean = specificity if not result else 1.0 - specificity
-        confidence = float(np.clip(self.rng.normal(mean, noise), 0.0, 1.0))
+        confidence = float(np.clip(self._stable_normal(mean, noise, "screening_confidence", task.task_id), 0.0, 1.0))
         return result, confidence
 
     def _should_trigger_review(self, task: InspectionTask) -> bool:
@@ -911,7 +1032,28 @@ class PortInspectionSchedulingEnv:
         probability = 0.1
         if isinstance(probabilities, dict):
             probability = float(probabilities.get(task.risk, probabilities.get(str(task.risk), probability)))
-        return bool(self.rng.random() < probability)
+        return bool(self._stable_uniform("true_anomaly", task.task_id, task.risk) < probability)
+
+    def _stable_uniform(self, *parts: Any) -> float:
+        seed = self._stable_seed(*parts)
+        if seed is None:
+            return float(self.rng.random())
+        return seed / float(1 << 64)
+
+    def _stable_normal(self, mean: float, std: float, *parts: Any) -> float:
+        if std <= 0.0:
+            return float(mean)
+        seed = self._stable_seed(*parts)
+        if seed is None:
+            return float(self.rng.normal(mean, std))
+        return float(np.random.default_rng(seed).normal(mean, std))
+
+    def _stable_seed(self, *parts: Any) -> int | None:
+        if self._scenario_seed is None:
+            return None
+        payload = "|".join([str(self._scenario_seed), *(str(part) for part in parts)])
+        digest = hashlib.blake2b(payload.encode("utf-8"), digest_size=8).digest()
+        return int.from_bytes(digest, byteorder="big", signed=False)
 
     def _stage_service_time(self, task: InspectionTask, stage: str) -> float:
         if stage == STAGE_SCREENING:
@@ -935,6 +1077,9 @@ class PortInspectionSchedulingEnv:
     def _start_return(self, platform_index: int) -> None:
         platform = self.platforms[platform_index]
         depot = self._platform_depot(platform)
+        if platform.current_cell == depot:
+            self._start_replenish(platform_index)
+            return
         travel = self._travel_distance(platform, platform.current_cell, depot)
         energy = self._energy_for_travel(platform, travel)
         platform.mode = MODE_RETURN
@@ -948,6 +1093,18 @@ class PortInspectionSchedulingEnv:
             "energy_steps": max(int(platform.remaining_travel_time), 1),
         }
         self.total_returns += 1
+
+    def _start_replenish(self, platform_index: int) -> None:
+        platform = self.platforms[platform_index]
+        platform.mode = MODE_REPLENISH
+        platform.current_task_id = None
+        platform.current_stage = None
+        platform.target_cell = None
+        platform.remaining_travel_time = 0.0
+        platform.remaining_service_time = 0.0
+        platform.remaining_replenish_time = float(self._replenish_steps(platform))
+        platform.metadata.pop("pending_cost", None)
+        self.total_replenishments += 1
 
     def _travel_distance(self, platform: Platform, start: GridCell, goal: GridCell) -> int:
         if start == goal:
@@ -980,6 +1137,19 @@ class PortInspectionSchedulingEnv:
         if isinstance(depot, (list, tuple)) and len(depot) == 2:
             return int(depot[0]), int(depot[1])
         return self.grid.depot
+
+    def _return_safety_factor(self, platform: Platform) -> float:
+        return max(float(platform.metadata.get("return_safety_factor", 1.0)), 1.0)
+
+    def _replenish_steps(self, platform: Platform) -> int:
+        configured = platform.metadata.get("replenish_steps", self.review_trigger.get("replenish_steps", 2))
+        return max(int(configured), 1)
+
+    def _should_replenish_at_depot(self, platform: Platform) -> bool:
+        if platform.current_cell != self._platform_depot(platform):
+            return False
+        threshold = float(platform.metadata.get("charge_start_ratio", 0.95))
+        return platform.energy < platform.energy_capacity * min(max(threshold, 0.0), 1.0)
 
     def _platform_features(self, platform: Platform) -> list[float]:
         height = max(self.grid.height - 1, 1)

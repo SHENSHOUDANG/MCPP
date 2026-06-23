@@ -87761,7 +87761,7 @@
     "fixed_task_count": 219,
     "dynamic_seed_count": 3,
     "task_count": 222,
-    "generated_at_utc": "2026-06-22T12:29:08.699944+00:00",
+    "generated_at_utc": "2026-06-22T13:38:12.471526+00:00",
     "note": "No legacy project map is used. The current scheduler treats UTM coordinate bins as model features only; no low-level path actions are emitted."
   }
 }

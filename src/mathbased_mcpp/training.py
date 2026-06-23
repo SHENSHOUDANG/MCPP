@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import copy
 import math
+import os
+import random
 import re
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
@@ -175,21 +178,28 @@ def _train_single_course(
     resume_state: dict[str, object] = {}
     if resume_checkpoint_path is not None:
         resume_state = _load_training_checkpoint(model, optimizer, resume_checkpoint_path, device)
+        _restore_rng_state(resume_state.get("rng_state"))
     elif checkpoint_path is not None:
         _load_checkpoint_weights(model, checkpoint_path)
 
-    observation = np.asarray(
-        [agent_observations(worker.reset(seed=worker.config.seed)) for worker in rollout_envs],
-        dtype=np.float32,
-    )
-    state = np.asarray([worker.global_state() for worker in rollout_envs], dtype=np.float32)
+    observation, state = _initialize_rollout_state(rollout_envs, resume_state)
     timestep = int(resume_state.get("timestep", 0))
     update_index = int(resume_state.get("update_index", 0))
     episode_index = int(resume_state.get("episode_index", 0))
-    episode_rewards = np.zeros(len(rollout_envs), dtype=np.float32)
-    episode_start_lengths = [worker.path_length for worker in rollout_envs]
+    episode_rewards = np.asarray(
+        resume_state.get("episode_rewards", np.zeros(len(rollout_envs), dtype=np.float32)),
+        dtype=np.float32,
+    )
+    if episode_rewards.shape != (len(rollout_envs),):
+        episode_rewards = np.zeros(len(rollout_envs), dtype=np.float32)
+    episode_start_lengths = [
+        int(item)
+        for item in resume_state.get("episode_start_lengths", [worker.path_length for worker in rollout_envs])
+    ]
+    if len(episode_start_lengths) != len(rollout_envs):
+        episode_start_lengths = [worker.path_length for worker in rollout_envs]
     metric_rows: list[dict[str, float | int]] = []
-    best_score: tuple[float, int, float, float] | None = None
+    best_score = _restore_best_score(resume_state.get("best_score"))
     best_checkpoint_path = run_path / "best_policy.pt"
     last_checkpoint_path = run_path / "last_policy.pt"
     eval_interval = max(config.train.eval_interval or config.train.log_interval, 1)
@@ -198,6 +208,7 @@ def _train_single_course(
     if training_complete_marker.exists():
         training_complete_marker.unlink()
 
+    env_executor = _make_rollout_executor(config, len(rollout_envs))
     try:
         while timestep < config.ppo.total_timesteps:
             batch, observation, state, rollout_metrics = _collect_rollout(
@@ -210,6 +221,7 @@ def _train_single_course(
                 episode_index=episode_index,
                 episode_rewards=episode_rewards,
                 episode_start_lengths=episode_start_lengths,
+                env_executor=env_executor,
             )
             episode_index = int(rollout_metrics.pop("episode_index"))
             episode_rewards = np.asarray(rollout_metrics.pop("episode_rewards"), dtype=np.float32)
@@ -235,11 +247,17 @@ def _train_single_course(
                         config,
                         model,
                         optimizer=optimizer,
-                        training_state={
-                            "timestep": timestep,
-                            "update_index": update_index,
-                            "episode_index": episode_index,
-                        },
+                        training_state=_training_state_payload(
+                            rollout_envs,
+                            observation,
+                            state,
+                            episode_rewards,
+                            episode_start_lengths,
+                            timestep=timestep,
+                            update_index=update_index,
+                            episode_index=episode_index,
+                            best_score=best_score,
+                        ),
                     ),
                     last_checkpoint_path,
                 )
@@ -259,11 +277,17 @@ def _train_single_course(
                             config,
                             model,
                             optimizer=optimizer,
-                            training_state={
-                                "timestep": timestep,
-                                "update_index": update_index,
-                                "episode_index": episode_index,
-                            },
+                            training_state=_training_state_payload(
+                                rollout_envs,
+                                observation,
+                                state,
+                                episode_rewards,
+                                episode_start_lengths,
+                                timestep=timestep,
+                                update_index=update_index,
+                                episode_index=episode_index,
+                                best_score=best_score,
+                            ),
                         ),
                         best_checkpoint_path,
                     )
@@ -273,11 +297,17 @@ def _train_single_course(
                 config,
                 model,
                 optimizer=optimizer,
-                training_state={
-                    "timestep": timestep,
-                    "update_index": update_index,
-                    "episode_index": episode_index,
-                },
+                training_state=_training_state_payload(
+                    rollout_envs,
+                    observation,
+                    state,
+                    episode_rewards,
+                    episode_start_lengths,
+                    timestep=timestep,
+                    update_index=update_index,
+                    episode_index=episode_index,
+                    best_score=best_score,
+                ),
             ),
             last_checkpoint_path,
         )
@@ -287,11 +317,17 @@ def _train_single_course(
                     config,
                     model,
                     optimizer=optimizer,
-                    training_state={
-                        "timestep": timestep,
-                        "update_index": update_index,
-                        "episode_index": episode_index,
-                    },
+                    training_state=_training_state_payload(
+                        rollout_envs,
+                        observation,
+                        state,
+                        episode_rewards,
+                        episode_start_lengths,
+                        timestep=timestep,
+                        update_index=update_index,
+                        episode_index=episode_index,
+                        best_score=best_score,
+                    ),
                 ),
                 best_checkpoint_path,
             )
@@ -312,6 +348,8 @@ def _train_single_course(
         )
         return run_path / "policy.pt"
     finally:
+        if env_executor is not None:
+            env_executor.shutdown(wait=True)
         if writer is not None:
             writer.close()
 
@@ -443,7 +481,7 @@ def _evaluate_model(config: ExperimentConfig, model: ActorCritic, update_index: 
 
 
 def _load_checkpoint_weights(model: ActorCritic, checkpoint_path: str | Path) -> None:
-    payload = torch.load(checkpoint_path, map_location="cpu")
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     model.load_compatible_state_dict(payload["model_state_dict"])
 
 
@@ -453,7 +491,7 @@ def _load_training_checkpoint(
     checkpoint_path: str | Path,
     device: torch.device,
 ) -> dict[str, object]:
-    payload = torch.load(checkpoint_path, map_location="cpu")
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     model.load_compatible_state_dict(payload["model_state_dict"])
     optimizer_state = payload.get("optimizer_state_dict")
     if optimizer_state is not None:
@@ -461,6 +499,92 @@ def _load_training_checkpoint(
         _move_optimizer_state(optimizer, device)
     training_state = payload.get("training_state", {})
     return training_state if isinstance(training_state, dict) else {}
+
+
+def _initialize_rollout_state(
+    rollout_envs: list[GridCoverageEnv],
+    resume_state: dict[str, object],
+) -> tuple[np.ndarray, np.ndarray]:
+    env_states = resume_state.get("env_states")
+    observation = resume_state.get("observation")
+    state = resume_state.get("state")
+    if env_states is not None or observation is not None or state is not None:
+        if not isinstance(env_states, list) or len(env_states) != len(rollout_envs):
+            raise ValueError("resume checkpoint env state count does not match configured ppo.num_envs")
+        for worker, worker_state in zip(rollout_envs, env_states):
+            if not isinstance(worker_state, dict):
+                raise ValueError("resume checkpoint contains an invalid environment state")
+            worker.load_state_dict(worker_state)
+        if observation is None or state is None:
+            raise ValueError("resume checkpoint is missing rollout observation/state arrays")
+        return np.asarray(observation, dtype=np.float32), np.asarray(state, dtype=np.float32)
+
+    return (
+        np.asarray([agent_observations(worker.reset(seed=worker.config.seed)) for worker in rollout_envs], dtype=np.float32),
+        np.asarray([worker.global_state() for worker in rollout_envs], dtype=np.float32),
+    )
+
+
+def _training_state_payload(
+    envs: list[GridCoverageEnv],
+    observation: np.ndarray,
+    state: np.ndarray,
+    episode_rewards: np.ndarray,
+    episode_start_lengths: list[int],
+    *,
+    timestep: int,
+    update_index: int,
+    episode_index: int,
+    best_score: tuple[float, int, float, float] | None,
+) -> dict[str, object]:
+    return {
+        "timestep": int(timestep),
+        "update_index": int(update_index),
+        "episode_index": int(episode_index),
+        "episode_rewards": np.asarray(episode_rewards, dtype=np.float32).tolist(),
+        "episode_start_lengths": [int(item) for item in episode_start_lengths],
+        "observation": np.asarray(observation, dtype=np.float32),
+        "state": np.asarray(state, dtype=np.float32),
+        "env_states": [worker.state_dict() for worker in envs],
+        "rng_state": _rng_state_payload(),
+        "best_score": None if best_score is None else list(best_score),
+    }
+
+
+def _rng_state_payload() -> dict[str, object]:
+    payload: dict[str, object] = {
+        "python": random.getstate(),
+        "numpy": np.random.get_state(),
+        "torch": torch.get_rng_state(),
+    }
+    if torch.cuda.is_available():
+        payload["torch_cuda"] = torch.cuda.get_rng_state_all()
+    return payload
+
+
+def _restore_rng_state(state: object) -> None:
+    if not isinstance(state, dict):
+        return
+    python_state = state.get("python")
+    numpy_state = state.get("numpy")
+    torch_state = state.get("torch")
+    cuda_state = state.get("torch_cuda")
+    if python_state is not None:
+        random.setstate(python_state)  # type: ignore[arg-type]
+    if numpy_state is not None:
+        np.random.set_state(numpy_state)  # type: ignore[arg-type]
+    if torch_state is not None and torch.is_tensor(torch_state):
+        torch.set_rng_state(torch_state.cpu())
+    if cuda_state is not None and torch.cuda.is_available():
+        if isinstance(cuda_state, list):
+            cuda_state = [item.cpu() if torch.is_tensor(item) else item for item in cuda_state]
+        torch.cuda.set_rng_state_all(cuda_state)  # type: ignore[arg-type]
+
+
+def _restore_best_score(score: object) -> tuple[float, int, float, float] | None:
+    if not isinstance(score, (list, tuple)) or len(score) != 4:
+        return None
+    return float(score[0]), int(score[1]), float(score[2]), float(score[3])
 
 
 def _move_optimizer_state(optimizer: torch.optim.Optimizer, device: torch.device) -> None:
@@ -604,13 +728,56 @@ def _configure_training_runtime(config: ExperimentConfig) -> None:
     threads = configure_runtime(config.train.cpu_threads)
     torch.set_num_threads(threads)
     try:
-        torch.set_num_interop_threads(max(1, min(threads, 2)))
+        interop_threads = max(int(getattr(config.train, "interop_threads", 1)), 1)
+        torch.set_num_interop_threads(interop_threads)
     except RuntimeError:
         pass
+    _configure_process_priority(config.train.process_priority)
+    _configure_gpu_budget(config.train.gpu_memory_fraction)
     if hasattr(torch, "set_float32_matmul_precision"):
         precision = config.train.float32_matmul_precision
         if precision in {"highest", "high", "medium"}:
             torch.set_float32_matmul_precision(precision)
+
+
+def _configure_gpu_budget(memory_fraction: float | None) -> None:
+    if not torch.cuda.is_available() or memory_fraction is None:
+        return
+    fraction = min(max(float(memory_fraction), 0.05), 0.95)
+    try:
+        torch.cuda.set_per_process_memory_fraction(fraction)
+    except RuntimeError:
+        pass
+    torch.backends.cudnn.benchmark = False
+
+
+def _configure_process_priority(priority: str) -> None:
+    normalized = str(priority).strip().lower()
+    if normalized in {"", "normal"}:
+        return
+    if os.name == "nt":
+        classes = {
+            "below_normal": 0x00004000,
+            "idle": 0x00000040,
+        }
+        priority_class = classes.get(normalized)
+        if priority_class is None:
+            return
+        try:
+            import ctypes
+
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), priority_class)
+        except Exception:
+            pass
+        return
+    nice_value = 15 if normalized == "idle" else 5 if normalized == "below_normal" else None
+    if nice_value is None:
+        return
+    try:
+        os.nice(nice_value)
+    except OSError:
+        pass
 
 
 def _validate_cuap_config(config: ExperimentConfig, env: GridCoverageEnv) -> None:
@@ -649,6 +816,13 @@ def _make_rollout_envs(config: ExperimentConfig) -> list[GridCoverageEnv]:
     return envs
 
 
+def _make_rollout_executor(config: ExperimentConfig, num_envs: int) -> ThreadPoolExecutor | None:
+    worker_count = min(max(int(getattr(config.train, "rollout_workers", 1)), 1), max(num_envs, 1))
+    if worker_count <= 1 or num_envs <= 1:
+        return None
+    return ThreadPoolExecutor(max_workers=worker_count)
+
+
 def _rollout_env_steps(
     config: ExperimentConfig,
     env: GridCoverageEnv,
@@ -671,6 +845,7 @@ def _collect_rollout(
     episode_index: int,
     episode_rewards: np.ndarray,
     episode_start_lengths: list[int],
+    env_executor: ThreadPoolExecutor | None = None,
 ) -> tuple[RolloutBatch, np.ndarray, np.ndarray, dict[str, object]]:
     observations: list[np.ndarray] = []
     states: list[np.ndarray] = []
@@ -775,8 +950,8 @@ def _collect_rollout(
         step_dones = np.zeros((num_envs, num_agents), dtype=np.float32)
         next_observation = np.empty_like(observation)
         next_state = np.empty_like(state)
-        for env_index, worker in enumerate(envs):
-            result = worker.step(action_array[env_index].tolist())
+        step_results = _step_rollout_envs(envs, action_array, env_executor)
+        for env_index, (worker, result) in enumerate(zip(envs, step_results)):
             reward_array = agent_rewards(worker.num_agents, result.reward)
             step_rewards[env_index] = reward_array
             step_dones[env_index] = float(result.done)
@@ -883,6 +1058,17 @@ def _collect_rollout(
         "metric_rows": metric_rows,
     }
     return batch, observation, state, metrics
+
+
+def _step_rollout_envs(
+    envs: list[GridCoverageEnv],
+    action_array: np.ndarray,
+    executor: ThreadPoolExecutor | None,
+) -> list[object]:
+    if executor is None:
+        return [worker.step(action_array[index].tolist()) for index, worker in enumerate(envs)]
+    futures = [executor.submit(worker.step, action_array[index].tolist()) for index, worker in enumerate(envs)]
+    return [future.result() for future in futures]
 
 
 def _flatten_time_env(array: np.ndarray) -> np.ndarray:

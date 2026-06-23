@@ -6,20 +6,20 @@ platform_profiles_path = "configs/platform_profiles_cn_common.toml"
 uav_count = 4
 usv_count = 4
 
-[platform_depots]
-uav = [73, 110]
-usv = [73, 110]
-
 platform_profile_sequence = [
-  "UAV_H_M350",
-  "UAV_H_M350",
   "UAV_M_M30",
   "UAV_M_M30",
-  "USV_P_M75",
-  "USV_P_M75",
+  "UAV_M_M30",
+  "UAV_M_M30",
+  "USV_S_SURVEY",
+  "USV_S_SURVEY",
   "USV_S_SURVEY",
   "USV_S_SURVEY",
 ]
+
+[platform_depots]
+uav = [73, 110]
+usv = [73, 110]
 
 [scheduling]
 risk_weight = 14.0
@@ -28,8 +28,15 @@ load_weight = 0.28
 compatibility_bonus = 5.0
 
 [scheduler_rl]
-max_steps = 96
+max_steps = 240
 candidate_k = 12
+device = "auto"
+num_envs = 2
+env_workers = 2
+cpu_threads = 6
+interop_threads = 2
+gpu_memory_fraction = 0.35
+process_priority = "below_normal"
 learning_rate = 0.0003
 gamma = 0.98
 gae_lambda = 0.95
@@ -50,9 +57,10 @@ conflict_penalty = 1.0
 [review_trigger]
 confidence_threshold = 0.65
 mandatory_review_risk = 3
-base_review_deadline = 36.0
-risk_deadline_scale = 4.0
-confidence_deadline_scale = 3.0
+base_review_deadline = 180.0
+risk_deadline_scale = 15.0
+confidence_deadline_scale = 10.0
+replenish_steps = 6
 sensitivity = 0.85
 specificity = 0.80
 confidence_noise = 0.08

@@ -1,0 +1,14 @@
+name: mathbased-mcpp-cuda
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch>=2.7
+  - pytorch-cuda=12.8
+  - numpy=1.26
+  - matplotlib
+  - tensorboard
+  - pip
+  - tomli

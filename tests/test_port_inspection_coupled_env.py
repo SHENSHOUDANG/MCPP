@@ -19,7 +19,7 @@ if str(TOOLS) not in sys.path:
 
 from check_port_inspection_env import build_env
 from mathbased_mcpp.port_inspection.mappo import HeterogeneousMappo
-from mathbased_mcpp.port_inspection.schema import STAGE_SCREENING, STAGE_REVIEW, TASK_AWAITING_REVIEW, TASK_CLOSED
+from mathbased_mcpp.port_inspection.schema import MODE_REPLENISH, STAGE_SCREENING, STAGE_REVIEW, TASK_AWAITING_REVIEW, TASK_CLOSED
 from train_port_scheduler_rl import _agent_types, _collect_rollout, _mappo_update, _obs_matrix
 
 import torch
@@ -119,6 +119,48 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertFalse(step.terminated)
         self.assertFalse(step.truncated)
         self.assertIn("total_invalid_actions", step.info["metrics"])
+
+    def test_idle_depot_platform_can_start_replenishment(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
+        env = build_env(config)
+        env.reset(seed=23)
+        platform = env.platforms[0]
+        platform.current_cell = env._platform_depot(platform)
+        platform.energy = platform.energy_capacity * 0.5
+
+        self.assertTrue(env.action_masks()[0, env.return_action])
+        actions = [env.wait_action for _ in env.platforms]
+        actions[0] = env.return_action
+        env.step(actions)
+
+        self.assertEqual(platform.mode, MODE_REPLENISH)
+        self.assertGreater(platform.remaining_replenish_time, 0.0)
+        self.assertEqual(env.total_replenishments, 1)
+
+    def test_seeded_environment_randomness_is_action_order_independent(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
+        env_a = build_env(config)
+        env_b = build_env(config)
+        env_a.reset(seed=31)
+        env_b.reset(seed=31)
+
+        self.assertEqual(
+            [(task.task_id, task.true_anomaly) for task in env_a.tasks],
+            [(task.task_id, task.true_anomaly) for task in env_b.tasks],
+        )
+        self.assertEqual(
+            [(platform.platform_id, platform.energy, platform.current_cell) for platform in env_a.platforms],
+            [(platform.platform_id, platform.energy, platform.current_cell) for platform in env_b.platforms],
+        )
+
+        target_a = env_a.tasks[0]
+        target_b = env_b.tasks[0]
+        env_b._screening_observation(env_b.tasks[1])
+        result_a, confidence_a = env_a._screening_observation(target_a)
+        result_b, confidence_b = env_b._screening_observation(target_b)
+
+        self.assertEqual(result_a, result_b)
+        self.assertAlmostEqual(confidence_a, confidence_b, places=12)
 
     def test_heterogeneous_mappo_rollout_update_smoke(self) -> None:
         config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")

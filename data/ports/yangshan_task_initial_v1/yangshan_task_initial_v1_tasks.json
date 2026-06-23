@@ -8,9 +8,11 @@
         17
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -43,9 +45,11 @@
         17
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -78,9 +82,11 @@
         54
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -113,9 +119,11 @@
         103
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -148,9 +156,11 @@
         107
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -183,9 +193,11 @@
         111
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -218,9 +230,11 @@
         155
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -253,9 +267,11 @@
         147
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -288,9 +304,11 @@
         122
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -323,9 +341,11 @@
         126
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -358,9 +378,11 @@
         141
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -393,9 +415,11 @@
         91
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -428,9 +452,11 @@
         99
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -463,9 +489,11 @@
         108
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.5,
+      "review_workload": 3.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -498,9 +526,11 @@
         75
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -533,9 +563,11 @@
         72
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -568,9 +600,11 @@
         77
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -603,9 +637,11 @@
         85
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -638,9 +674,11 @@
         81
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -673,9 +711,11 @@
         83
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -708,9 +748,11 @@
         71
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -743,9 +785,11 @@
         78
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -778,9 +822,11 @@
         65
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -813,9 +859,11 @@
         61
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -848,9 +896,11 @@
         79
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -883,9 +933,11 @@
         59
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -918,9 +970,11 @@
         100
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -953,9 +1007,11 @@
         58
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -988,9 +1044,11 @@
         63
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1023,9 +1081,11 @@
         68
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1058,9 +1118,11 @@
         82
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1093,9 +1155,11 @@
         63
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1128,9 +1192,11 @@
         103
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1163,9 +1229,11 @@
         84
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1198,9 +1266,11 @@
         82
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1233,9 +1303,11 @@
         98
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1268,9 +1340,11 @@
         79
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1303,9 +1377,11 @@
         86
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1338,9 +1414,11 @@
         92
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1373,9 +1451,11 @@
         95
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1408,9 +1488,11 @@
         89
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1443,9 +1525,11 @@
         78
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1478,9 +1562,11 @@
         60
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1513,9 +1599,11 @@
         81
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1548,9 +1636,11 @@
         84
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1583,9 +1673,11 @@
         87
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1618,9 +1710,11 @@
         90
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1653,9 +1747,11 @@
         85
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1688,9 +1784,11 @@
         81
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1723,9 +1821,11 @@
         83
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1758,9 +1858,11 @@
         80
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1793,9 +1895,11 @@
         73
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1828,9 +1932,11 @@
         74
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1863,9 +1969,11 @@
         94
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1898,9 +2006,11 @@
         101
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1933,9 +2043,11 @@
         102
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -1968,9 +2080,11 @@
         96
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2003,9 +2117,11 @@
         107
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2038,9 +2154,11 @@
         70
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2073,9 +2191,11 @@
         111
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2108,9 +2228,11 @@
         106
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2143,9 +2265,11 @@
         109
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2178,9 +2302,11 @@
         113
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2213,9 +2339,11 @@
         116
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2248,9 +2376,11 @@
         117
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2283,9 +2413,11 @@
         116
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2318,9 +2450,11 @@
         114
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2353,9 +2487,11 @@
         113
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2388,9 +2524,11 @@
         114
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2423,9 +2561,11 @@
         117
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2458,9 +2598,11 @@
         122
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2493,9 +2635,11 @@
         119
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2528,9 +2672,11 @@
         125
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2563,9 +2709,11 @@
         129
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2598,9 +2746,11 @@
         154
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2633,9 +2783,11 @@
         119
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2668,9 +2820,11 @@
         124
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2703,9 +2857,11 @@
         132
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2738,9 +2894,11 @@
         158
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2773,9 +2931,11 @@
         136
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2808,9 +2968,11 @@
         124
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2843,9 +3005,11 @@
         118
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2878,9 +3042,11 @@
         153
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2913,9 +3079,11 @@
         139
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2948,9 +3116,11 @@
         150
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -2983,9 +3153,11 @@
         118
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3018,9 +3190,11 @@
         123
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3053,9 +3227,11 @@
         156
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3088,9 +3264,11 @@
         142
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3123,9 +3301,11 @@
         144
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3158,9 +3338,11 @@
         123
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3193,9 +3375,11 @@
         148
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3228,9 +3412,11 @@
         118
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3263,9 +3449,11 @@
         153
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3298,9 +3486,11 @@
         144
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3333,9 +3523,11 @@
         122
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3368,9 +3560,11 @@
         116
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3403,9 +3597,11 @@
         146
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3438,9 +3634,11 @@
         119
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3473,9 +3671,11 @@
         145
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3508,9 +3708,11 @@
         113
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3543,9 +3745,11 @@
         148
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3578,9 +3782,11 @@
         152
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3613,9 +3819,11 @@
         154
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3648,9 +3856,11 @@
         143
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3683,9 +3893,11 @@
         111
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3718,9 +3930,11 @@
         156
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3753,9 +3967,11 @@
         110
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3788,9 +4004,11 @@
         151
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3823,9 +4041,11 @@
         121
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3858,9 +4078,11 @@
         153
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3893,9 +4115,11 @@
         110
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3928,9 +4152,11 @@
         143
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3963,9 +4189,11 @@
         93
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -3998,9 +4226,11 @@
         147
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4033,9 +4263,11 @@
         150
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4068,9 +4300,11 @@
         109
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4103,9 +4337,11 @@
         155
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4138,9 +4374,11 @@
         109
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4173,9 +4411,11 @@
         141
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4208,9 +4448,11 @@
         95
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4243,9 +4485,11 @@
         119
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4278,9 +4522,11 @@
         155
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4313,9 +4559,11 @@
         115
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4348,9 +4596,11 @@
         98
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4383,9 +4633,11 @@
         155
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4418,9 +4670,11 @@
         109
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4453,9 +4707,11 @@
         118
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4488,9 +4744,11 @@
         112
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4523,9 +4781,11 @@
         142
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4558,9 +4818,11 @@
         101
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4593,9 +4855,11 @@
         155
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4628,9 +4892,11 @@
         104
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4663,9 +4929,11 @@
         107
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4698,9 +4966,11 @@
         147
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4733,9 +5003,11 @@
         145
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4768,9 +5040,11 @@
         112
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4803,9 +5077,11 @@
         149
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4838,9 +5114,11 @@
         155
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4873,9 +5151,11 @@
         143
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4908,9 +5188,11 @@
         116
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4943,9 +5225,11 @@
         151
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -4978,9 +5262,11 @@
         117
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5013,9 +5299,11 @@
         115
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5048,9 +5336,11 @@
         122
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5083,9 +5373,11 @@
         124
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5118,9 +5410,11 @@
         142
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5153,9 +5447,11 @@
         147
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5188,9 +5484,11 @@
         146
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5223,9 +5521,11 @@
         128
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5258,9 +5558,11 @@
         117
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5293,9 +5595,11 @@
         119
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5328,9 +5632,11 @@
         144
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5363,9 +5669,11 @@
         131
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5398,9 +5706,11 @@
         142
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5433,9 +5743,11 @@
         133
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5468,9 +5780,11 @@
         137
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5503,9 +5817,11 @@
         143
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5538,9 +5854,11 @@
         131
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5573,9 +5891,11 @@
         132
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5608,9 +5928,11 @@
         141
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5643,9 +5965,11 @@
         140
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5678,9 +6002,11 @@
         138
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5713,9 +6039,11 @@
         132
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5748,9 +6076,11 @@
         135
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5783,9 +6113,11 @@
         54
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5818,9 +6150,11 @@
         56
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5853,9 +6187,11 @@
         55
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5888,9 +6224,11 @@
         56
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5923,9 +6261,11 @@
         57
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5958,9 +6298,11 @@
         58
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -5993,9 +6335,11 @@
         58
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6028,9 +6372,11 @@
         60
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6063,9 +6409,11 @@
         63
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6098,9 +6446,11 @@
         65
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6133,9 +6483,11 @@
         68
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6168,9 +6520,11 @@
         71
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6203,9 +6557,11 @@
         73
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6238,9 +6594,11 @@
         76
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6273,9 +6631,11 @@
         79
       ],
       "risk": 1,
-      "service_time": 3,
-      "max_interval": 36,
-      "deadline": 36,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 720,
+      "deadline": 720,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6308,9 +6668,11 @@
         110
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6343,9 +6705,11 @@
         109
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6378,9 +6742,11 @@
         109
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6413,9 +6779,11 @@
         108
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6448,9 +6816,11 @@
         107
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6483,9 +6853,11 @@
         107
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6518,9 +6890,11 @@
         106
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6553,9 +6927,11 @@
         105
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6588,9 +6964,11 @@
         104
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6623,9 +7001,11 @@
         103
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6658,9 +7038,11 @@
         102
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6693,9 +7075,11 @@
         101
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6728,9 +7112,11 @@
         99
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6763,9 +7149,11 @@
         98
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6798,9 +7186,11 @@
         97
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6833,9 +7223,11 @@
         102
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6868,9 +7260,11 @@
         104
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6903,9 +7297,11 @@
         105
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6938,9 +7334,11 @@
         107
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -6973,9 +7371,11 @@
         28
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7008,9 +7408,11 @@
         33
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7043,9 +7445,11 @@
         37
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7078,9 +7482,11 @@
         40
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7113,9 +7519,11 @@
         43
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7148,9 +7556,11 @@
         45
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7183,9 +7593,11 @@
         48
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7218,9 +7630,11 @@
         50
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7253,9 +7667,11 @@
         22
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7288,9 +7704,11 @@
         27
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7323,9 +7741,11 @@
         28
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7358,9 +7778,11 @@
         27
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7393,9 +7815,11 @@
         25
       ],
       "risk": 3,
-      "service_time": 5,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 2,
+      "screening_workload": 2.0,
+      "review_workload": 4.0,
+      "max_interval": 240,
+      "deadline": 240,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7428,9 +7852,11 @@
         96
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7463,9 +7889,11 @@
         99
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7498,9 +7926,11 @@
         97
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7533,9 +7963,11 @@
         100
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7568,9 +8000,11 @@
         99
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7603,9 +8037,11 @@
         66
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7638,9 +8074,11 @@
         66
       ],
       "risk": 2,
-      "service_time": 4,
-      "max_interval": 24,
-      "deadline": 24,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 2.0,
+      "max_interval": 480,
+      "deadline": 480,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7673,9 +8111,11 @@
         63
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 3.0,
+      "max_interval": 120,
+      "deadline": 120,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7699,9 +8139,11 @@
         134
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 3.0,
+      "max_interval": 120,
+      "deadline": 120,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -7725,9 +8167,11 @@
         111
       ],
       "risk": 3,
-      "service_time": 4,
-      "max_interval": 12,
-      "deadline": 12,
+      "service_time": 1,
+      "screening_workload": 1.0,
+      "review_workload": 3.0,
+      "max_interval": 120,
+      "deadline": 120,
       "allowed_platforms": [
         "UAV",
         "USV"

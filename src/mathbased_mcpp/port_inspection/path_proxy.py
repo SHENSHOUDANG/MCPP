@@ -35,7 +35,8 @@ def estimate_task_cost(platform: Platform, task: InspectionTask, grid: PortGridM
     except ValueError:
         return _infeasible(task)
     reserve = min(max(platform.return_reserve_ratio, 0.0), 0.95)
-    feasible = cost.energy_cost + cost.return_cost <= max(platform.energy - reserve, 0.0)
+    return_safety_factor = _return_safety_factor(platform)
+    feasible = cost.energy_cost + return_safety_factor * cost.return_cost <= max(platform.energy - reserve, 0.0)
     return TaskCost(
         path_length=cost.path_length,
         travel_time=cost.travel_time,
@@ -113,6 +114,10 @@ def _platform_depot(platform: Platform, grid: PortGridMap) -> GridCell:
     if isinstance(depot, (list, tuple)) and len(depot) == 2:
         return int(depot[0]), int(depot[1])
     return grid.depot
+
+
+def _return_safety_factor(platform: Platform) -> float:
+    return max(float(platform.metadata.get("return_safety_factor", 1.0)), 1.0)
 
 
 def _cost_from_lengths(

@@ -181,7 +181,7 @@ def scenario_config(base_config: ExperimentConfig, scenario: Scenario, obstacle_
 
 
 def load_policy_for_shape(checkpoint_path: Path, config: ExperimentConfig) -> ActorCritic:
-    payload = torch.load(checkpoint_path, map_location="cpu")
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     model = ActorCritic(
         observation_dim=int(payload["observation_dim"]),
         action_dim=int(payload["action_dim"]),
