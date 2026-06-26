@@ -517,7 +517,21 @@ def _initialize_rollout_state(
             worker.load_state_dict(worker_state)
         if observation is None or state is None:
             raise ValueError("resume checkpoint is missing rollout observation/state arrays")
-        return np.asarray(observation, dtype=np.float32), np.asarray(state, dtype=np.float32)
+        observation_array = np.asarray(observation, dtype=np.float32)
+        state_array = np.asarray(state, dtype=np.float32)
+        expected_observation_shape = (len(rollout_envs), rollout_envs[0].num_agents, rollout_envs[0].observation_dim)
+        expected_state_shape = (len(rollout_envs), rollout_envs[0].state_dim)
+        if observation_array.shape != expected_observation_shape:
+            raise ValueError(
+                "resume checkpoint observation shape does not match current environment: "
+                f"{observation_array.shape} != {expected_observation_shape}"
+            )
+        if state_array.shape != expected_state_shape:
+            raise ValueError(
+                "resume checkpoint global state shape does not match current environment: "
+                f"{state_array.shape} != {expected_state_shape}"
+            )
+        return observation_array, state_array
 
     return (
         np.asarray([agent_observations(worker.reset(seed=worker.config.seed)) for worker in rollout_envs], dtype=np.float32),
@@ -745,8 +759,9 @@ def _configure_gpu_budget(memory_fraction: float | None) -> None:
         return
     fraction = min(max(float(memory_fraction), 0.05), 0.95)
     try:
-        torch.cuda.set_per_process_memory_fraction(fraction)
-    except RuntimeError:
+        device_index = torch.cuda.current_device()
+        torch.cuda.set_per_process_memory_fraction(fraction, device=device_index)
+    except (RuntimeError, ValueError):
         pass
     torch.backends.cudnn.benchmark = False
 

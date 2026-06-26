@@ -103,6 +103,7 @@ def main() -> None:
             next_checkpoint_step = _next_checkpoint_step(total_steps, int(args.checkpoint_interval))
             restored_envs = resume_state.get("envs")
             if isinstance(restored_envs, list) and restored_envs:
+                _validate_restored_envs(restored_envs, model)
                 envs = restored_envs
                 env = envs[0]
                 num_envs = len(envs)
@@ -597,8 +598,8 @@ def _save_checkpoint(
             "episode_index": int(episode_index),
             "rows": rows or [],
             "args": args or {},
-            "envs": copy.deepcopy(envs) if envs is not None else None,
-            "obs_by_env": [np.asarray(item, dtype=np.float32) for item in obs_by_env] if obs_by_env is not None else None,
+            "envs": _checkpoint_envs(envs) if envs is not None else None,
+            "obs_by_env": [np.asarray(item, dtype=np.float32).copy() for item in obs_by_env] if obs_by_env is not None else None,
             "episode_rewards": [float(item) for item in episode_rewards] if episode_rewards is not None else None,
             "rng_state": _rng_state_payload(),
         },
@@ -657,6 +658,24 @@ def _clear_env_view_caches(envs: list[Any]) -> None:
         clear = getattr(env, "_clear_view_cache", None)
         if callable(clear):
             clear()
+
+
+def _checkpoint_envs(envs: list[Any]) -> list[Any]:
+    snapshot = copy.deepcopy(envs)
+    _clear_env_view_caches(snapshot)
+    return snapshot
+
+
+def _validate_restored_envs(envs: list[Any], model: HeterogeneousMappo) -> None:
+    for index, env in enumerate(envs):
+        observation_dim = int(getattr(env, "local_observation_dim", -1))
+        action_dim = int(getattr(env, "action_choices", -1))
+        if observation_dim != model.observation_dim or action_dim != model.action_dim:
+            raise ValueError(
+                "resume checkpoint environment shape does not match the current scheduler model: "
+                f"env[{index}] obs/action=({observation_dim}, {action_dim}) "
+                f"model=({model.observation_dim}, {model.action_dim})"
+            )
 
 
 def _resolve_resume_path(output_dir: Path, requested: str) -> Path | None:

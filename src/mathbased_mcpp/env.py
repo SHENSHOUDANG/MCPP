@@ -1038,7 +1038,7 @@ class GridCoverageEnv:
         return np.concatenate([channel.ravel() for channel in channels] + [metadata])
 
     def _refresh_explicit_map_memory(self) -> None:
-        self._node_message_cache = [None for _ in self.positions]
+        self._clear_cached_views(clear_messages=True)
         if not self.config.use_explicit_map_memory:
             return
         radius = max(self.config.observation_radius, 0)
