@@ -22,6 +22,8 @@ Resume from the latest course checkpoint:
 
 The resume checkpoint now stores model weights, optimizer state, Python/NumPy/PyTorch RNG state, per-environment state, current rollout observations, current global states, episode rewards, and episode path offsets.
 
+Resume depends on the local checkpoint file still existing. Checkpoints, metrics, TensorBoard logs, and rendered trajectories are local training artifacts and are not committed to Git.
+
 ## Port Scheduler Training
 
 Run a GPU-backed, resource-limited scheduler training job:
@@ -36,6 +38,8 @@ Resume automatically from the newest scheduler checkpoint:
 .\.venv\Scripts\python.exe tools\train_port_scheduler_rl.py --config configs\port_yangshan_task_initial_v1.toml --steps 200000 --checkpoint-interval 10000 --resume auto --num-envs 2 --env-workers 2 --cpu-threads 4 --gpu-memory-fraction 0.35 --process-priority below_normal
 ```
 
+Scheduler artifacts are generated under the configured scenario/output directory and are ignored by Git. After cleanup, `--resume auto` only finds checkpoints created by a later local run.
+
 ## Resource Headroom
 
 The default training runtime is intentionally conservative:
@@ -47,3 +51,5 @@ The default training runtime is intentionally conservative:
 - `process_priority = "below_normal"`
 
 For office work or gaming while training, keep `gpu_memory_fraction` between `0.25` and `0.35`, and keep `num_envs`/`rollout_workers` at `2`. For overnight training, raise `num_envs` and `rollout_workers` gradually after checking GPU memory and system responsiveness.
+
+`gpu_memory_fraction` only limits PyTorch's CUDA memory allocator. It does not cap GPU compute usage, so the practical way to keep the desktop responsive is to lower `num_envs`, `rollout_workers`/`env_workers`, and CPU threads, then use `process_priority = "below_normal"` or `"idle"`.

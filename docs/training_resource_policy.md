@@ -8,6 +8,19 @@ The scheduler training script is configured for low-impact local training by def
 - `gpu_memory_fraction = 0.35` caps PyTorch's CUDA allocator to roughly one third of GPU memory.
 - `process_priority = "below_normal"` lets foreground work and games win OS scheduling.
 
+The GPU memory fraction does not throttle GPU compute. If games or office apps feel sluggish, reduce `num_envs`, `env_workers`, and `cpu_threads` before increasing the memory cap.
+
+## Artifact Policy
+
+Training products are local-only and should not be committed:
+
+- model checkpoints (`*.pt`);
+- scheduler metrics and summaries;
+- training logs and TensorBoard event files;
+- evaluation traces, generated figures, and report folders.
+
+Keep source code, configs, tests, docs, and compact scenario definitions in Git. Regenerate training products from the commands below when needed.
+
 Example training command:
 
 ```powershell
