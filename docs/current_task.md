@@ -101,5 +101,5 @@
 ### 2026-06-29 LA effect figure
 
 - Added a reproducible renderer for a Los Angeles official-geometry training effect figure.
-- The figure visualizes the current `PENDING` NOAA-derived point, line, and area tasks, grid risk, depot, and provenance summary.
+- The figure now uses a NOAA ENC Direct Harbour chart export as the basemap and overlays the current `PENDING` NOAA-derived point, line, and area tasks, grid risk, depot, and provenance summary.
 - Generated PNG files belong under ignored `reports/` and must not be treated as final experiment evidence.

@@ -196,6 +196,6 @@ interpretation and next decision
 
 ### 2026-06-29 LA effect figure renderer
 
-- Added `tools/render_los_angeles_training_effect.py` to render the official NOAA-derived LA training scenario as a PNG effect figure.
-- Default output is `reports/los_angeles_training_effect.png`, which remains outside Git under the artifact policy.
-- Verification: renderer smoke output was created and `tests/test_los_angeles_effect_render.py` covers PNG generation from checked-in JSON.
+- Added `tools/render_los_angeles_training_effect.py` to render the official NOAA-derived LA training scenario as a PNG effect figure over a NOAA ENC Direct Harbour chart basemap.
+- Default output is `reports/los_angeles_training_effect.png`; the NOAA chart export and rendered PNG remain outside Git under the artifact policy.
+- Verification: renderer smoke output was created and `tests/test_los_angeles_effect_render.py` covers PNG generation from checked-in JSON with and without a chart basemap.
