@@ -97,3 +97,9 @@
 - `los_angeles_training_v1` has been corrected from an engineering seed scene to official NOAA ENC Direct geometry. The checked-in data uses the embedded NOAA official sample snapshot captured on 2026-06-29 because live REST execution was unavailable during this update.
 - Training parameters remain `PENDING`: deadlines, risk, service time, release mode, and recovery depot are training assumptions, not official Port of Los Angeles work orders.
 - Future LA data work should prefer live NOAA ENC Direct / official port data regeneration and must not reintroduce hand-drawn QGIS geometry for LA.
+
+### 2026-06-29 LA effect figure
+
+- Added a reproducible renderer for a Los Angeles official-geometry training effect figure.
+- The figure visualizes the current `PENDING` NOAA-derived point, line, and area tasks, grid risk, depot, and provenance summary.
+- Generated PNG files belong under ignored `reports/` and must not be treated as final experiment evidence.

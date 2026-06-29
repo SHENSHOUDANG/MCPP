@@ -193,3 +193,9 @@ interpretation and next decision
 - Replaced the LA training scene provenance from `PENDING_ENGINEERING_TRAINING` engineering seed geometry to `PENDING_OFFICIAL_GEOMETRY_TRAINING` official NOAA ENC Direct geometry.
 - Added a live NOAA REST generator path and an explicit `--use-embedded-official-snapshot` path. The checked-in data uses the 2026-06-29 embedded official NOAA sample snapshot because live REST execution was blocked by environment usage limits during this update.
 - The generated tasks contain official geometry provenance fields (`source_dataset`, `source_agency`, `source_url`, `source_date`, `source_version_or_edition`, `access_date`, `original_crs`, `file_checksum`, and `processing_script_version`). Scheduling parameters remain training assumptions and do not represent official work orders.
+
+### 2026-06-29 LA effect figure renderer
+
+- Added `tools/render_los_angeles_training_effect.py` to render the official NOAA-derived LA training scenario as a PNG effect figure.
+- Default output is `reports/los_angeles_training_effect.png`, which remains outside Git under the artifact policy.
+- Verification: renderer smoke output was created and `tests/test_los_angeles_effect_render.py` covers PNG generation from checked-in JSON.
