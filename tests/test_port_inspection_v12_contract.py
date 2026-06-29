@@ -77,6 +77,14 @@ class V12ContractTests(unittest.TestCase):
         with self.assertRaises(ContractValidationError):
             require_historical_baseline_ack(boundary, False, purpose="test training")
 
+    def test_los_angeles_config_is_pending_training_prototype(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")
+        boundary = classify_config_boundary(config)
+        self.assertEqual(boundary.scenario_status, "PENDING")
+        self.assertFalse(boundary.historical_only)
+        self.assertFalse(boundary.final_experiment_eligible)
+        require_historical_baseline_ack(boundary, False, purpose="test training")
+
     def test_validate_periodic_task_record(self) -> None:
         validate_v12_task_record(_task_record())
 

@@ -162,6 +162,14 @@
 - 更新 `.gitignore`，将训练/评估输出、source 包、报告目录和缓存目录排除在版本控制之外。
 - 本清理仅降低历史产物对后续上下文分析的干扰，不形成新的模型有效性、基线或实验结论。
 
+### 2026-06-29 洛杉矶港训练管线原型
+
+- 新增 `los_angeles_training_v1` compact 场景、专用平台配置和训练配置，状态为 `PENDING_ENGINEERING_TRAINING`。
+- 默认 `check_port_inspection_env.py`、`train_port_scheduler_rl.py` 和评估脚本切换到洛杉矶港训练配置；Yangshan 仍仅作显式历史基线。
+- 任务加载器支持 `point_tasks`、`line_tasks` 和 `area_tasks`，用于覆盖导航助航点、航道/泊位走廊和港池/水面区域训练。
+- 已完成 smoke 训练：`tools/train_port_scheduler_rl.py --config configs/port_los_angeles_training_v1.toml --steps 8 --device cpu`，checkpoint 输出位于 ignored 的 `data/ports/los_angeles_training_v1/smoke_training/scheduler_rl/`。
+- 验证：`python -m unittest discover tests` 通过。该结果仅说明训练管线可运行，不构成最终算法、基线或实验结论。
+
 ## 后续实验记录字段
 
 最终基线、消融和创新结论在第十二项冻结前均为 `PENDING`。恢复实验后，每次运行至少记录：

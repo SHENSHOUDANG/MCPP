@@ -38,8 +38,8 @@ from mathbased_mcpp.port_inspection.v12_contract import (
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Train the historical UAV-USV scheduler baseline with CTDE MAPPO.")
-    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
+    parser = argparse.ArgumentParser(description="Train a UAV-USV port scheduler prototype with CTDE MAPPO.")
+    parser.add_argument("--config", default="configs/port_los_angeles_training_v1.toml")
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=20260615)
     parser.add_argument("--checkpoint-interval", type=int, default=100000)

@@ -26,7 +26,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Evaluate greedy schedulers inside the RL scheduling environment.")
-    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
+    parser.add_argument("--config", default="configs/port_los_angeles_training_v1.toml")
     parser.add_argument("--seed", type=int, default=20260615)
     parser.add_argument(
         "--strategy",

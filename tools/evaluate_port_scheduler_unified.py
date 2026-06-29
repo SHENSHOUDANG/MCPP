@@ -38,9 +38,9 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Evaluate MAPPO and greedy policies through the same agent observation API.")
-    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
-    parser.add_argument("--checkpoint", default="data/ports/yangshan_task_initial_v1/scheduler_rl/scheduler_mappo.pt")
-    parser.add_argument("--output-dir", default="data/ports/yangshan_task_initial_v1/unified_eval")
+    parser.add_argument("--config", default="configs/port_los_angeles_training_v1.toml")
+    parser.add_argument("--checkpoint", default="data/ports/los_angeles_training_v1/scheduler_rl/scheduler_mappo.pt")
+    parser.add_argument("--output-dir", default="data/ports/los_angeles_training_v1/unified_eval")
     parser.add_argument("--seeds", nargs="+", type=int, default=[20260622, 20260623, 20260624, 20260625, 20260626])
     parser.add_argument("--policies", nargs="+", choices=POLICIES, default=list(POLICIES))
     args = parser.parse_args()

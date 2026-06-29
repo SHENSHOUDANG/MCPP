@@ -1,0 +1,75 @@
+grid_path = "data/ports/los_angeles_training_v1/los_angeles_training_v1_grid.json"
+tasks_path = "data/ports/los_angeles_training_v1/los_angeles_training_v1_tasks.json"
+output_dir = "data/ports/los_angeles_training_v1"
+map_source = "los_angeles_training_engineering_seed_v1"
+platform_profiles_path = "configs/platform_profiles_la_training_v1.toml"
+uav_count = 3
+usv_count = 3
+
+platform_profile_sequence = [
+  "UAV_LA_TRAINING",
+  "UAV_LA_TRAINING",
+  "UAV_LA_TRAINING",
+  "USV_LA_TRAINING",
+  "USV_LA_TRAINING",
+  "USV_LA_TRAINING",
+]
+
+[contract]
+model_contract_version = "V1.2"
+scenario_status = "PENDING"
+historical_only = false
+final_experiment_eligible = false
+notice = "Los Angeles compact training scenario is runnable for engineering training only; final algorithm and official GIS experiment remain unfrozen."
+
+[scheduling]
+risk_weight = 12.0
+urgency_weight = 6.0
+review_wait_weight = 0.5
+distance_weight = 0.06
+load_weight = 0.25
+compatibility_bonus = 4.0
+
+[scheduler_rl]
+max_steps = 160
+candidate_k = 10
+device = "auto"
+num_envs = 1
+env_workers = 1
+cpu_threads = 4
+interop_threads = 1
+gpu_memory_fraction = 0.25
+process_priority = "below_normal"
+learning_rate = 0.0003
+gamma = 0.98
+gae_lambda = 0.95
+clip_ratio = 0.2
+update_epochs = 2
+rollout_steps = 16
+hidden_dim = 96
+
+[scheduler_rl.reward]
+team_close_reward = 8.0
+screen_progress_reward = 1.0
+review_progress_reward = 1.5
+energy_cost = 0.5
+time_cost = 0.01
+invalid_penalty = 5.0
+conflict_penalty = 1.0
+
+[review_trigger]
+confidence_threshold = 0.65
+mandatory_review_risk = 3
+base_review_deadline = 120.0
+risk_deadline_scale = 12.0
+confidence_deadline_scale = 8.0
+replenish_steps = 6
+sensitivity = 0.85
+specificity = 0.80
+confidence_noise = 0.08
+uncertainty_base = 0.35
+
+[review_trigger.anomaly_probability_by_risk]
+1 = 0.08
+2 = 0.22
+3 = 0.42

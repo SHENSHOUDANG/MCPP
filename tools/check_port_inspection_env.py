@@ -26,7 +26,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Smoke-check the port inspection scheduling environment.")
-    parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
+    parser.add_argument("--config", default="configs/port_los_angeles_training_v1.toml")
     parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()

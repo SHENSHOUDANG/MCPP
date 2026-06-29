@@ -1,0 +1,1204 @@
+{
+  "metadata": {
+    "scenario_name": "los_angeles_training_v1",
+    "port": "Los Angeles",
+    "contract_status": "PENDING_ENGINEERING_TRAINING",
+    "scenario_generated": true,
+    "cell_size_m": 250.0,
+    "bounds_lon_lat": {
+      "lon_min": -118.302,
+      "lon_max": -118.234,
+      "lat_min": 33.696000000000005,
+      "lat_max": 33.768
+    },
+    "grid_shape": [
+      33,
+      27
+    ],
+    "note": "Compact scenario seed for making LA-port scheduler training runnable; replace with verified official GIS layers before final experiments."
+  },
+  "point_tasks": [
+    {
+      "id": "LA-ATON-ANGELS-GATE",
+      "type": "navigation_aid",
+      "risk": 3,
+      "service_time": 2,
+      "screening_workload": 1.2,
+      "review_workload": 2.5,
+      "max_interval": 300,
+      "deadline": 300,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "TARGET",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Angels Gate navigation aid inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.248,
+        "latitude": 33.706
+      },
+      "cell": [
+        27,
+        20
+      ]
+    },
+    {
+      "id": "LA-ATON-QUEENS-GATE",
+      "type": "navigation_aid",
+      "risk": 3,
+      "service_time": 2,
+      "screening_workload": 1.2,
+      "review_workload": 2.5,
+      "max_interval": 300,
+      "deadline": 300,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "TARGET",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Queens Gate navigation aid inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.286,
+        "latitude": 33.711
+      },
+      "cell": [
+        25,
+        6
+      ]
+    },
+    {
+      "id": "LA-ATON-MAIN-CHANNEL-1",
+      "type": "navigation_aid",
+      "risk": 2,
+      "service_time": 2,
+      "screening_workload": 1.2,
+      "review_workload": 2.5,
+      "max_interval": 480,
+      "deadline": 480,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "TARGET",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Main Channel buoy inspection 1",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.253,
+        "latitude": 33.727
+      },
+      "cell": [
+        18,
+        18
+      ]
+    },
+    {
+      "id": "LA-ATON-MAIN-CHANNEL-2",
+      "type": "navigation_aid",
+      "risk": 2,
+      "service_time": 2,
+      "screening_workload": 1.2,
+      "review_workload": 2.5,
+      "max_interval": 480,
+      "deadline": 480,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "TARGET",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Main Channel buoy inspection 2",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.258,
+        "latitude": 33.742
+      },
+      "cell": [
+        11,
+        16
+      ]
+    },
+    {
+      "id": "LA-ASSET-PIER400-FENDER",
+      "type": "fender_cluster",
+      "risk": 2,
+      "service_time": 3,
+      "screening_workload": 1.8,
+      "review_workload": 3.75,
+      "max_interval": 480,
+      "deadline": 480,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "TARGET",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Pier 400 fender cluster inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.257,
+        "latitude": 33.732
+      },
+      "cell": [
+        16,
+        17
+      ]
+    },
+    {
+      "id": "LA-ASSET-VTS-WATERLINE",
+      "type": "waterside_asset",
+      "risk": 2,
+      "service_time": 3,
+      "screening_workload": 1.8,
+      "review_workload": 3.75,
+      "max_interval": 540,
+      "deadline": 540,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "TARGET",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Inner harbor waterline asset inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.268,
+        "latitude": 33.758
+      },
+      "cell": [
+        4,
+        13
+      ]
+    },
+    {
+      "id": "LA-EVENT-FLOATING-DEBRIS-A",
+      "type": "floating_debris",
+      "risk": 3,
+      "service_time": 2,
+      "screening_workload": 1.2,
+      "review_workload": 2.5,
+      "max_interval": 180,
+      "deadline": 180,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "SURFACE_SAFETY_PATROL",
+        "geometry_mode": "TARGET",
+        "release_mode": "EVENT",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Scenario floating debris response A",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.262,
+        "latitude": 33.734
+      },
+      "cell": [
+        15,
+        15
+      ]
+    },
+    {
+      "id": "LA-EVENT-SURFACE-SHEEN-A",
+      "type": "surface_sheen",
+      "risk": 3,
+      "service_time": 2,
+      "screening_workload": 1.2,
+      "review_workload": 2.5,
+      "max_interval": 180,
+      "deadline": 180,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "SURFACE_SAFETY_PATROL",
+        "geometry_mode": "TARGET",
+        "release_mode": "EVENT",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Scenario visible surface sheen response A",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": -118.274,
+        "latitude": 33.744
+      },
+      "cell": [
+        11,
+        10
+      ]
+    }
+  ],
+  "line_tasks": [
+    {
+      "id": "LA-CH-MAIN",
+      "type": "channel",
+      "risk": 3,
+      "service_time": 8,
+      "screening_workload": 4.8,
+      "review_workload": 10.0,
+      "max_interval": 300,
+      "deadline": 300,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Main Channel hydrographic survey",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          27,
+          21
+        ],
+        [
+          26,
+          21
+        ],
+        [
+          25,
+          21
+        ],
+        [
+          24,
+          21
+        ],
+        [
+          23,
+          20
+        ],
+        [
+          22,
+          20
+        ],
+        [
+          21,
+          20
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          19,
+          20
+        ],
+        [
+          18,
+          20
+        ],
+        [
+          17,
+          20
+        ],
+        [
+          16,
+          20
+        ],
+        [
+          15,
+          19
+        ],
+        [
+          14,
+          19
+        ],
+        [
+          13,
+          19
+        ],
+        [
+          12,
+          19
+        ],
+        [
+          11,
+          18
+        ],
+        [
+          10,
+          18
+        ],
+        [
+          9,
+          17
+        ],
+        [
+          8,
+          16
+        ],
+        [
+          7,
+          16
+        ],
+        [
+          6,
+          15
+        ]
+      ]
+    },
+    {
+      "id": "LA-CH-CABRILLO",
+      "type": "approach_channel",
+      "risk": 3,
+      "service_time": 7,
+      "screening_workload": 4.2,
+      "review_workload": 8.75,
+      "max_interval": 300,
+      "deadline": 300,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Cabrillo approach corridor survey",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          26,
+          4
+        ],
+        [
+          25,
+          5
+        ],
+        [
+          24,
+          6
+        ],
+        [
+          24,
+          7
+        ],
+        [
+          23,
+          8
+        ],
+        [
+          22,
+          9
+        ],
+        [
+          21,
+          10
+        ],
+        [
+          21,
+          11
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          13
+        ],
+        [
+          19,
+          14
+        ],
+        [
+          19,
+          15
+        ],
+        [
+          18,
+          16
+        ]
+      ]
+    },
+    {
+      "id": "LA-BERTH-PIER400-W",
+      "type": "berth_face",
+      "risk": 2,
+      "service_time": 6,
+      "screening_workload": 3.6,
+      "review_workload": 7.5,
+      "max_interval": 480,
+      "deadline": 480,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Pier 400 west berth face inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          16,
+          11
+        ],
+        [
+          16,
+          12
+        ],
+        [
+          16,
+          13
+        ],
+        [
+          15,
+          14
+        ],
+        [
+          15,
+          15
+        ],
+        [
+          14,
+          16
+        ],
+        [
+          14,
+          17
+        ],
+        [
+          13,
+          18
+        ]
+      ]
+    },
+    {
+      "id": "LA-BERTH-TERMINAL-ISLAND",
+      "type": "berth_face",
+      "risk": 2,
+      "service_time": 6,
+      "screening_workload": 3.6,
+      "review_workload": 7.5,
+      "max_interval": 480,
+      "deadline": 480,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Terminal Island waterside berth inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          10,
+          10
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          9,
+          12
+        ],
+        [
+          8,
+          13
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          6,
+          15
+        ],
+        [
+          6,
+          16
+        ],
+        [
+          5,
+          17
+        ]
+      ]
+    },
+    {
+      "id": "LA-BREAKWATER-SAN-PEDRO",
+      "type": "breakwater",
+      "risk": 2,
+      "service_time": 7,
+      "screening_workload": 4.2,
+      "review_workload": 8.75,
+      "max_interval": 540,
+      "deadline": 540,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "San Pedro breakwater waterside inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          27,
+          6
+        ],
+        [
+          27,
+          7
+        ],
+        [
+          26,
+          8
+        ],
+        [
+          26,
+          9
+        ],
+        [
+          25,
+          10
+        ],
+        [
+          25,
+          11
+        ],
+        [
+          25,
+          12
+        ],
+        [
+          25,
+          13
+        ],
+        [
+          24,
+          14
+        ],
+        [
+          24,
+          15
+        ],
+        [
+          24,
+          16
+        ],
+        [
+          24,
+          17
+        ]
+      ]
+    },
+    {
+      "id": "LA-BRIDGE-VINCENT-THOMAS",
+      "type": "bridge_pier_waterline",
+      "risk": 3,
+      "service_time": 5,
+      "screening_workload": 3.0,
+      "review_workload": 6.25,
+      "max_interval": 360,
+      "deadline": 360,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 1.0,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Vincent Thomas Bridge pier waterline inspection",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          9,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          8,
+          11
+        ],
+        [
+          8,
+          12
+        ],
+        [
+          8,
+          13
+        ],
+        [
+          8,
+          14
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          7,
+          16
+        ]
+      ]
+    }
+  ],
+  "area_tasks": [
+    {
+      "id": "LA-AREA-PIER400-BASIN",
+      "type": "basin",
+      "risk": 2,
+      "service_time": 9,
+      "screening_workload": 5.4,
+      "review_workload": 11.25,
+      "max_interval": 420,
+      "deadline": 420,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.85,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "SURFACE_SAFETY_PATROL",
+        "geometry_mode": "AREA",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Pier 400 basin surface safety patrol",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          11,
+          10
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          11,
+          14
+        ],
+        [
+          11,
+          16
+        ],
+        [
+          11,
+          18
+        ],
+        [
+          13,
+          10
+        ],
+        [
+          13,
+          12
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          13,
+          16
+        ],
+        [
+          13,
+          18
+        ],
+        [
+          15,
+          10
+        ],
+        [
+          15,
+          12
+        ],
+        [
+          15,
+          14
+        ],
+        [
+          15,
+          16
+        ],
+        [
+          15,
+          18
+        ],
+        [
+          17,
+          10
+        ],
+        [
+          17,
+          12
+        ],
+        [
+          17,
+          14
+        ],
+        [
+          17,
+          16
+        ],
+        [
+          17,
+          18
+        ],
+        [
+          19,
+          10
+        ],
+        [
+          19,
+          12
+        ],
+        [
+          19,
+          14
+        ],
+        [
+          19,
+          16
+        ],
+        [
+          19,
+          18
+        ]
+      ]
+    },
+    {
+      "id": "LA-AREA-WEST-BASIN",
+      "type": "basin",
+      "risk": 2,
+      "service_time": 8,
+      "screening_workload": 4.8,
+      "review_workload": 10.0,
+      "max_interval": 420,
+      "deadline": 420,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.85,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "SURFACE_SAFETY_PATROL",
+        "geometry_mode": "AREA",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "West Basin visible obstruction patrol",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          7,
+          12
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          12
+        ],
+        [
+          11,
+          6
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          10
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          13,
+          6
+        ],
+        [
+          13,
+          8
+        ],
+        [
+          13,
+          10
+        ],
+        [
+          13,
+          12
+        ],
+        [
+          15,
+          6
+        ],
+        [
+          15,
+          8
+        ],
+        [
+          15,
+          10
+        ],
+        [
+          15,
+          12
+        ]
+      ]
+    },
+    {
+      "id": "LA-AREA-TURNING-BASIN",
+      "type": "turning_basin",
+      "risk": 3,
+      "service_time": 10,
+      "screening_workload": 6.0,
+      "review_workload": 12.5,
+      "max_interval": 360,
+      "deadline": 360,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.85,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "AREA",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Turning basin hydrographic check",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          5,
+          14
+        ],
+        [
+          5,
+          16
+        ],
+        [
+          5,
+          18
+        ],
+        [
+          5,
+          20
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          7,
+          16
+        ],
+        [
+          7,
+          18
+        ],
+        [
+          7,
+          20
+        ],
+        [
+          9,
+          14
+        ],
+        [
+          9,
+          16
+        ],
+        [
+          9,
+          18
+        ],
+        [
+          9,
+          20
+        ],
+        [
+          11,
+          14
+        ],
+        [
+          11,
+          16
+        ],
+        [
+          11,
+          18
+        ],
+        [
+          11,
+          20
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          13,
+          16
+        ],
+        [
+          13,
+          18
+        ],
+        [
+          13,
+          20
+        ]
+      ]
+    },
+    {
+      "id": "LA-AREA-FISH-HARBOR",
+      "type": "harbor_basin",
+      "risk": 1,
+      "service_time": 6,
+      "screening_workload": 3.6,
+      "review_workload": 7.5,
+      "max_interval": 600,
+      "deadline": 600,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.85,
+      "priority": 1.0,
+      "metadata": {
+        "task_family": "SURFACE_SAFETY_PATROL",
+        "geometry_mode": "AREA",
+        "release_mode": "SCHEDULED",
+        "scenario_generated": true,
+        "parameter_status": "engineering_training_scenario",
+        "object_name": "Fish Harbor surface condition patrol",
+        "source_dataset": "Los Angeles port engineering seed objects",
+        "source_kind": "scenario_seed_not_final_official_dataset",
+        "verification_level": "engineering_seed",
+        "longitude": null,
+        "latitude": null
+      },
+      "cells": [
+        [
+          18,
+          8
+        ],
+        [
+          18,
+          10
+        ],
+        [
+          18,
+          12
+        ],
+        [
+          18,
+          14
+        ],
+        [
+          18,
+          16
+        ],
+        [
+          20,
+          8
+        ],
+        [
+          20,
+          10
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          14
+        ],
+        [
+          20,
+          16
+        ],
+        [
+          22,
+          8
+        ],
+        [
+          22,
+          10
+        ],
+        [
+          22,
+          12
+        ],
+        [
+          22,
+          14
+        ],
+        [
+          22,
+          16
+        ]
+      ]
+    }
+  ]
+}

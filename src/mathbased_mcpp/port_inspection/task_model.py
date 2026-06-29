@@ -11,7 +11,12 @@ def load_inspection_tasks(path: str | Path, grid: PortGridMap | None = None) -> 
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     tasks: list[InspectionTask] = []
     for item in raw.get("point_tasks", []):
-        tasks.append(_task_from_raw(item, geometry="point", cells=[item["cell"]]))
+        cells = item.get("cells", [item["cell"]])
+        tasks.append(_task_from_raw(item, geometry="point", cells=cells))
+    for item in raw.get("line_tasks", []):
+        tasks.append(_task_from_raw(item, geometry="line", cells=list(item["cells"])))
+    for item in raw.get("area_tasks", []):
+        tasks.append(_task_from_raw(item, geometry="area", cells=list(item["cells"])))
     if grid is not None:
         _validate_tasks(tasks, grid)
     return tasks
@@ -63,8 +68,10 @@ def _cell(value: Any) -> GridCell:
 def _validate_tasks(tasks: list[InspectionTask], grid: PortGridMap) -> None:
     free = grid.free_cell_set
     for task in tasks:
-        if task.geometry != "point":
+        if task.geometry not in {"point", "line", "area"}:
             raise ValueError(f"unsupported task geometry: {task.geometry}")
+        if task.geometry in {"line", "area"} and len(task.cells) < 2:
+            raise ValueError(f"{task.geometry} task must reference at least two cells: {task.task_id}")
         if task.risk < 1 or task.risk > 3:
             raise ValueError(f"task risk must be in [1, 3]: {task.task_id}")
         for cell in task.cells:

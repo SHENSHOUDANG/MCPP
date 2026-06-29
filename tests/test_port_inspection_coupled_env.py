@@ -122,6 +122,19 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertFalse(step.truncated)
         self.assertIn("total_invalid_actions", step.info["metrics"])
 
+    def test_los_angeles_training_config_builds_mixed_geometry_env(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")
+        env = build_env(config)
+        reset = env.reset_model(seed=13)
+        geometries = {task.geometry for task in env.tasks}
+
+        self.assertEqual(reset.info["contract_boundary"]["scenario_status"], "PENDING")
+        self.assertFalse(reset.info["contract_boundary"]["historical_only"])
+        self.assertIn("point", geometries)
+        self.assertIn("line", geometries)
+        self.assertIn("area", geometries)
+        self.assertGreater(env.action_masks().sum(), env.num_platforms)
+
     def test_idle_depot_platform_can_start_replenishment(self) -> None:
         config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
         env = build_env(config)
