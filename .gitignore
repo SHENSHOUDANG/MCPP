@@ -9,6 +9,19 @@ __pycache__/
 .venv/
 runs/
 outputs/
+reports/
+
+# Local training and evaluation artifacts kept out of version control.
+data/ports/*/scheduler_rl/
+data/ports/*/scheduler_rl_*backup/
+data/ports/*/smoke_training/
+data/ports/*/training_logs/
+data/ports/*/baselines/
+data/ports/*/unified_eval/
+data/ports/*/unified_eval_step*/
+data/ports/*/source/
+data/ports/*/import_summary.json
+
 *.egg-info/
 build/
 dist/

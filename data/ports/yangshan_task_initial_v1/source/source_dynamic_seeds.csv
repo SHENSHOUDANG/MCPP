@@ -1,4 +1,0 @@
-﻿event_id,event_family,parent_zone_id,longitude,latitude,x_utm,y_utm,initial_visible,source_kind
-E009,floating_object,FZ01,122.04700652,30.64133301,408680.699,3390240.811,False,simulation_seed_not_observed
-E011,floating_object,FZ02,122.12140856,30.60854315,415782.066,3386548.789,False,simulation_seed_not_observed
-E012,floating_object,FZ02,122.09713054,30.62313966,413467.772,3388184.874,False,simulation_seed_not_observed

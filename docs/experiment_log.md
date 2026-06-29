@@ -156,6 +156,12 @@
 - 历史训练入口需要显式确认 `--allow-historical-baseline` 后才能运行；检查与评估输出写入契约边界元数据。
 - 验证：`python -m unittest discover tests` 通过。
 
+### 2026-06-29 旧产物清理
+
+- 删除已跟踪的 Yangshan 历史 checkpoint、训练指标、评估 trace、日志、import summary 和 raw source 包。
+- 更新 `.gitignore`，将训练/评估输出、source 包、报告目录和缓存目录排除在版本控制之外。
+- 本清理仅降低历史产物对后续上下文分析的干扰，不形成新的模型有效性、基线或实验结论。
+
 ## 后续实验记录字段
 
 最终基线、消融和创新结论在第十二项冻结前均为 `PENDING`。恢复实验后，每次运行至少记录：
