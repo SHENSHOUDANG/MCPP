@@ -1,35 +1,90 @@
-# Agent Instructions
+# AGENTS.md
 
-Keep this file short. It defines long-lived working rules for Codex and other coding agents in this repository.
+> 规范版本：V1.2
 
-## Working Style
+## 1. 规范效力
 
-- Do not use one long prompt as the project memory.
-- Keep durable project knowledge in repository Markdown files.
-- After each completed repository change, update the relevant project memory file before finishing.
-- Commit completed code, config, data-cleanup, or documentation changes after review; keep commits focused.
-- Prefer small, scoped changes that match the existing codebase.
-- Do not commit model checkpoints, training outputs, raw source data packages, generated reports, or cache folders.
-- Do not delete or rewrite source code unless the current task explicitly asks for it.
-- Before broad cleanup, inspect `git status` and distinguish code/config/docs from generated artifacts.
+本仓库实现 UAV-USV 异构港区水空巡检研究的冻结规范。
 
-## Project Memory Files
+实质性结论按以下顺序生效：
 
-- `docs/model_specification.md`: theoretical definitions, task semantics, observation/action/reward contracts.
-- `docs/current_task.md`: current active objective, decisions, constraints, and next steps.
-- `docs/experiment_log.md`: experiment history, results, and artifact locations if they exist outside Git.
-- `README.md`: concise entry point for setup, commands, repository layout, and artifact policy.
+1. 第一项：时间结构、空间范围、上下层职责。
+2. 第二项：任务真实性、任务族、实证港口。
+3. 第三项：空间粒度、上层调度任务单元。
+4. 第四至第七项：能力、任务表示、依赖、截止时间与重访。
+5. 第八项：时间、能量、返航与补能。
+6. 第八至第十二项结构 V2：仅更新后续编号、审查顺序和跨项边界。
 
-Use the active Codex conversation only for concrete one-off instructions. If an instruction should survive a new thread, move it into one of the Markdown files above.
+冲突处理规则：
 
-## Artifact Policy
+- 未经明确批准的后续内容与前序冻结条款冲突时，以前序条款为准。
+- 经用户批准，且明确标注为 `AMENDS` 或 `REPLACES` 的后续冻结条款，可以修改或替代被指明的前序条款。
+- 未被明确替代的前序内容继续有效。
+- Codex 不得根据版本号、代码重构或隐含推断静默改变冻结语义。
 
-Tracked files should be source code, configs, tests, docs, and compact runtime scenario definitions.
+正式修订至少记录：`amendment_id`、`operation`、`target_clause`、`approved_on`、受影响的公式、接口、测试和文件。
 
-Keep these out of Git:
+## 2. Codex 强制规则
 
-- `*.pt` checkpoints;
-- `runs/`, `outputs/`, `reports/`, `.tmp_tests/`;
-- scheduler output folders under `data/ports/*/`;
-- raw QGIS/GIS/GeoPackage/CSV source packages under `data/ports/*/source/`;
-- metrics, logs, TensorBoard events, rendered trajectories, and temporary diagnostics.
+Codex 必须：
+
+- 修改代码前阅读 `README.md`、`docs/current_task.md` 和 `docs/model_specification.md`。
+- 只实施当前任务所需的最小改动。
+- 保持上层调度策略与下层执行策略职责分离，并通过标准接口耦合。
+- 以“上下层均采用强化学习”为最终方法约束；研究初期可用传统规划器临时替代下层，但必须保持接口兼容。
+- 保留点、线、面原始几何；质心仅作特征，不替代服务几何。
+- 跨调度窗口保存任务、平台、回收点和周期日历状态。
+- 严格区分预计时间/能耗与实际时间/能耗。
+- 对 `null` 显式分支处理，不得自动转为 `0`。
+- 使用冻结的枚举值和状态转移；逾期只能作为派生标志，不得作为任务状态。
+- 为新增数据结构、状态转移、掩码和接口补充校验与测试。
+- 将经批准的模型变化同步记录到 `docs/experiment_log.md`。
+
+Codex 禁止：
+
+- 自行编造任务类型、设备参数、截止时间、重访间隔、质量规则或算法超参数。
+- 将所有 GIS 对象或采样点直接变成上层任务。
+- 在能力判断前按“UAV 任务/USV 任务”预切任务族。
+- UAV 发现异常后自动生成 USV 任务。
+- 恢复缺乏依据的综合风险分数。
+- 将到达坐标、质心或单一质量分数直接视为任务完成。
+- 将航点、测线、扫描条带或覆盖栅格视为上层任务。
+- 假设每项任务结束后必须立即返航或补能。
+- 将厂家最大续航直接作为安全可调度续航。
+- 假设普通 USV 天然具备 UAV 回收、搭载或补能能力。
+- 将研究初期的传统下层规划器表述为最终下层方法，或据此否定双层强化学习路线。
+- 在下层强化学习冻结前，让临时规划器改变上层任务语义、完成标准或安全约束。
+- 将 `deadline=null`、`max_revisit_interval=null` 或 `last_completion_time=null` 强制写成零值参与计算。
+- 在对应审查项冻结前恢复最终 GIS 制作、最终策略训练、基线结论或创新结论。
+
+## 3. 范围状态
+
+当前已冻结：
+
+- 有限作业窗口下的多周期滚动调度。
+- 周期、计划和事件释放任务。
+- 三类任务族及点、线、面统一表示。
+- 能力资格、动态任务图、任务状态、完成判定、截止时间与重访语义。
+- 事件驱动调度、物理能源状态、安全返航和固定点补能。
+- 最低任务、平台和回收点数据结构。
+- 上下层职责、最低信息接口及最终双层强化学习架构。
+- 研究初期允许传统规划方法作为下层临时替代与对照基线。
+
+当前未冻结：
+
+- 第九项：上层决策主体、状态、动作、掩码、冲突处理、目标/奖励和求解算法。
+- 第十项：点、线、面任务的 UAV/USV 下层强化学习执行器及其传统规划临时替代方案。
+- 第十一项：训练顺序、成本调用、失败反馈和闭环联调。
+- 第十二项：基线、消融、指标、最终创新点和最终论文题目。
+
+## 4. 变更协议
+
+冻结条款仅可在以下条件全部满足时修改：
+
+1. 明确说明冲突、新证据或实现闭合需要。
+2. 指定 `AMENDS` 或 `REPLACES`，并准确指出目标条款。
+3. 列出受影响的公式、数据结构、接口、测试和文档。
+4. 获得用户明确批准。
+5. 同一改动中更新 `docs/model_specification.md` 与 `docs/experiment_log.md`。
+
+未经批准的重构可以改善代码质量，但不得改变模型语义。

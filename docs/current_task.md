@@ -1,42 +1,83 @@
-# Current Task
+# docs/current_task.md
 
-Last updated: 2026-06-26
+> 规范版本：V1.2
 
-## Active Objective
+## 当前正式任务
 
-Clean the repository so it tracks code, configs, tests, docs, and compact runtime scenario definitions only. Remove training products, training data packages, stale generated artifacts, and outdated README content.
+**第九项：冻结上层决策机制与求解算法。**
 
-## Decisions
+在下列契约完成并获批前，不得选择或实现最终上层算法。最终研究架构为上下层均采用强化学习；本项只冻结上层。
 
-- Do not rely on one long Codex prompt for project memory.
-- Keep long-lived rules in `AGENTS.md`.
-- Keep theoretical definitions in `docs/model_specification.md`.
-- Keep current task state here.
-- Keep experiment history in `docs/experiment_log.md`.
-- Keep raw training artifacts and generated reports out of Git.
-- After each completed repository change, update the relevant project memory file.
-- Completed code, config, cleanup, or documentation changes should be committed after review.
+## 必须确定的内容
 
-## Current Repository State
+1. **决策主体**
+   - 掌握全局状态的中央调度器；或
+   - 每个平台一个策略主体，采用集中训练、分散执行。
 
-- Code-only update was committed and pushed as `df418c6 chore: save code updates 2026-06-26`.
-- Generated training products under the Yangshan scheduler scenario have been removed from the working tree.
-- Raw `source/` data packages and `import_summary.json` were removed from the working tree.
-- `README.md` has been shortened to current setup, workflow, and artifact policy.
-- `docs/model_specification.md` now defines the port scheduler model contract, including UAV/USV sets, screening/review tasks, review triggers, USV backlog backpressure, state/action spaces, candidate generation, conflict resolution, rewards, completion rules, depot/replenishment behavior, constraints, and thesis metrics.
+2. **状态表示**
+   - 活动任务及带类型依赖关系；
+   - 任务族、几何引用、释放/截止/重访/义务状态；
+   - 平台位置、状态、物理剩余能源、补能状态和实际退出位置；
+   - 回收点兼容性、容量、开放窗口和当前占用；
+   - 下层估计的路径、时间、能耗和退出信息；
+   - 当前窗口时间及继承的未完成状态。
 
-## Remaining Local Changes
+3. **候选集与掩码**
+   - 区分硬能力资格与当前完整可行性；
+   - 明确哪些条件必须作为硬掩码；
+   - 对无截止、无重访或首次巡检状态显式分支，不得以零值替代空值；
+   - 明确 Top-K 是不用、仅作效率机制，还是作为消融变量。
 
-The working tree currently contains cleanup/documentation changes that have not been committed yet:
+4. **动作表示**
+   - 平台—任务配对、逐平台顺序选择、联合匹配或其他可变规模结构；
+   - 空闲、返航和补能动作必须符合第八项；
+   - 明确重复选择任务、重复占用平台和超额占用回收点的消解方式。
 
-- updated artifact ignore rules;
-- deleted generated training and evaluation artifacts;
-- updated repository and scenario README files;
-- updated runtime/resource docs;
-- added project memory documents.
+5. **目标或奖励**
+   - 每一项均对应任务完成、最终迟期、实时逾期、重访违约、资源消耗或安全约束；
+   - `best_case_slack` 只表示单任务的最佳可行平台裕度，不得视为竞争条件下的确定结果；
+   - 不得恢复综合风险分数；
+   - 只有在决策架构确定后才定义信用分配。
 
-## Next Steps
+6. **求解算法**
+   - 比较集中式 PPO、MAPPO/IPPO、图/注意力策略和混合优化；
+   - 依据任务与平台数量变化、依赖关系、资源占用和冲突处理进行选择；
+   - 不得因旧项目曾使用某算法而直接沿用。
 
-1. Review this cleanup diff.
-2. Commit the cleanup as a documentation/artifact-pruning change.
-3. Push the cleanup commit after review.
+## 已具备前提
+
+- 任务真实性与三类任务族。
+- 点、线、面调度任务语义。
+- 最低任务、平台和回收点数据结构。
+- 能力候选集 `R_cap`。
+- 带类型动态任务图和固定任务状态枚举。
+- 任务族相关质量验收函数。
+- 截止、重访、首次巡检和空值处理规则。
+- 事件驱动时间、物理能量状态更新和安全返航规则。
+- 上下层预计/实际成本接口。
+
+## 本项不处理
+
+- 点、线、面下层强化学习执行器及其训练方法。
+- 研究初期临时传统规划器的具体算法实现；其只需满足既有接口。
+- 上下层联合训练、分阶段训练与闭环联调细节。
+- 最终 GIS 制作和最终策略训练。
+- 最终基线、消融、创新点和论文题目。
+
+## 验收条件
+
+第九项只有在一个自洽规范中同时明确以下内容后才算完成：
+
+- 决策主体；
+- 状态/观测结构；
+- 候选生成与掩码；
+- 动作编码；
+- 任务、平台和回收点冲突处理；
+- 决策触发时机；
+- 目标/奖励；
+- 求解算法及被拒方案；
+- 可变规模处理；
+- 向第十项下层强化学习执行器提出的成本与可行性接口需求；
+- 明确上层训练期间可调用接口兼容的传统下层规划器，但不得将其认定为最终方案。
+
+每项结论必须说明依据、备选方案和代码影响。

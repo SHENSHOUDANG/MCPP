@@ -28,12 +28,17 @@ from torch import nn
 
 from check_port_inspection_env import build_env
 from mathbased_mcpp.port_inspection.mappo import HeterogeneousMappo, PortMappoBatch
+from mathbased_mcpp.port_inspection.v12_contract import (
+    ContractValidationError,
+    classify_config_boundary,
+    require_historical_baseline_ack,
+)
 
 
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Train the frozen UAV-USV inspection scheduler with CTDE MAPPO.")
+    parser = argparse.ArgumentParser(description="Train the historical UAV-USV scheduler baseline with CTDE MAPPO.")
     parser.add_argument("--config", default="configs/port_yangshan_task_initial_v1.toml")
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=20260615)
@@ -47,11 +52,26 @@ def main() -> None:
     parser.add_argument("--interop-threads", type=int, default=None)
     parser.add_argument("--gpu-memory-fraction", type=float, default=None)
     parser.add_argument("--process-priority", choices=("normal", "below_normal", "idle"), default=None)
+    parser.add_argument(
+        "--allow-historical-baseline",
+        action="store_true",
+        help="Acknowledge that a HISTORICAL config is only an engineering baseline, not a final V1.2 result.",
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     config = _load_config(args.config)
+    boundary = classify_config_boundary(config)
+    try:
+        require_historical_baseline_ack(
+            boundary,
+            args.allow_historical_baseline,
+            purpose="scheduler training",
+        )
+    except ContractValidationError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(f"contract_boundary={json.dumps(boundary.as_dict(), ensure_ascii=False)}", flush=True)
     rl_config = dict(config.get("scheduler_rl", {}))
     _configure_cpu_threads(args, rl_config)
     _configure_process_priority(str(args.process_priority or rl_config.get("process_priority", "below_normal")))

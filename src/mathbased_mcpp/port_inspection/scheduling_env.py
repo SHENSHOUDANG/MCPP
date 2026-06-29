@@ -545,6 +545,7 @@ class PortInspectionSchedulingEnv:
         metrics = self.metrics()
         return {
             "reward_terms": dict(self.last_reward_terms),
+            "contract_boundary": dict(getattr(self, "contract_boundary", {})),
             "completed_tasks": sorted(self.completed_tasks),
             "closed_tasks": sorted(self.completed_tasks),
             "screening_open_tasks": [task.task_id for task in self.tasks if task.state == TASK_UNSCREENED],

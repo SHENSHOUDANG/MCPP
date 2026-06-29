@@ -95,6 +95,8 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertEqual(reset.info["global_state_dim"], env.global_state_dim)
         self.assertIn("metrics", reset.info)
         self.assertIn("aggregate_broadcast", reset.info)
+        self.assertEqual(reset.info["contract_boundary"]["scenario_status"], "HISTORICAL")
+        self.assertFalse(reset.info["contract_boundary"]["final_experiment_eligible"])
 
         for platform_id in platform_ids:
             self.assertEqual(reset.obs_dict[platform_id].shape, (env.local_observation_dim,))

@@ -1,188 +1,99 @@
-# mathbased-mcpp
+# README.md
 
-`mathbased-mcpp` is a Python/PyTorch project for multi-agent coverage path planning and port inspection scheduling. It includes:
+> 规范版本：V1.2
 
-- a grid-coverage PPO/MAPPO baseline;
-- optional explicit-memory, GAT, CUAP, and related ablation configs;
-- a port-inspection scheduling environment for the Yangshan task scenario;
-- command-line tools for training, evaluation, rendering, and scenario import.
+## 项目名称
 
-The repository should contain source code, configs, tests, documentation, and compact runtime scenario definitions. Training products are local artifacts and should not be committed.
+**UAV-USV 异构港区水空巡检双层强化学习调度与路径执行**
 
-## Repository Layout
+研究从交通运输系统、港区运营组织、通航安全和设施运维出发，不研究通用全覆盖，也不以底层控制为核心。
 
-```text
-configs/                         Experiment and scheduler configs
-data/ports/yangshan_task_initial_v1/
-  yangshan_task_initial_v1_grid.json
-  yangshan_task_initial_v1_tasks.json
-  README.md                      Compact runtime scenario definition
-docs/                            Runtime and resource notes
-src/mathbased_mcpp/              Main package
-src/mathbased_mcpp/port_inspection/
-tools/                           Training, evaluation, import, and render scripts
-tests/                           Unit and smoke tests
-```
+## 核心目标
 
-Generated folders such as `runs/`, `outputs/`, `reports/`, `.tmp_tests/`, scheduler checkpoint folders, training logs, and evaluation traces are ignored by Git.
+建立可复现闭环：
 
-## Project Memory
+1. 跨作业窗口维护周期、计划和事件任务；
+2. 从真实港区管理对象生成可信的调度任务；
+3. 在能力、时间、能量和安全返航约束下分配 UAV/USV；
+4. 最终由下层强化学习策略完成点、线、面任务的旅行与服务路径；
+5. 将实际时间、能耗、完成度、质量验收和失败状态反馈给滚动调度。
 
-Long-lived project knowledge is kept in small Markdown files instead of a single large prompt:
+## 系统边界
 
-- `AGENTS.md`: durable agent rules and artifact policy.
-- `docs/model_specification.md`: theoretical task and model contracts.
-- `docs/current_task.md`: current objective, decisions, and next steps.
-- `docs/experiment_log.md`: experiment summaries and cleanup history.
+### 上层调度
 
-After each repository change, update the relevant project memory file before finishing:
+负责平台—任务分配、任务排序、开始时机、返航补能和动态重调度。
 
-- long-term rules -> `AGENTS.md`;
-- theoretical definitions -> `docs/model_specification.md`;
-- current task state -> `docs/current_task.md`;
-- experiment results -> `docs/experiment_log.md`;
-- concrete one-off instructions -> the active Codex conversation.
+不得输出逐栅格、逐航点或逐时间步移动动作。
 
-Every completed code, config, data-cleanup, or documentation change should be committed after review. Keep commits focused and do not include generated training artifacts.
+### 下层执行
 
-## Setup
+最终由强化学习策略负责 UAV/USV 的可行旅行路径和服务路径。研究初期可采用传统规划器临时替代，以支撑上层建模、接口验证和对照实验。
 
-Use Python 3.10+ and install the package dependencies:
+无论采用临时规划器还是最终强化学习策略，均须返回路径可行性、旅行/准备/等待/服务/退出时间、能耗、退出位置、完成度、任务族相关质量验收结果和失败原因；不得决定全局任务分配。临时替代不得被表述为最终下层方法。
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e .
-```
+## 任务准入
 
-For CUDA training, install a CUDA-enabled PyTorch build or use `environment.cuda.yml` if you manage the environment with Conda. The default config uses `device = "auto"`, so CUDA is selected only when the active PyTorch installation supports it.
+任务必须对应真实管理需求和明确数据产品。移动平台应满足下列至少一项：
 
-## Quick Checks
+- 获得固定系统或陆侧方式无法等效取得的信息；
+- 以更安全、更及时、更完整或对港区运行干扰更小的方式形成具有明确管理用途的数据产品。
 
-Validate the basic grid-coverage configuration:
+“更适合”必须有可解释依据，不能据此把所有 GIS 对象转化为任务。
 
-```powershell
-.\.venv\Scripts\python.exe -m mathbased_mcpp doctor --config configs\smoke.toml
-```
+## 任务体系
 
-Run the unit/smoke test set:
+一级任务族固定为：
 
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover tests
-```
+- `HYDROGRAPHIC_SURVEY`：航道、港池、泊位前沿等海道调查。
+- `SURFACE_SAFETY_PATROL`：漂浮物、可见碍航物、油污和异常水面状态巡查。
+- `WATERSIDE_ASSET_INSPECTION`：航标、防波堤水侧、水中桥墩和码头临水立面检查。
 
-## Grid-Coverage Training
+三个维度相互独立：
 
-Run a small smoke training job:
+- `task_family`：业务目的。
+- `geometry_mode`：`TARGET | CORRIDOR | AREA`。
+- `release_mode`：`PERIODIC | SCHEDULED | EVENT`。
 
-```powershell
-.\.venv\Scripts\python.exe -m mathbased_mcpp train --config configs\smoke.toml
-```
+## 实证场景与数据边界
 
-Run the formal curriculum one course at a time:
+主要数据驱动实证场景为**洛杉矶港**。优先使用 NOAA ENC、洛杉矶港泊位线、USACE eHydro 及其他官方公开数据。
 
-```powershell
-.\.venv\Scripts\python.exe -m mathbased_mcpp train --config configs\formal_v1.toml --course tier-1-8x8-1agent
-```
+真实空间对象不能证明真实巡检工单、周期或截止时间。无法核验的业务参数必须标记为实验情景参数。旧洋山港任务点仅作历史对照，不再作为最终真实任务集合。
 
-Depot-return training can be driven through the pipeline script:
+正式数据必须保存来源网址、版本/版次、访问日期、许可条件、原始坐标系、文件校验和及处理脚本版本。
 
-```powershell
-.\.venv\Scripts\python.exe tools\run_depot_return_pipeline.py --config configs\formal_v1.toml --dry-run
-.\.venv\Scripts\python.exe tools\run_depot_return_pipeline.py --config configs\formal_v1.toml
-```
+## 规范文件
 
-Training writes checkpoints, metrics, TensorBoard logs, trajectories, and rendered images under the configured run root. These outputs are not versioned.
+- `AGENTS.md`：Codex 强制规则、优先级、正式修订和禁止事项。
+- `README.md`：研究目标、边界、任务体系、数据场景和状态。
+- `docs/current_task.md`：当前唯一正式审查任务。
+- `docs/model_specification.md`：统一冻结模型契约。
+- `docs/experiment_log.md`：冻结决策、正式修订、冲突处理和实验记录。
 
-## Port Scheduler Workflow
+## 当前状态
 
-The current Yangshan scheduler config uses compact runtime inputs:
+第一至第八项及 V1.2 的正式修订构成当前有效模型基线。最终方法路线明确为上下层均采用强化学习。下一正式审查项为第九项“上层决策机制与求解算法”，随后冻结第十项下层强化学习执行器。
+
+研究初期允许传统规划器暂代下层，但最终上下层算法、联合训练方式、基线、创新点和论文题目仍未冻结。
+
+## 运行闭环
 
 ```text
-configs\port_yangshan_task_initial_v1.toml
-data\ports\yangshan_task_initial_v1\yangshan_task_initial_v1_grid.json
-data\ports\yangshan_task_initial_v1\yangshan_task_initial_v1_tasks.json
+读取继承的任务、平台、回收点和日历状态
+-> 释放周期/计划/事件任务
+-> 更新带类型关系的任务图
+-> 生成硬能力候选集
+-> 调用下层估计路径、时间、能耗与退出状态
+-> 施加时间、能量、资源占用和同一回收点安全约束
+-> 上层分配与排序
+-> 下层旅行和服务执行（初期传统规划器；最终强化学习策略）
+-> 更新实际能量、平台状态和回收点占用
+-> 执行任务族相关质量验收
+-> 关闭任务、保留剩余量或触发有依据的后继任务
+-> 保存状态并进入下一决策事件/作业窗口
 ```
 
-Check the scenario/environment:
+## 可复现性要求
 
-```powershell
-.\.venv\Scripts\python.exe tools\check_port_inspection_env.py --config configs\port_yangshan_task_initial_v1.toml
-```
-
-Run a conservative local scheduler training job:
-
-```powershell
-.\.venv\Scripts\python.exe tools\train_port_scheduler_rl.py `
-  --config configs\port_yangshan_task_initial_v1.toml `
-  --steps 100000 `
-  --checkpoint-interval 10000 `
-  --num-envs 2 `
-  --env-workers 2 `
-  --cpu-threads 4 `
-  --gpu-memory-fraction 0.35 `
-  --process-priority below_normal
-```
-
-Resume from locally generated scheduler checkpoints:
-
-```powershell
-.\.venv\Scripts\python.exe tools\train_port_scheduler_rl.py `
-  --config configs\port_yangshan_task_initial_v1.toml `
-  --steps 200000 `
-  --checkpoint-interval 10000 `
-  --resume auto
-```
-
-After cleanup, `--resume auto` only finds checkpoints created by a later local run.
-
-## Scenario Data Policy
-
-The repository keeps only compact scenario files needed by the current config. Raw QGIS/GeoPackage/CSV source packages, import summaries, generated tile caches, model checkpoints, metrics, and report folders are excluded.
-
-If the Yangshan scenario must be rebuilt from raw source material, use:
-
-```powershell
-.\.venv\Scripts\python.exe tools\import_yangshan_task_initial.py
-```
-
-The raw source package must exist locally; it is not stored in Git.
-
-## Artifact Policy
-
-Do not commit:
-
-- `*.pt` model checkpoints;
-- scheduler output folders such as `data/ports/*/scheduler_rl/`;
-- `runs/`, `outputs/`, `reports/`, and `.tmp_tests/`;
-- metrics CSV/JSON summaries produced by training or evaluation;
-- TensorBoard event files, rendered trajectories, map tile caches, and temporary diagnostics;
-- raw GIS/QGIS/GeoPackage/CSV source packages under `data/ports/*/source/`.
-
-Keep commits focused on source code, configs, tests, docs, and compact runtime scenario definitions.
-
-## Common Commands
-
-Render a port scenario:
-
-```powershell
-.\.venv\Scripts\python.exe tools\render_port_scenario.py --config configs\port_yangshan_task_initial_v1.toml
-```
-
-Evaluate a port scheduler checkpoint generated locally:
-
-```powershell
-.\.venv\Scripts\python.exe tools\evaluate_port_scheduler_unified.py `
-  --config configs\port_yangshan_task_initial_v1.toml `
-  --checkpoint <local-checkpoint.pt>
-```
-
-Run a greedy scheduler baseline:
-
-```powershell
-.\.venv\Scripts\python.exe tools\evaluate_port_scheduler_greedy.py --config configs\port_yangshan_task_initial_v1.toml
-```
-
-## Development Notes
-
-- Historical checkpoints and generated reports were removed from the working tree and are no longer part of the repository.
-- Old training results should be treated as local artifacts only, not as project source.
-- If new experiments produce results worth preserving, summarize the method and conclusion in Markdown and keep the raw artifacts outside Git.
+原始官方数据、清洗后的管理对象、上层调度任务、下层执行基元和仿真事件必须分层保存。任务、平台、回收点和数据来源均须通过显式结构和校验规则实现，不得依赖隐含默认值。

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mathbased-mcpp"
 version = "0.1.0"
-description = "PPO baseline for boustrophedon-style grid coverage path planning."
+description = "UAV-USV port inspection scheduling and path-execution research code."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

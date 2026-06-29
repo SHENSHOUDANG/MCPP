@@ -17,6 +17,13 @@ platform_profile_sequence = [
   "USV_S_SURVEY",
 ]
 
+[contract]
+model_contract_version = "pre_v1_2_coupled_screen_review"
+scenario_status = "HISTORICAL"
+historical_only = true
+final_experiment_eligible = false
+notice = "Yangshan fixed-point screening/review data are retained only as a historical engineering baseline under V1.2."
+
 [platform_depots]
 uav = [73, 110]
 usv = [73, 110]

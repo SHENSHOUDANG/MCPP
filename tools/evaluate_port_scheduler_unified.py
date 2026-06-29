@@ -25,6 +25,7 @@ import torch
 
 from check_port_inspection_env import build_env
 from mathbased_mcpp.port_inspection.mappo import HeterogeneousMappo
+from mathbased_mcpp.port_inspection.v12_contract import classify_config_boundary
 from train_port_scheduler_rl import _agent_types, _obs_matrix
 
 
@@ -45,6 +46,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = _load_config(args.config)
+    contract_boundary = classify_config_boundary(config).as_dict()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -67,6 +69,7 @@ def main() -> None:
     summary = {
         "config": args.config,
         "checkpoint": args.checkpoint,
+        "contract_boundary": contract_boundary,
         "seeds": args.seeds,
         "environment_control": _environment_control(rows),
         "aggregate": aggregate,

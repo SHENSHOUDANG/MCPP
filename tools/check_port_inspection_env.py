@@ -19,6 +19,7 @@ if str(SRC) not in sys.path:
 from mathbased_mcpp.port_inspection import PortInspectionSchedulingEnv, load_inspection_tasks, load_port_grid
 from mathbased_mcpp.port_inspection.platform_params import load_platform_profiles, platform_from_profile
 from mathbased_mcpp.port_inspection.simple_planner import create_platforms
+from mathbased_mcpp.port_inspection.v12_contract import classify_config_boundary
 
 
 def main() -> None:
@@ -34,6 +35,7 @@ def main() -> None:
     env = build_env(config)
     rng = np.random.default_rng(args.seed)
     observation = env.reset(seed=args.seed)
+    print(f"contract_boundary={json.dumps(env.contract_boundary, ensure_ascii=False)}")
     print(f"observation_dim={observation.shape[0]}")
     print(f"action_dim={env.action_dim}")
     for step in range(args.steps):
@@ -65,7 +67,7 @@ def build_env(config: dict[str, object]) -> PortInspectionSchedulingEnv:
     rl_config = dict(config.get("scheduler_rl", {}))
     reward_weights = dict(rl_config.get("reward", {}))
     scheduling_config = dict(config.get("scheduling", {}))
-    return PortInspectionSchedulingEnv(
+    env = PortInspectionSchedulingEnv(
         grid=grid,
         tasks=tasks,
         platforms=platforms,
@@ -75,6 +77,8 @@ def build_env(config: dict[str, object]) -> PortInspectionSchedulingEnv:
         candidate_weights={key: float(value) for key, value in scheduling_config.items() if isinstance(value, (int, float))},
         review_trigger=dict(config.get("review_trigger", {})),
     )
+    env.contract_boundary = classify_config_boundary(config).as_dict()
+    return env
 
 
 def _platforms_from_config(config: dict[str, object], depot: tuple[int, int]):

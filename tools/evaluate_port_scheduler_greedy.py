@@ -19,6 +19,7 @@ if str(ROOT / "tools") not in sys.path:
     sys.path.insert(0, str(ROOT / "tools"))
 
 from check_port_inspection_env import build_env
+from mathbased_mcpp.port_inspection.v12_contract import classify_config_boundary
 
 
 def main() -> None:
@@ -37,11 +38,13 @@ def main() -> None:
     args = parser.parse_args()
 
     config = _load_config(args.config)
+    contract_boundary = classify_config_boundary(config).as_dict()
     env = build_env(config)
     output_dir = Path(args.output_dir or str(config.get("output_dir", "outputs/port_inspection/scheduler")))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     summary, trace = run_greedy_env_rollout(env, config, seed=args.seed, strategy=args.strategy)
+    summary["contract_boundary"] = contract_boundary
     summary_path = output_dir / f"greedy_env_{args.strategy}_summary.json"
     trace_path = output_dir / f"greedy_env_{args.strategy}_trace.csv"
     summary_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")

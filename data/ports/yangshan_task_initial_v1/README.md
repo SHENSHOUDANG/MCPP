@@ -1,6 +1,9 @@
 # yangshan_task_initial_v1
 
-This scenario is the compact runtime import of the Yangshan QGIS/GeoPackage task map. Raw QGIS/GeoPackage/CSV source packages are not stored in Git; regenerate them with the import tooling when needed. No legacy project map is reused.
+This scenario is the compact runtime import of the Yangshan QGIS/GeoPackage task map.
+Under the V1.2 contract it is retained only as a HISTORICAL engineering baseline.
+It is not the final real-port task set and must not be used as final V1.2 evidence.
+Raw QGIS/GeoPackage/CSV source packages are not stored in Git; regenerate them with the import tooling when needed.
 
 - Coordinate mode: EPSG:32651 UTM, Euclidean travel proxy
 - Coordinate feature resolution: 100.0 m
