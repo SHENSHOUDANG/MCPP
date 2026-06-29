@@ -90,3 +90,10 @@
 - 默认训练配置已切换到 `configs/port_los_angeles_training_v1.toml`。
 - `los_angeles_training_v1` compact 场景包含点、线、面任务，用于验证上层训练代码、候选集、掩码和混合几何加载。
 - smoke 训练已可运行；后续若要形成正式实验，仍需按 V1.2 数据契约替换为经核验的官方 GIS 数据和获批第九项算法规范。
+
+### 2026-06-29 Los Angeles official-data correction
+
+- Los Angeles is not treated like Yangshan: Yangshan may retain QGIS/self-defined historical baselines, but Los Angeles training geometry must come from official public chart/port data.
+- `los_angeles_training_v1` has been corrected from an engineering seed scene to official NOAA ENC Direct geometry. The checked-in data uses the embedded NOAA official sample snapshot captured on 2026-06-29 because live REST execution was unavailable during this update.
+- Training parameters remain `PENDING`: deadlines, risk, service time, release mode, and recovery depot are training assumptions, not official Port of Los Angeles work orders.
+- Future LA data work should prefer live NOAA ENC Direct / official port data regeneration and must not reintroduce hand-drawn QGIS geometry for LA.

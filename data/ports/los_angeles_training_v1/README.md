@@ -1,16 +1,35 @@
 # los_angeles_training_v1
 
-This is a compact Los Angeles port scheduler training scenario.
+This is a Los Angeles port scheduler training scenario built from official NOAA ENC Direct geometry.
 
-Status: `PENDING_ENGINEERING_TRAINING`.
+Status: `PENDING_OFFICIAL_GEOMETRY_TRAINING`.
 
-It is designed to make the LA-port training command runnable today while V1.2 item 9 and the final official GIS workflow remain unfrozen. The task objects are named after plausible LA port management objects and are marked as scenario-generated engineering seeds. They are not final official work orders and must not be reported as final experiment evidence.
+The geometry is sourced from NOAA Office of Coast Survey ENC Direct REST services for the Los Angeles port
+area. This checked-in scenario was regenerated from the embedded official sample snapshot captured on
+2026-06-29 because live network execution was unavailable during the update. The generated scheduler tasks
+are derived from official chart objects, but the workload, deadlines, risk, and release settings remain
+training parameters rather than official Port of Los Angeles work orders. Do not report this as final
+experiment evidence until the V1.2 algorithm contract and official experiment workflow are frozen.
 
-- Point tasks: 8
-- Corridor tasks: 6
-- Area tasks: 4
+- Point tasks: 3
+- Corridor tasks: 2
+- Area tasks: 2
+- Geometry source: NOAA ENC Direct Harbour and Approach REST services
+- Access date: 2026-06-29
 - Coordinate mode: local equirectangular approximation, `distance_mode=utm_euclidean`
 - Cell size: 250 m
+
+Regenerate from official NOAA services:
+
+```powershell
+.\.venv\Scripts\python.exe tools\build_los_angeles_training_scenario.py
+```
+
+Regenerate from the embedded official NOAA sample snapshot:
+
+```powershell
+.\.venv\Scripts\python.exe tools\build_los_angeles_training_scenario.py --use-embedded-official-snapshot
+```
 
 Run a smoke check:
 

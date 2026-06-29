@@ -187,3 +187,9 @@ metrics
 failure cases
 interpretation and next decision
 ```
+### 2026-06-29 Los Angeles official-data correction
+
+- User clarified that Los Angeles must not follow the Yangshan QGIS/self-defined scene pattern because NOAA and other official public chart/port datasets are available.
+- Replaced the LA training scene provenance from `PENDING_ENGINEERING_TRAINING` engineering seed geometry to `PENDING_OFFICIAL_GEOMETRY_TRAINING` official NOAA ENC Direct geometry.
+- Added a live NOAA REST generator path and an explicit `--use-embedded-official-snapshot` path. The checked-in data uses the 2026-06-29 embedded official NOAA sample snapshot because live REST execution was blocked by environment usage limits during this update.
+- The generated tasks contain official geometry provenance fields (`source_dataset`, `source_agency`, `source_url`, `source_date`, `source_version_or_edition`, `access_date`, `original_crs`, `file_checksum`, and `processing_script_version`). Scheduling parameters remain training assumptions and do not represent official work orders.

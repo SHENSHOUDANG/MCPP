@@ -2,24 +2,164 @@
   "metadata": {
     "scenario_name": "los_angeles_training_v1",
     "port": "Los Angeles",
-    "contract_status": "PENDING_ENGINEERING_TRAINING",
+    "contract_status": "PENDING_OFFICIAL_GEOMETRY_TRAINING",
     "scenario_generated": true,
+    "official_geometry": true,
     "cell_size_m": 250.0,
+    "access_date": "2026-06-29",
+    "official_query_bbox_epsg4326": {
+      "xmin": -118.33,
+      "ymin": 33.67,
+      "xmax": -118.18,
+      "ymax": 33.8
+    },
     "bounds_lon_lat": {
-      "lon_min": -118.302,
-      "lon_max": -118.234,
-      "lat_min": 33.696000000000005,
-      "lat_max": 33.768
+      "lon_min": -118.3016822,
+      "lon_max": -118.1706531,
+      "lat_min": 33.663325,
+      "lat_max": 33.792098499999994
     },
     "grid_shape": [
-      33,
-      27
+      58,
+      50
     ],
-    "note": "Compact scenario seed for making LA-port scheduler training runnable; replace with verified official GIS layers before final experiments."
+    "source_layers": [
+      {
+        "service_name": "NOAA ENC Direct Harbour",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
+        "layer_id": 6,
+        "layer_name": "Harbor.Buoy_Lateral_point",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
+        "queried_feature_count": 3,
+        "selected_feature_count": 3,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Harbour",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
+        "layer_id": 11,
+        "layer_name": "Harbor.Light_point",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/11",
+        "queried_feature_count": 0,
+        "selected_feature_count": 0,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Harbour",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
+        "layer_id": 87,
+        "layer_name": "Harbor.Bridge_line",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/87",
+        "queried_feature_count": 1,
+        "selected_feature_count": 1,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Harbour",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
+        "layer_id": 134,
+        "layer_name": "Harbor.Recommended_Track_line",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/134",
+        "queried_feature_count": 1,
+        "selected_feature_count": 1,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Approach",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer",
+        "layer_id": 139,
+        "layer_name": "Approach.Recommended_Track_line",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/139",
+        "queried_feature_count": 1,
+        "selected_feature_count": 1,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Harbour",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
+        "layer_id": 104,
+        "layer_name": "Harbor.Depth_Contour_line",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/104",
+        "queried_feature_count": 0,
+        "selected_feature_count": 0,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Approach",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer",
+        "layer_id": 242,
+        "layer_name": "Approach.Sea_Area_Named_Water_Area",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/242",
+        "queried_feature_count": 2,
+        "selected_feature_count": 2,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Harbour",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
+        "layer_id": 237,
+        "layer_name": "Harbor.Sea_Area_Named_Water_Area",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/237",
+        "queried_feature_count": 0,
+        "selected_feature_count": 0,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Harbour",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
+        "layer_id": 208,
+        "layer_name": "Harbor.Fairway_area",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/208",
+        "queried_feature_count": 0,
+        "selected_feature_count": 0,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      },
+      {
+        "service_name": "NOAA ENC Direct Approach",
+        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer",
+        "layer_id": 233,
+        "layer_name": "Approach.Dredged_Area",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/233",
+        "queried_feature_count": 0,
+        "selected_feature_count": 0,
+        "access_date": "2026-06-29",
+        "original_crs": "EPSG:4326",
+        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "retrieval_mode": "embedded_official_snapshot"
+      }
+    ],
+    "note": "All task geometry is derived from official NOAA ENC Direct REST layers. Training workload/deadline/risk parameters are scenario parameters and are not official work orders."
   },
   "point_tasks": [
     {
-      "id": "LA-ATON-ANGELS-GATE",
+      "id": "NOAA-HARBOR-BUOY-LATERAL-POINT-2845058",
       "type": "navigation_aid",
       "risk": 3,
       "service_time": 2,
@@ -38,21 +178,41 @@
         "geometry_mode": "TARGET",
         "release_mode": "SCHEDULED",
         "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Angels Gate navigation aid inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.248,
-        "latitude": 33.706
+        "geometry_source_status": "official_noaa_geometry",
+        "work_order_status": "training_task_derived_not_official_work_order",
+        "parameter_status": "training_parameters_not_official_operational_schedule",
+        "object_name": "Los Angeles Approach Channel Lighted Buoy 2",
+        "longitude": -118.2289833,
+        "latitude": 33.673325,
+        "source_dataset": "NOAA ENC Direct Harbour",
+        "source_agency": "NOAA Office of Coast Survey",
+        "source_date": "20000829",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
+        "source_version_or_edition": "US5LGBBD.000",
+        "access_date": "2026-06-29",
+        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "original_id": 2845058,
+        "original_crs": "EPSG:4326",
+        "file_checksum": "a17c473dc2fb5b99e0b802dfabd781fc7b44e191f416ed81daffed324222a32e",
+        "processing_script_version": "official-noaa-rest-v2",
+        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
+        "source_layer_id": 6,
+        "source_layer_name": "Harbor.Buoy_Lateral_point",
+        "source_attributes": {
+          "OBJNAM": "Los Angeles Approach Channel Lighted Buoy 2",
+          "INFORM": null,
+          "SORDAT": "20000829",
+          "SORIND": "US,US,reprt,11thCGD,LNM 35/00",
+          "DSNM": "US5LGBBD.000"
+        }
       },
       "cell": [
-        27,
-        20
+        53,
+        27
       ]
     },
     {
-      "id": "LA-ATON-QUEENS-GATE",
+      "id": "NOAA-HARBOR-BUOY-LATERAL-POINT-2845060",
       "type": "navigation_aid",
       "risk": 3,
       "service_time": 2,
@@ -71,341 +231,97 @@
         "geometry_mode": "TARGET",
         "release_mode": "SCHEDULED",
         "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Queens Gate navigation aid inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.286,
-        "latitude": 33.711
+        "geometry_source_status": "official_noaa_geometry",
+        "work_order_status": "training_task_derived_not_official_work_order",
+        "parameter_status": "training_parameters_not_official_operational_schedule",
+        "object_name": "Point Fermin Lighted Whistle Buoy 6PF",
+        "longitude": -118.2916822,
+        "latitude": 33.6988253,
+        "source_dataset": "NOAA ENC Direct Harbour",
+        "source_agency": "NOAA Office of Coast Survey",
+        "source_date": "20041208",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
+        "source_version_or_edition": "US5LGBCC.000",
+        "access_date": "2026-06-29",
+        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "original_id": 2845060,
+        "original_crs": "EPSG:4326",
+        "file_checksum": "c9b12ec3abd53700d6f177dc7837d1fe36a2e41e9c496c3466a50d4d68692839",
+        "processing_script_version": "official-noaa-rest-v2",
+        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
+        "source_layer_id": 6,
+        "source_layer_name": "Harbor.Buoy_Lateral_point",
+        "source_attributes": {
+          "OBJNAM": "Point Fermin Lighted Whistle Buoy 6PF",
+          "INFORM": null,
+          "SORDAT": "20041208",
+          "SORIND": "US,US,reprt,11thCGD,ATONIS",
+          "DSNM": "US5LGBCC.000"
+        }
       },
       "cell": [
-        25,
-        6
+        41,
+        4
       ]
     },
     {
-      "id": "LA-ATON-MAIN-CHANNEL-1",
+      "id": "NOAA-HARBOR-BUOY-LATERAL-POINT-2845061",
       "type": "navigation_aid",
-      "risk": 2,
+      "risk": 3,
       "service_time": 2,
       "screening_workload": 1.2,
       "review_workload": 2.5,
-      "max_interval": 480,
-      "deadline": 480,
+      "max_interval": 300,
+      "deadline": 300,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
       "coverage_threshold": 1.0,
-      "priority": 2.0,
+      "priority": 3.0,
       "metadata": {
         "task_family": "WATERSIDE_ASSET_INSPECTION",
         "geometry_mode": "TARGET",
         "release_mode": "SCHEDULED",
         "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Main Channel buoy inspection 1",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.253,
-        "latitude": 33.727
+        "geometry_source_status": "official_noaa_geometry",
+        "work_order_status": "training_task_derived_not_official_work_order",
+        "parameter_status": "training_parameters_not_official_operational_schedule",
+        "object_name": "Terminal Island Channel Lighted Buoy 5",
+        "longitude": -118.2656596,
+        "latitude": 33.7293432,
+        "source_dataset": "NOAA ENC Direct Harbour",
+        "source_agency": "NOAA Office of Coast Survey",
+        "source_date": "20030325",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
+        "source_version_or_edition": "US5LGBCD.000",
+        "access_date": "2026-06-29",
+        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "original_id": 2845061,
+        "original_crs": "EPSG:4326",
+        "file_checksum": "bbe918e3722639be55d1b09b75924bcc4567e64a1e5967cbbf2cd18b18d91604",
+        "processing_script_version": "official-noaa-rest-v2",
+        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
+        "source_layer_id": 6,
+        "source_layer_name": "Harbor.Buoy_Lateral_point",
+        "source_attributes": {
+          "OBJNAM": "Terminal Island Channel Lighted Buoy 5",
+          "INFORM": null,
+          "SORDAT": "20030325",
+          "SORIND": "US,US,reprt,11thCGD,LNM 12/03",
+          "DSNM": "US5LGBCD.000"
+        }
       },
       "cell": [
-        18,
-        18
-      ]
-    },
-    {
-      "id": "LA-ATON-MAIN-CHANNEL-2",
-      "type": "navigation_aid",
-      "risk": 2,
-      "service_time": 2,
-      "screening_workload": 1.2,
-      "review_workload": 2.5,
-      "max_interval": 480,
-      "deadline": 480,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 2.0,
-      "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
-        "geometry_mode": "TARGET",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Main Channel buoy inspection 2",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.258,
-        "latitude": 33.742
-      },
-      "cell": [
-        11,
-        16
-      ]
-    },
-    {
-      "id": "LA-ASSET-PIER400-FENDER",
-      "type": "fender_cluster",
-      "risk": 2,
-      "service_time": 3,
-      "screening_workload": 1.8,
-      "review_workload": 3.75,
-      "max_interval": 480,
-      "deadline": 480,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 2.0,
-      "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
-        "geometry_mode": "TARGET",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Pier 400 fender cluster inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.257,
-        "latitude": 33.732
-      },
-      "cell": [
-        16,
-        17
-      ]
-    },
-    {
-      "id": "LA-ASSET-VTS-WATERLINE",
-      "type": "waterside_asset",
-      "risk": 2,
-      "service_time": 3,
-      "screening_workload": 1.8,
-      "review_workload": 3.75,
-      "max_interval": 540,
-      "deadline": 540,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 2.0,
-      "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
-        "geometry_mode": "TARGET",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Inner harbor waterline asset inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.268,
-        "latitude": 33.758
-      },
-      "cell": [
-        4,
+        28,
         13
-      ]
-    },
-    {
-      "id": "LA-EVENT-FLOATING-DEBRIS-A",
-      "type": "floating_debris",
-      "risk": 3,
-      "service_time": 2,
-      "screening_workload": 1.2,
-      "review_workload": 2.5,
-      "max_interval": 180,
-      "deadline": 180,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 3.0,
-      "metadata": {
-        "task_family": "SURFACE_SAFETY_PATROL",
-        "geometry_mode": "TARGET",
-        "release_mode": "EVENT",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Scenario floating debris response A",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.262,
-        "latitude": 33.734
-      },
-      "cell": [
-        15,
-        15
-      ]
-    },
-    {
-      "id": "LA-EVENT-SURFACE-SHEEN-A",
-      "type": "surface_sheen",
-      "risk": 3,
-      "service_time": 2,
-      "screening_workload": 1.2,
-      "review_workload": 2.5,
-      "max_interval": 180,
-      "deadline": 180,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 3.0,
-      "metadata": {
-        "task_family": "SURFACE_SAFETY_PATROL",
-        "geometry_mode": "TARGET",
-        "release_mode": "EVENT",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Scenario visible surface sheen response A",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": -118.274,
-        "latitude": 33.744
-      },
-      "cell": [
-        11,
-        10
       ]
     }
   ],
   "line_tasks": [
     {
-      "id": "LA-CH-MAIN",
-      "type": "channel",
-      "risk": 3,
-      "service_time": 8,
-      "screening_workload": 4.8,
-      "review_workload": 10.0,
-      "max_interval": 300,
-      "deadline": 300,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 3.0,
-      "metadata": {
-        "task_family": "HYDROGRAPHIC_SURVEY",
-        "geometry_mode": "CORRIDOR",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Main Channel hydrographic survey",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
-      },
-      "cells": [
-        [
-          27,
-          21
-        ],
-        [
-          26,
-          21
-        ],
-        [
-          25,
-          21
-        ],
-        [
-          24,
-          21
-        ],
-        [
-          23,
-          20
-        ],
-        [
-          22,
-          20
-        ],
-        [
-          21,
-          20
-        ],
-        [
-          20,
-          20
-        ],
-        [
-          19,
-          20
-        ],
-        [
-          18,
-          20
-        ],
-        [
-          17,
-          20
-        ],
-        [
-          16,
-          20
-        ],
-        [
-          15,
-          19
-        ],
-        [
-          14,
-          19
-        ],
-        [
-          13,
-          19
-        ],
-        [
-          12,
-          19
-        ],
-        [
-          11,
-          18
-        ],
-        [
-          10,
-          18
-        ],
-        [
-          9,
-          17
-        ],
-        [
-          8,
-          16
-        ],
-        [
-          7,
-          16
-        ],
-        [
-          6,
-          15
-        ]
-      ]
-    },
-    {
-      "id": "LA-CH-CABRILLO",
-      "type": "approach_channel",
+      "id": "NOAA-HARBOR-RECOMMENDED-TRACK-LINE-363104",
+      "type": "recommended_track",
       "risk": 3,
       "service_time": 7,
       "screening_workload": 4.2,
@@ -423,283 +339,82 @@
         "geometry_mode": "CORRIDOR",
         "release_mode": "SCHEDULED",
         "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Cabrillo approach corridor survey",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
+        "geometry_source_status": "official_noaa_geometry",
+        "work_order_status": "training_task_derived_not_official_work_order",
+        "parameter_status": "training_parameters_not_official_operational_schedule",
+        "object_name": "based on a system of fixed marks",
+        "longitude": -118.25821245,
+        "latitude": 33.7141564,
+        "source_dataset": "NOAA ENC Direct Harbour",
+        "source_agency": "NOAA Office of Coast Survey",
+        "source_date": "20120925",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/134",
+        "source_version_or_edition": "US5LGBCD.000",
+        "access_date": "2026-06-29",
+        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "original_id": 363104,
+        "original_crs": "EPSG:4326",
+        "file_checksum": "b7e3d1a5398b27ef3c4805c486157c241133113e2ca028eebab3e9889bb5bc99",
+        "processing_script_version": "official-noaa-rest-v2",
+        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
+        "source_layer_id": 134,
+        "source_layer_name": "Harbor.Recommended_Track_line",
+        "source_attributes": {
+          "OBJNAM": null,
+          "INFORM": null,
+          "SORDAT": "20120925",
+          "SORIND": "US,US,reprt,11thCGD,LNM 39/12",
+          "DSNM": "US5LGBCD.000"
+        }
       },
       "cells": [
         [
-          26,
-          4
+          36,
+          20
         ],
         [
-          25,
-          5
+          36,
+          19
         ],
         [
-          24,
-          6
-        ],
-        [
-          24,
-          7
-        ],
-        [
-          23,
-          8
-        ],
-        [
-          22,
-          9
-        ],
-        [
-          21,
-          10
-        ],
-        [
-          21,
-          11
-        ],
-        [
-          20,
-          12
-        ],
-        [
-          20,
-          13
-        ],
-        [
-          19,
-          14
-        ],
-        [
-          19,
-          15
-        ],
-        [
-          18,
-          16
-        ]
-      ]
-    },
-    {
-      "id": "LA-BERTH-PIER400-W",
-      "type": "berth_face",
-      "risk": 2,
-      "service_time": 6,
-      "screening_workload": 3.6,
-      "review_workload": 7.5,
-      "max_interval": 480,
-      "deadline": 480,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 2.0,
-      "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
-        "geometry_mode": "CORRIDOR",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Pier 400 west berth face inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
-      },
-      "cells": [
-        [
-          16,
-          11
-        ],
-        [
-          16,
-          12
-        ],
-        [
-          16,
-          13
-        ],
-        [
-          15,
-          14
-        ],
-        [
-          15,
-          15
-        ],
-        [
-          14,
-          16
-        ],
-        [
-          14,
-          17
-        ],
-        [
-          13,
+          35,
           18
-        ]
-      ]
-    },
-    {
-      "id": "LA-BERTH-TERMINAL-ISLAND",
-      "type": "berth_face",
-      "risk": 2,
-      "service_time": 6,
-      "screening_workload": 3.6,
-      "review_workload": 7.5,
-      "max_interval": 480,
-      "deadline": 480,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 2.0,
-      "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
-        "geometry_mode": "CORRIDOR",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Terminal Island waterside berth inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
-      },
-      "cells": [
-        [
-          10,
-          10
         ],
         [
-          9,
-          11
+          35,
+          17
         ],
         [
-          9,
-          12
-        ],
-        [
-          8,
-          13
-        ],
-        [
-          7,
-          14
-        ],
-        [
-          6,
-          15
-        ],
-        [
-          6,
+          34,
           16
         ],
         [
-          5,
-          17
+          34,
+          15
+        ],
+        [
+          34,
+          14
+        ],
+        [
+          33,
+          13
+        ],
+        [
+          33,
+          12
         ]
       ]
     },
     {
-      "id": "LA-BREAKWATER-SAN-PEDRO",
-      "type": "breakwater",
-      "risk": 2,
+      "id": "NOAA-APPROACH-RECOMMENDED-TRACK-LINE-223275",
+      "type": "approach_recommended_track",
+      "risk": 3,
       "service_time": 7,
       "screening_workload": 4.2,
       "review_workload": 8.75,
-      "max_interval": 540,
-      "deadline": 540,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 2.0,
-      "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
-        "geometry_mode": "CORRIDOR",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "San Pedro breakwater waterside inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
-      },
-      "cells": [
-        [
-          27,
-          6
-        ],
-        [
-          27,
-          7
-        ],
-        [
-          26,
-          8
-        ],
-        [
-          26,
-          9
-        ],
-        [
-          25,
-          10
-        ],
-        [
-          25,
-          11
-        ],
-        [
-          25,
-          12
-        ],
-        [
-          25,
-          13
-        ],
-        [
-          24,
-          14
-        ],
-        [
-          24,
-          15
-        ],
-        [
-          24,
-          16
-        ],
-        [
-          24,
-          17
-        ]
-      ]
-    },
-    {
-      "id": "LA-BRIDGE-VINCENT-THOMAS",
-      "type": "bridge_pier_waterline",
-      "risk": 3,
-      "service_time": 5,
-      "screening_workload": 3.0,
-      "review_workload": 6.25,
-      "max_interval": 360,
-      "deadline": 360,
+      "max_interval": 300,
+      "deadline": 300,
       "allowed_platforms": [
         "UAV",
         "USV"
@@ -707,189 +422,102 @@
       "coverage_threshold": 1.0,
       "priority": 3.0,
       "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "task_family": "HYDROGRAPHIC_SURVEY",
         "geometry_mode": "CORRIDOR",
         "release_mode": "SCHEDULED",
         "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Vincent Thomas Bridge pier waterline inspection",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
+        "geometry_source_status": "official_noaa_geometry",
+        "work_order_status": "training_task_derived_not_official_work_order",
+        "parameter_status": "training_parameters_not_official_operational_schedule",
+        "object_name": "based on a system of fixed marks",
+        "longitude": -118.1821395,
+        "latitude": 33.707477600000004,
+        "source_dataset": "NOAA ENC Direct Approach",
+        "source_agency": "NOAA Office of Coast Survey",
+        "source_date": "20120925",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/139",
+        "source_version_or_edition": "US4CA60M.000",
+        "access_date": "2026-06-29",
+        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "original_id": 223275,
+        "original_crs": "EPSG:4326",
+        "file_checksum": "b40048bcc99c5a65c61421d46f0968958c894c1f4a96e45c89833a661dc59834",
+        "processing_script_version": "official-noaa-rest-v2",
+        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
+        "source_layer_id": 139,
+        "source_layer_name": "Approach.Recommended_Track_line",
+        "source_attributes": {
+          "OBJNAM": null,
+          "INFORM": null,
+          "SORDAT": "20120925",
+          "SORIND": "US,US,reprt,11thCGD,LNM 39/12",
+          "DSNM": "US4CA60M.000"
+        }
       },
       "cells": [
         [
-          9,
-          9
+          44,
+          45
         ],
         [
-          9,
-          10
+          43,
+          45
         ],
         [
-          8,
-          11
+          42,
+          45
         ],
         [
-          8,
-          12
+          41,
+          45
         ],
         [
-          8,
-          13
+          40,
+          45
         ],
         [
-          8,
-          14
+          39,
+          45
         ],
         [
-          7,
-          15
+          38,
+          45
         ],
         [
-          7,
-          16
+          37,
+          44
+        ],
+        [
+          36,
+          44
+        ],
+        [
+          35,
+          44
+        ],
+        [
+          34,
+          44
+        ],
+        [
+          33,
+          44
+        ],
+        [
+          32,
+          44
+        ],
+        [
+          31,
+          44
         ]
       ]
     }
   ],
   "area_tasks": [
     {
-      "id": "LA-AREA-PIER400-BASIN",
-      "type": "basin",
-      "risk": 2,
-      "service_time": 9,
-      "screening_workload": 5.4,
-      "review_workload": 11.25,
-      "max_interval": 420,
-      "deadline": 420,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 0.85,
-      "priority": 2.0,
-      "metadata": {
-        "task_family": "SURFACE_SAFETY_PATROL",
-        "geometry_mode": "AREA",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Pier 400 basin surface safety patrol",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
-      },
-      "cells": [
-        [
-          11,
-          10
-        ],
-        [
-          11,
-          12
-        ],
-        [
-          11,
-          14
-        ],
-        [
-          11,
-          16
-        ],
-        [
-          11,
-          18
-        ],
-        [
-          13,
-          10
-        ],
-        [
-          13,
-          12
-        ],
-        [
-          13,
-          14
-        ],
-        [
-          13,
-          16
-        ],
-        [
-          13,
-          18
-        ],
-        [
-          15,
-          10
-        ],
-        [
-          15,
-          12
-        ],
-        [
-          15,
-          14
-        ],
-        [
-          15,
-          16
-        ],
-        [
-          15,
-          18
-        ],
-        [
-          17,
-          10
-        ],
-        [
-          17,
-          12
-        ],
-        [
-          17,
-          14
-        ],
-        [
-          17,
-          16
-        ],
-        [
-          17,
-          18
-        ],
-        [
-          19,
-          10
-        ],
-        [
-          19,
-          12
-        ],
-        [
-          19,
-          14
-        ],
-        [
-          19,
-          16
-        ],
-        [
-          19,
-          18
-        ]
-      ]
-    },
-    {
-      "id": "LA-AREA-WEST-BASIN",
-      "type": "basin",
+      "id": "NOAA-APPROACH-SEA-AREA-NAMED-WATER-AREA-2476641",
+      "type": "named_water_area",
       "risk": 2,
       "service_time": 8,
       "screening_workload": 4.8,
@@ -907,296 +535,117 @@
         "geometry_mode": "AREA",
         "release_mode": "SCHEDULED",
         "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "West Basin visible obstruction patrol",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
+        "geometry_source_status": "official_noaa_geometry",
+        "work_order_status": "training_task_derived_not_official_work_order",
+        "parameter_status": "training_parameters_not_official_operational_schedule",
+        "object_name": "Fish Harbor",
+        "longitude": -118.26780369999999,
+        "latitude": 33.736176025,
+        "source_dataset": "NOAA ENC Direct Approach",
+        "source_agency": "NOAA Office of Coast Survey",
+        "source_date": "20090410",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/242",
+        "source_version_or_edition": "US4CA60M.000",
+        "access_date": "2026-06-29",
+        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "original_id": 2476641,
+        "original_crs": "EPSG:4326",
+        "file_checksum": "ef41826f9cd6872233c655092f69bf77f18756b1ed2369f21412e0cc0f997a56",
+        "processing_script_version": "official-noaa-rest-v2",
+        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
+        "source_layer_id": 242,
+        "source_layer_name": "Approach.Sea_Area_Named_Water_Area",
+        "source_attributes": {
+          "OBJNAM": "Fish Harbor",
+          "INFORM": null,
+          "SORDAT": "20090410",
+          "SORIND": "US,US,graph,Chart 18746",
+          "DSNM": "US4CA60M.000"
+        }
       },
       "cells": [
         [
-          7,
-          6
+          24,
+          11
         ],
         [
-          7,
-          8
+          24,
+          13
         ],
         [
-          7,
-          10
+          26,
+          11
         ],
         [
-          7,
-          12
-        ],
-        [
-          9,
-          6
-        ],
-        [
-          9,
-          8
-        ],
-        [
-          9,
-          10
-        ],
-        [
-          9,
-          12
-        ],
-        [
-          11,
-          6
-        ],
-        [
-          11,
-          8
-        ],
-        [
-          11,
-          10
-        ],
-        [
-          11,
-          12
-        ],
-        [
-          13,
-          6
-        ],
-        [
-          13,
-          8
-        ],
-        [
-          13,
-          10
-        ],
-        [
-          13,
-          12
-        ],
-        [
-          15,
-          6
-        ],
-        [
-          15,
-          8
-        ],
-        [
-          15,
-          10
-        ],
-        [
-          15,
-          12
+          26,
+          13
         ]
       ]
     },
     {
-      "id": "LA-AREA-TURNING-BASIN",
-      "type": "turning_basin",
-      "risk": 3,
-      "service_time": 10,
-      "screening_workload": 6.0,
-      "review_workload": 12.5,
-      "max_interval": 360,
-      "deadline": 360,
+      "id": "NOAA-APPROACH-SEA-AREA-NAMED-WATER-AREA-2476663",
+      "type": "named_water_area",
+      "risk": 2,
+      "service_time": 8,
+      "screening_workload": 4.8,
+      "review_workload": 10.0,
+      "max_interval": 420,
+      "deadline": 420,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
       "coverage_threshold": 0.85,
-      "priority": 3.0,
-      "metadata": {
-        "task_family": "HYDROGRAPHIC_SURVEY",
-        "geometry_mode": "AREA",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Turning basin hydrographic check",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
-      },
-      "cells": [
-        [
-          5,
-          14
-        ],
-        [
-          5,
-          16
-        ],
-        [
-          5,
-          18
-        ],
-        [
-          5,
-          20
-        ],
-        [
-          7,
-          14
-        ],
-        [
-          7,
-          16
-        ],
-        [
-          7,
-          18
-        ],
-        [
-          7,
-          20
-        ],
-        [
-          9,
-          14
-        ],
-        [
-          9,
-          16
-        ],
-        [
-          9,
-          18
-        ],
-        [
-          9,
-          20
-        ],
-        [
-          11,
-          14
-        ],
-        [
-          11,
-          16
-        ],
-        [
-          11,
-          18
-        ],
-        [
-          11,
-          20
-        ],
-        [
-          13,
-          14
-        ],
-        [
-          13,
-          16
-        ],
-        [
-          13,
-          18
-        ],
-        [
-          13,
-          20
-        ]
-      ]
-    },
-    {
-      "id": "LA-AREA-FISH-HARBOR",
-      "type": "harbor_basin",
-      "risk": 1,
-      "service_time": 6,
-      "screening_workload": 3.6,
-      "review_workload": 7.5,
-      "max_interval": 600,
-      "deadline": 600,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 0.85,
-      "priority": 1.0,
+      "priority": 2.0,
       "metadata": {
         "task_family": "SURFACE_SAFETY_PATROL",
         "geometry_mode": "AREA",
         "release_mode": "SCHEDULED",
         "scenario_generated": true,
-        "parameter_status": "engineering_training_scenario",
-        "object_name": "Fish Harbor surface condition patrol",
-        "source_dataset": "Los Angeles port engineering seed objects",
-        "source_kind": "scenario_seed_not_final_official_dataset",
-        "verification_level": "engineering_seed",
-        "longitude": null,
-        "latitude": null
+        "geometry_source_status": "official_noaa_geometry",
+        "work_order_status": "training_task_derived_not_official_work_order",
+        "parameter_status": "training_parameters_not_official_operational_schedule",
+        "object_name": "Flood Control Channel",
+        "longitude": -118.2055711125,
+        "latitude": 33.773862137500004,
+        "source_dataset": "NOAA ENC Direct Approach",
+        "source_agency": "NOAA Office of Coast Survey",
+        "source_date": "20090410",
+        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/242",
+        "source_version_or_edition": "US4CA60M.000",
+        "access_date": "2026-06-29",
+        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
+        "original_id": 2476663,
+        "original_crs": "EPSG:4326",
+        "file_checksum": "e388f65820f8db2405ef4cd2b33a21a6defe55075d36e8a8a0e78990587a7a39",
+        "processing_script_version": "official-noaa-rest-v2",
+        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
+        "source_layer_id": 242,
+        "source_layer_name": "Approach.Sea_Area_Named_Water_Area",
+        "source_attributes": {
+          "OBJNAM": "Flood Control Channel",
+          "INFORM": null,
+          "SORDAT": "20090410",
+          "SORIND": "US,US,graph,Chart 18746",
+          "DSNM": "US4CA60M.000"
+        }
       },
       "cells": [
         [
-          18,
-          8
+          4,
+          35
         ],
         [
-          18,
-          10
+          6,
+          35
         ],
         [
-          18,
-          12
+          8,
+          35
         ],
         [
-          18,
-          14
-        ],
-        [
-          18,
-          16
-        ],
-        [
-          20,
-          8
-        ],
-        [
-          20,
-          10
-        ],
-        [
-          20,
-          12
-        ],
-        [
-          20,
-          14
-        ],
-        [
-          20,
-          16
-        ],
-        [
-          22,
-          8
-        ],
-        [
-          22,
-          10
-        ],
-        [
-          22,
-          12
-        ],
-        [
-          22,
-          14
-        ],
-        [
-          22,
-          16
+          10,
+          35
         ]
       ]
     }

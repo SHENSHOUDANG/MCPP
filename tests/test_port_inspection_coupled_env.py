@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -127,6 +128,8 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         env = build_env(config)
         reset = env.reset_model(seed=13)
         geometries = {task.geometry for task in env.tasks}
+        tasks_payload = json.loads((ROOT / config["tasks_path"]).read_text(encoding="utf-8"))
+        task_records = tasks_payload["point_tasks"] + tasks_payload["line_tasks"] + tasks_payload["area_tasks"]
 
         self.assertEqual(reset.info["contract_boundary"]["scenario_status"], "PENDING")
         self.assertFalse(reset.info["contract_boundary"]["historical_only"])
@@ -134,6 +137,13 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertIn("line", geometries)
         self.assertIn("area", geometries)
         self.assertGreater(env.action_masks().sum(), env.num_platforms)
+        self.assertNotIn("engineering_seed", json.dumps(tasks_payload))
+        self.assertTrue(task_records)
+        for task in task_records:
+            metadata = task["metadata"]
+            self.assertEqual(metadata["geometry_source_status"], "official_noaa_geometry")
+            self.assertEqual(metadata["source_agency"], "NOAA Office of Coast Survey")
+            self.assertIn("encdirect.noaa.gov", metadata["source_url"])
 
     def test_idle_depot_platform_can_start_replenishment(self) -> None:
         config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
