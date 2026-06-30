@@ -235,7 +235,7 @@ def _draw_title(ax, grid: dict[str, Any], tasks: dict[str, Any]) -> None:
     area_count = len(tasks.get("area_tasks", []))
     title = "Los Angeles Port UAV-USV Training Scenario"
     subtitle = (
-        f"Official NOAA ENC Direct geometry | PENDING training assumptions | "
+        f"Chart-aligned LA task mapping | PENDING training assumptions | "
         f"NOAA ENC chart basemap | {point_count} point, {line_count} line, {area_count} area tasks | "
         f"{metadata.get('cell_size_m', grid.get('cell_size_m'))} m cells"
     )
@@ -246,14 +246,18 @@ def _draw_info_panel(ax, grid: dict[str, Any], tasks: dict[str, Any]) -> None:
     ax.set_axis_off()
     metadata = grid.get("metadata", {})
     task_records = [task for _, records in _task_groups(tasks) for task in records]
-    official_count = sum(1 for task in task_records if task.get("metadata", {}).get("geometry_source_status") == "official_noaa_geometry")
+    chart_aligned_count = sum(
+        1
+        for task in task_records
+        if task.get("metadata", {}).get("geometry_source_status") == "chart_aligned_research_geometry"
+    )
     families = _count_by(task_records, lambda task: task.get("metadata", {}).get("task_family", "UNKNOWN"))
     bbox = metadata.get("official_query_bbox_epsg4326", {})
 
     ax.text(0.02, 0.97, "Effect Figure Notes", fontsize=14, weight="bold", color="#0f172a", va="top")
     body = [
         ("Status", str(metadata.get("contract_status", "PENDING"))),
-        ("Geometry", f"{official_count}/{len(task_records)} tasks official NOAA"),
+        ("Geometry", f"{chart_aligned_count}/{len(task_records)} tasks chart-aligned"),
         ("Basemap", "NOAA ENC Direct Harbour export"),
         ("Access date", str(metadata.get("access_date", "unknown"))),
         ("Grid", f"{grid['width']} x {grid['height']} cells"),
@@ -283,7 +287,7 @@ def _draw_info_panel(ax, grid: dict[str, Any], tasks: dict[str, Any]) -> None:
     ax.text(
         0.04,
         y,
-        "NOAA ENC Direct Harbour chart export is used as the basemap. Task cells are derived from official NOAA Harbour/Approach geometry snapshots.",
+        "NOAA ENC Direct Harbour chart export is used as the basemap. Task cells are imported from the V2.0 chart-aligned LA task mapping package.",
         fontsize=7.4,
         color="#334155",
         va="top",
@@ -293,7 +297,7 @@ def _draw_info_panel(ax, grid: dict[str, Any], tasks: dict[str, Any]) -> None:
     ax.text(
         0.02,
         0.03,
-        "Chart basemap and task geometries are NOAA-derived. Workload, risk, deadlines, and depot are training assumptions, not official work orders.",
+        "Chart basemap is NOAA-derived; task geometries are chart-aligned research inputs. Workload, risk, deadlines, and depot are training assumptions.",
         fontsize=7.3,
         color="#64748b",
         va="bottom",

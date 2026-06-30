@@ -111,3 +111,11 @@
 - `tools/run_port_algorithm_comparison.py` runs the configured candidates on the Los Angeles `PENDING` training scenario and writes comparable JSON/CSV summaries.
 - Comparison outputs belong under ignored `data/ports/*/algorithm_comparison/` and are not final baseline, ablation, or innovation evidence.
 - IPPO, graph/attention policy, hybrid optimization, and the final rejected/accepted algorithm rationale remain pending item-9 decisions.
+
+### 2026-06-30 User-provided LA task mapping import
+
+- Replaced the compact 7-task NOAA snapshot training set with the user-provided `D:/地图/洛杉矶` Port of Los Angeles Task Mapping V2.0 chart-aligned catalog.
+- Current `los_angeles_training_v1` now contains 26 released training tasks: 3 point tasks, 10 corridor tasks, and 13 area tasks.
+- Four reinspection records from `reinspection_catalog_v2_0.csv` are preserved as metadata only; they are not automatically released into the current scheduler action space.
+- Geometry is labelled `chart_aligned_research_geometry`, not native ENC vector geometry. It remains `PENDING` training data and must not be treated as final GIS or official work-order evidence.
+- The import path is reproducible through `tools/import_los_angeles_task_mapping.py`; source CSV/GPKG checksums are embedded in the generated grid/task metadata.

@@ -1,34 +1,34 @@
 # los_angeles_training_v1
 
-This is a Los Angeles port scheduler training scenario built from official NOAA ENC Direct geometry.
+This is a Los Angeles port scheduler training scenario imported from the user-provided
+`Port_of_Los_Angeles_Task_Mapping_V2.0_Chart_Aligned` package.
 
-Status: `PENDING_OFFICIAL_GEOMETRY_TRAINING`.
+Status: `PENDING_CHART_ALIGNED_TASK_MAPPING_TRAINING`.
 
-The geometry is sourced from NOAA Office of Coast Survey ENC Direct REST services for the Los Angeles port
-area. This checked-in scenario was regenerated from the embedded official sample snapshot captured on
-2026-06-29 because live network execution was unavailable during the update. The generated scheduler tasks
-are derived from official chart objects, but the workload, deadlines, risk, and release settings remain
-training parameters rather than official Port of Los Angeles work orders. Do not report this as final
-experiment evidence until the V1.2 algorithm contract and official experiment workflow are frozen.
+The checked-in grid and task JSON were generated from `D:/地图/洛杉矶/task_catalog_v2_0.csv`.
+The source package describes chart-aligned research geometry validated against NOAA Chart 18751 and
+supporting public NOAA/Port of Los Angeles datasets. It is not native ENC vector geometry and must not be
+reported as final experiment evidence until the V1.2 algorithm contract and official experiment workflow
+are frozen.
 
 - Point tasks: 3
-- Corridor tasks: 2
-- Area tasks: 2
-- Geometry source: NOAA ENC Direct Harbour and Approach REST services
-- Access date: 2026-06-29
+- Corridor tasks: 10
+- Area tasks: 13
+- Stored reinspection metadata tasks: 4
 - Coordinate mode: local equirectangular approximation, `distance_mode=utm_euclidean`
 - Cell size: 250 m
 
-Regenerate from official NOAA services:
+Task type counts:
+
+- ANCHORAGE_INSPECTION: 2
+- BERTH_AREA_INSPECTION: 11
+- BUOY_INSPECTION: 3
+- CHANNEL_INSPECTION: 10
+
+Regenerate from the provided local task mapping directory:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\build_los_angeles_training_scenario.py
-```
-
-Regenerate from the embedded official NOAA sample snapshot:
-
-```powershell
-.\.venv\Scripts\python.exe tools\build_los_angeles_training_scenario.py --use-embedded-official-snapshot
+.\.venv\Scripts\python.exe tools\import_los_angeles_task_mapping.py
 ```
 
 Run a smoke check:
@@ -40,5 +40,5 @@ Run a smoke check:
 Run scheduler training:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\train_port_scheduler_rl.py --config configs\port_los_angeles_training_v1.toml --steps 10000
+.\.venv\Scripts\python.exe tools\run_port_algorithm_comparison.py --config configs\port_los_angeles_training_v1.toml --steps 50000 --device auto --num-envs 1 --env-workers 1 --checkpoint-interval 10000
 ```

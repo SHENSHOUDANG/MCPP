@@ -1,7 +1,7 @@
 grid_path = "data/ports/los_angeles_training_v1/los_angeles_training_v1_grid.json"
 tasks_path = "data/ports/los_angeles_training_v1/los_angeles_training_v1_tasks.json"
 output_dir = "data/ports/los_angeles_training_v1"
-map_source = "noaa_enc_direct_official_geometry_snapshot_2026_06_29"
+map_source = "port_of_los_angeles_task_mapping_v2_0_chart_aligned_2026_06_30"
 platform_profiles_path = "configs/platform_profiles_la_training_v1.toml"
 uav_count = 3
 usv_count = 3
@@ -20,7 +20,7 @@ model_contract_version = "V1.2"
 scenario_status = "PENDING"
 historical_only = false
 final_experiment_eligible = false
-notice = "Los Angeles training scenario uses official NOAA ENC Direct geometry; workload, deadline, risk, and release parameters remain training assumptions until final GIS and algorithm review are frozen."
+notice = "Los Angeles training scenario uses the user-provided Port of Los Angeles Task Mapping V2.0 chart-aligned package. Geometry is validated against public NOAA/POLA sources but is not native ENC vector geometry; training parameters remain non-final until GIS and algorithm review are frozen."
 
 [scheduling]
 risk_weight = 12.0

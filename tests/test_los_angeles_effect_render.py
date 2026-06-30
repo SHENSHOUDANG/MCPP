@@ -13,7 +13,7 @@ from render_los_angeles_training_effect import _load_json, render_effect
 
 
 class LosAngelesEffectRenderTests(unittest.TestCase):
-    def test_render_effect_writes_png_from_official_training_json(self) -> None:
+    def test_render_effect_writes_png_from_chart_aligned_training_json(self) -> None:
         grid = _load_json(ROOT / "data" / "ports" / "los_angeles_training_v1" / "los_angeles_training_v1_grid.json")
         tasks = _load_json(ROOT / "data" / "ports" / "los_angeles_training_v1" / "los_angeles_training_v1_tasks.json")
         output = ROOT / ".tmp_tests" / "los_angeles_training_effect_test.png"

@@ -206,3 +206,11 @@ interpretation and next decision
 - Added `tools/run_port_algorithm_comparison.py` to run selected candidates with a shared config/seed/step budget and collect `algorithm_comparison_summary.json` plus CSV.
 - Added `data/ports/*/algorithm_comparison/` to ignored artifacts; per-candidate checkpoints and summaries remain engineering training outputs outside Git.
 - This change records no final MAPPO/IPPO/centralized PPO decision. Graph/attention, hybrid optimization, IPPO, final metrics, rejected alternatives, and paper claims remain `PENDING` until the relevant freeze items are approved.
+
+### 2026-06-30 User-provided Los Angeles task mapping import
+
+- Imported `D:/地图/洛杉矶/task_catalog_v2_0.csv` into the current `los_angeles_training_v1` grid/task JSON using `tools/import_los_angeles_task_mapping.py`.
+- Replaced the previous compact NOAA REST snapshot task set with 26 chart-aligned training tasks: 3 `BUOY_INSPECTION`, 2 `ANCHORAGE_INSPECTION`, 11 `BERTH_AREA_INSPECTION`, and 10 `CHANNEL_INSPECTION` tasks.
+- Preserved 4 `reinspection_catalog_v2_0.csv` records as metadata-only illustrative internal successor tasks; they are not automatically released into the scheduler training action space.
+- Embedded source file SHA-256 values for `task_catalog_v2_0.csv`, `reinspection_catalog_v2_0.csv`, `geometry_alignment_qa_v2_0.csv`, and `port_of_los_angeles_task_mapping_v2_0.gpkg`.
+- Data status remains `PENDING_CHART_ALIGNED_TASK_MAPPING_TRAINING`: the package is validated against public NOAA/POLA sources but is not native ENC vector geometry and is not final experiment evidence.

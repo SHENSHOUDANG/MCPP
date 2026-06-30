@@ -2,652 +2,2936 @@
   "metadata": {
     "scenario_name": "los_angeles_training_v1",
     "port": "Los Angeles",
-    "contract_status": "PENDING_OFFICIAL_GEOMETRY_TRAINING",
+    "contract_status": "PENDING_CHART_ALIGNED_TASK_MAPPING_TRAINING",
     "scenario_generated": true,
-    "official_geometry": true,
+    "official_geometry": false,
     "cell_size_m": 250.0,
-    "access_date": "2026-06-29",
-    "official_query_bbox_epsg4326": {
-      "xmin": -118.33,
-      "ymin": 33.67,
-      "xmax": -118.18,
-      "ymax": 33.8
+    "access_date": "2026-06-30",
+    "source_package": "D:/地图/洛杉矶",
+    "source_files": {
+      "task_catalog_v2_0.csv": {
+        "filename": "task_catalog_v2_0.csv",
+        "bytes": 40696,
+        "sha256": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169"
+      },
+      "reinspection_catalog_v2_0.csv": {
+        "filename": "reinspection_catalog_v2_0.csv",
+        "bytes": 3097,
+        "sha256": "4dbc4955add3f10feb0fc5a3f6a011d54618ffde1220faed2b5460defcb8ff29"
+      },
+      "geometry_alignment_qa_v2_0.csv": {
+        "filename": "geometry_alignment_qa_v2_0.csv",
+        "bytes": 5354,
+        "sha256": "159b4d73a9e524f2acaa24b5bf8e64539ab060f84efccd25e307756080efb222"
+      },
+      "port_of_los_angeles_task_mapping_v2_0.gpkg": {
+        "filename": "port_of_los_angeles_task_mapping_v2_0.gpkg",
+        "bytes": 294912,
+        "sha256": "8584236475984a0b1dc178fde42cbb1014f04605707e3dd48f6ee6a2a25eb621"
+      }
     },
     "bounds_lon_lat": {
-      "lon_min": -118.3016822,
-      "lon_max": -118.1706531,
-      "lat_min": 33.663325,
-      "lat_max": 33.792098499999994
+      "lon_min": -118.29318400000001,
+      "lon_max": -118.20517199999999,
+      "lat_min": 33.690189000000004,
+      "lat_max": 33.778096
     },
     "grid_shape": [
-      58,
-      50
+      40,
+      34
     ],
-    "source_layers": [
-      {
-        "service_name": "NOAA ENC Direct Harbour",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
-        "layer_id": 6,
-        "layer_name": "Harbor.Buoy_Lateral_point",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
-        "queried_feature_count": 3,
-        "selected_feature_count": 3,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Harbour",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
-        "layer_id": 11,
-        "layer_name": "Harbor.Light_point",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/11",
-        "queried_feature_count": 0,
-        "selected_feature_count": 0,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Harbour",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
-        "layer_id": 87,
-        "layer_name": "Harbor.Bridge_line",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/87",
-        "queried_feature_count": 1,
-        "selected_feature_count": 1,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Harbour",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
-        "layer_id": 134,
-        "layer_name": "Harbor.Recommended_Track_line",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/134",
-        "queried_feature_count": 1,
-        "selected_feature_count": 1,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Approach",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer",
-        "layer_id": 139,
-        "layer_name": "Approach.Recommended_Track_line",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/139",
-        "queried_feature_count": 1,
-        "selected_feature_count": 1,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Harbour",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
-        "layer_id": 104,
-        "layer_name": "Harbor.Depth_Contour_line",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/104",
-        "queried_feature_count": 0,
-        "selected_feature_count": 0,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Approach",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer",
-        "layer_id": 242,
-        "layer_name": "Approach.Sea_Area_Named_Water_Area",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/242",
-        "queried_feature_count": 2,
-        "selected_feature_count": 2,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Harbour",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
-        "layer_id": 237,
-        "layer_name": "Harbor.Sea_Area_Named_Water_Area",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/237",
-        "queried_feature_count": 0,
-        "selected_feature_count": 0,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Harbour",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer",
-        "layer_id": 208,
-        "layer_name": "Harbor.Fairway_area",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/208",
-        "queried_feature_count": 0,
-        "selected_feature_count": 0,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      },
-      {
-        "service_name": "NOAA ENC Direct Approach",
-        "service_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer",
-        "layer_id": 233,
-        "layer_name": "Approach.Dredged_Area",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/233",
-        "queried_feature_count": 0,
-        "selected_feature_count": 0,
-        "access_date": "2026-06-29",
-        "original_crs": "EPSG:4326",
-        "usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "retrieval_mode": "embedded_official_snapshot"
-      }
-    ],
-    "note": "All task geometry is derived from official NOAA ENC Direct REST layers. Training workload/deadline/risk parameters are scenario parameters and are not official work orders."
+    "task_type_counts": {
+      "BUOY_INSPECTION": 3,
+      "ANCHORAGE_INSPECTION": 2,
+      "BERTH_AREA_INSPECTION": 11,
+      "CHANNEL_INSPECTION": 10
+    },
+    "geometry_counts": {
+      "point": 3,
+      "area": 13,
+      "line": 10
+    },
+    "qa_summary": {
+      "PASS_VISUAL_ALIGNMENT_REVIEW": 26
+    },
+    "note": "Task geometry is imported from the user-provided Port of Los Angeles Task Mapping V2.0 package. The package is chart-aligned research geometry, not native ENC vector geometry, and remains PENDING training data."
   },
   "point_tasks": [
     {
-      "id": "NOAA-HARBOR-BUOY-LATERAL-POINT-2845058",
-      "type": "navigation_aid",
+      "id": "BUOY-001",
+      "type": "BUOY_INSPECTION",
       "risk": 3,
-      "service_time": 2,
-      "screening_workload": 1.2,
-      "review_workload": 2.5,
-      "max_interval": 300,
-      "deadline": 300,
+      "max_interval": 10080,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
-      "coverage_threshold": 1.0,
+      "coverage_threshold": 0.9,
       "priority": 3.0,
       "metadata": {
         "task_family": "WATERSIDE_ASSET_INSPECTION",
         "geometry_mode": "TARGET",
-        "release_mode": "SCHEDULED",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
         "scenario_generated": true,
-        "geometry_source_status": "official_noaa_geometry",
-        "work_order_status": "training_task_derived_not_official_work_order",
-        "parameter_status": "training_parameters_not_official_operational_schedule",
-        "object_name": "Los Angeles Approach Channel Lighted Buoy 2",
-        "longitude": -118.2289833,
-        "latitude": 33.673325,
-        "source_dataset": "NOAA ENC Direct Harbour",
-        "source_agency": "NOAA Office of Coast Survey",
-        "source_date": "20000829",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
-        "source_version_or_edition": "US5LGBBD.000",
-        "access_date": "2026-06-29",
-        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "original_id": 2845058,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "BUOY-LA-01",
+        "object_name": "Los Angeles Channel Buoy #1",
+        "task_name_zh": "洛杉矶航道1号浮标检测",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 10080,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 10080,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "relative_positioning": 1
+        },
+        "inspection_scope": "位置偏移、标体外观、灯光/标识可见性及周边障碍物检测",
+        "data_product": "带时间戳的定位、环绕影像与异常标签",
+        "management_use": "航标维护优先级与通航安全告警",
+        "quality_requirement": {
+          "position_recorded": true,
+          "view_coverage_min": 0.9,
+          "identifier_readable": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BUOY_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR",
+          "SRC_POLA_MARINERS_2026"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BUOY-001",
         "original_crs": "EPSG:4326",
-        "file_checksum": "a17c473dc2fb5b99e0b802dfabd781fc7b44e191f416ed81daffed324222a32e",
-        "processing_script_version": "official-noaa-rest-v2",
-        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
-        "source_layer_id": 6,
-        "source_layer_name": "Harbor.Buoy_Lateral_point",
-        "source_attributes": {
-          "OBJNAM": "Los Angeles Approach Channel Lighted Buoy 2",
-          "INFORM": null,
-          "SORDAT": "20000829",
-          "SORIND": "US,US,reprt,11thCGD,LNM 35/00",
-          "DSNM": "US5LGBBD.000"
-        }
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POINT (-118.251046 33.707121)",
+        "centroid_lon_lat": [
+          -118.251046,
+          33.707121
+        ]
       },
       "cell": [
-        53,
-        27
+        31,
+        16
       ]
     },
     {
-      "id": "NOAA-HARBOR-BUOY-LATERAL-POINT-2845060",
-      "type": "navigation_aid",
+      "id": "BUOY-002",
+      "type": "BUOY_INSPECTION",
       "risk": 3,
-      "service_time": 2,
-      "screening_workload": 1.2,
-      "review_workload": 2.5,
-      "max_interval": 300,
-      "deadline": 300,
+      "max_interval": 10080,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
-      "coverage_threshold": 1.0,
+      "coverage_threshold": 0.9,
       "priority": 3.0,
       "metadata": {
         "task_family": "WATERSIDE_ASSET_INSPECTION",
         "geometry_mode": "TARGET",
-        "release_mode": "SCHEDULED",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
         "scenario_generated": true,
-        "geometry_source_status": "official_noaa_geometry",
-        "work_order_status": "training_task_derived_not_official_work_order",
-        "parameter_status": "training_parameters_not_official_operational_schedule",
-        "object_name": "Point Fermin Lighted Whistle Buoy 6PF",
-        "longitude": -118.2916822,
-        "latitude": 33.6988253,
-        "source_dataset": "NOAA ENC Direct Harbour",
-        "source_agency": "NOAA Office of Coast Survey",
-        "source_date": "20041208",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
-        "source_version_or_edition": "US5LGBCC.000",
-        "access_date": "2026-06-29",
-        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "original_id": 2845060,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "BUOY-LA-03",
+        "object_name": "Los Angeles Channel RACON Buoy #3",
+        "task_name_zh": "洛杉矶航道RACON 3号浮标检测",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 10080,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 10080,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "relative_positioning": 1
+        },
+        "inspection_scope": "位置偏移、标体外观、RACON/灯光可见状态及周边障碍物检测",
+        "data_product": "带时间戳的定位、环绕影像与异常标签",
+        "management_use": "引航接载区航标维护与安全告警",
+        "quality_requirement": {
+          "position_recorded": true,
+          "view_coverage_min": 0.9,
+          "identifier_readable": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BUOY_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR",
+          "SRC_POLA_MARINERS_2026"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BUOY-002",
         "original_crs": "EPSG:4326",
-        "file_checksum": "c9b12ec3abd53700d6f177dc7837d1fe36a2e41e9c496c3466a50d4d68692839",
-        "processing_script_version": "official-noaa-rest-v2",
-        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
-        "source_layer_id": 6,
-        "source_layer_name": "Harbor.Buoy_Lateral_point",
-        "source_attributes": {
-          "OBJNAM": "Point Fermin Lighted Whistle Buoy 6PF",
-          "INFORM": null,
-          "SORDAT": "20041208",
-          "SORIND": "US,US,reprt,11thCGD,ATONIS",
-          "DSNM": "US5LGBCC.000"
-        }
-      },
-      "cell": [
-        41,
-        4
-      ]
-    },
-    {
-      "id": "NOAA-HARBOR-BUOY-LATERAL-POINT-2845061",
-      "type": "navigation_aid",
-      "risk": 3,
-      "service_time": 2,
-      "screening_workload": 1.2,
-      "review_workload": 2.5,
-      "max_interval": 300,
-      "deadline": 300,
-      "allowed_platforms": [
-        "UAV",
-        "USV"
-      ],
-      "coverage_threshold": 1.0,
-      "priority": 3.0,
-      "metadata": {
-        "task_family": "WATERSIDE_ASSET_INSPECTION",
-        "geometry_mode": "TARGET",
-        "release_mode": "SCHEDULED",
-        "scenario_generated": true,
-        "geometry_source_status": "official_noaa_geometry",
-        "work_order_status": "training_task_derived_not_official_work_order",
-        "parameter_status": "training_parameters_not_official_operational_schedule",
-        "object_name": "Terminal Island Channel Lighted Buoy 5",
-        "longitude": -118.2656596,
-        "latitude": 33.7293432,
-        "source_dataset": "NOAA ENC Direct Harbour",
-        "source_agency": "NOAA Office of Coast Survey",
-        "source_date": "20030325",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/6",
-        "source_version_or_edition": "US5LGBCD.000",
-        "access_date": "2026-06-29",
-        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "original_id": 2845061,
-        "original_crs": "EPSG:4326",
-        "file_checksum": "bbe918e3722639be55d1b09b75924bcc4567e64a1e5967cbbf2cd18b18d91604",
-        "processing_script_version": "official-noaa-rest-v2",
-        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
-        "source_layer_id": 6,
-        "source_layer_name": "Harbor.Buoy_Lateral_point",
-        "source_attributes": {
-          "OBJNAM": "Terminal Island Channel Lighted Buoy 5",
-          "INFORM": null,
-          "SORDAT": "20030325",
-          "SORIND": "US,US,reprt,11thCGD,LNM 12/03",
-          "DSNM": "US5LGBCD.000"
-        }
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POINT (-118.256278 33.714682)",
+        "centroid_lon_lat": [
+          -118.256278,
+          33.714682
+        ]
       },
       "cell": [
         28,
-        13
+        14
+      ]
+    },
+    {
+      "id": "BUOY-003",
+      "type": "BUOY_INSPECTION",
+      "risk": 3,
+      "max_interval": 10080,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.9,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "TARGET",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "BUOY-LA-11",
+        "object_name": "Los Angeles Main Channel Buoy #11",
+        "task_name_zh": "洛杉矶主航道11号浮标检测",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 10080,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 10080,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "relative_positioning": 1
+        },
+        "inspection_scope": "位置偏移、标体外观、灯光/标识可见性及周边障碍物检测",
+        "data_product": "带时间戳的定位、环绕影像与异常标签",
+        "management_use": "入口—主航道转换段航标维护与安全告警",
+        "quality_requirement": {
+          "position_recorded": true,
+          "view_coverage_min": 0.9,
+          "identifier_readable": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BUOY_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR",
+          "SRC_POLA_MARINERS_2026"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BUOY-003",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POINT (-118.277578 33.725078)",
+        "centroid_lon_lat": [
+          -118.277578,
+          33.725078
+        ]
+      },
+      "cell": [
+        23,
+        6
       ]
     }
   ],
   "line_tasks": [
     {
-      "id": "NOAA-HARBOR-RECOMMENDED-TRACK-LINE-363104",
-      "type": "recommended_track",
+      "id": "CHANNEL-001",
+      "type": "CHANNEL_INSPECTION",
       "risk": 3,
-      "service_time": 7,
-      "screening_workload": 4.2,
-      "review_workload": 8.75,
-      "max_interval": 300,
-      "deadline": 300,
+      "max_interval": 2880,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
-      "coverage_threshold": 1.0,
+      "coverage_threshold": 0.95,
       "priority": 3.0,
       "metadata": {
         "task_family": "HYDROGRAPHIC_SURVEY",
         "geometry_mode": "CORRIDOR",
-        "release_mode": "SCHEDULED",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
         "scenario_generated": true,
-        "geometry_source_status": "official_noaa_geometry",
-        "work_order_status": "training_task_derived_not_official_work_order",
-        "parameter_status": "training_parameters_not_official_operational_schedule",
-        "object_name": "based on a system of fixed marks",
-        "longitude": -118.25821245,
-        "latitude": 33.7141564,
-        "source_dataset": "NOAA ENC Direct Harbour",
-        "source_agency": "NOAA Office of Coast Survey",
-        "source_date": "20120925",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_harbour/MapServer/134",
-        "source_version_or_edition": "US5LGBCD.000",
-        "access_date": "2026-06-29",
-        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "original_id": 363104,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-01",
+        "object_name": "Los Angeles Approach / Entrance Channel candidate zone",
+        "task_name_zh": "洛杉矶进港/入口航道",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-001",
         "original_crs": "EPSG:4326",
-        "file_checksum": "b7e3d1a5398b27ef3c4805c486157c241133113e2ca028eebab3e9889bb5bc99",
-        "processing_script_version": "official-noaa-rest-v2",
-        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
-        "source_layer_id": 134,
-        "source_layer_name": "Harbor.Recommended_Track_line",
-        "source_attributes": {
-          "OBJNAM": null,
-          "INFORM": null,
-          "SORDAT": "20120925",
-          "SORIND": "US,US,reprt,11thCGD,LNM 39/12",
-          "DSNM": "US5LGBCD.000"
-        }
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.247683 33.700189, -118.249925 33.704915, -118.252541 33.709641, -118.255157 33.713107, -118.257773 33.715627)",
+        "centroid_lon_lat": [
+          -118.25261580000002,
+          33.7086958
+        ]
       },
       "cells": [
         [
-          36,
-          20
-        ],
-        [
-          36,
-          19
-        ],
-        [
-          35,
-          18
-        ],
-        [
-          35,
+          34,
           17
         ],
         [
-          34,
+          33,
           16
         ],
         [
-          34,
+          32,
+          16
+        ],
+        [
+          31,
+          16
+        ],
+        [
+          30,
           15
         ],
         [
-          34,
+          29,
           14
         ],
         [
-          33,
+          28,
           13
-        ],
-        [
-          33,
-          12
         ]
       ]
     },
     {
-      "id": "NOAA-APPROACH-RECOMMENDED-TRACK-LINE-223275",
-      "type": "approach_recommended_track",
+      "id": "CHANNEL-002",
+      "type": "CHANNEL_INSPECTION",
       "risk": 3,
-      "service_time": 7,
-      "screening_workload": 4.2,
-      "review_workload": 8.75,
-      "max_interval": 300,
-      "deadline": 300,
+      "max_interval": 2880,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
-      "coverage_threshold": 1.0,
+      "coverage_threshold": 0.95,
       "priority": 3.0,
       "metadata": {
         "task_family": "HYDROGRAPHIC_SURVEY",
         "geometry_mode": "CORRIDOR",
-        "release_mode": "SCHEDULED",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
         "scenario_generated": true,
-        "geometry_source_status": "official_noaa_geometry",
-        "work_order_status": "training_task_derived_not_official_work_order",
-        "parameter_status": "training_parameters_not_official_operational_schedule",
-        "object_name": "based on a system of fixed marks",
-        "longitude": -118.1821395,
-        "latitude": 33.707477600000004,
-        "source_dataset": "NOAA ENC Direct Approach",
-        "source_agency": "NOAA Office of Coast Survey",
-        "source_date": "20120925",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/139",
-        "source_version_or_edition": "US4CA60M.000",
-        "access_date": "2026-06-29",
-        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "original_id": 223275,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-02",
+        "object_name": "Angels Gate and Outer Harbor candidate zone",
+        "task_name_zh": "Angels Gate—外港航段",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-002",
         "original_crs": "EPSG:4326",
-        "file_checksum": "b40048bcc99c5a65c61421d46f0968958c894c1f4a96e45c89833a661dc59834",
-        "processing_script_version": "official-noaa-rest-v2",
-        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
-        "source_layer_id": 139,
-        "source_layer_name": "Approach.Recommended_Track_line",
-        "source_attributes": {
-          "OBJNAM": null,
-          "INFORM": null,
-          "SORDAT": "20120925",
-          "SORIND": "US,US,reprt,11thCGD,LNM 39/12",
-          "DSNM": "US4CA60M.000"
-        }
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.257773 33.715627, -118.261136 33.716887, -118.264499 33.718148, -118.267862 33.719723, -118.270852 33.721613, -118.27272 33.723188)",
+        "centroid_lon_lat": [
+          -118.26580700000001,
+          33.719197666666666
+        ]
       },
       "cells": [
         [
-          44,
-          45
+          28,
+          13
         ],
         [
-          43,
-          45
+          27,
+          12
         ],
         [
-          42,
-          45
+          27,
+          11
         ],
         [
-          41,
-          45
+          26,
+          10
         ],
         [
-          40,
-          45
+          26,
+          9
         ],
         [
-          39,
-          45
+          25,
+          8
         ],
         [
-          38,
-          45
+          24,
+          8
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-003",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-03",
+        "object_name": "Los Angeles Main Channel - south reach",
+        "task_name_zh": "洛杉矶主航道南段",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-003",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.27272 33.723188, -118.274963 33.726023, -118.276831 33.729803, -118.278326 33.734212, -118.279297 33.738622, -118.279447 33.743031, -118.278849 33.747125, -118.277578 33.750589, -118.276233 33.753423)",
+        "centroid_lon_lat": [
+          -118.27713822222225,
+          33.73844622222222
+        ]
+      },
+      "cells": [
+        [
+          24,
+          8
         ],
         [
-          37,
-          44
+          23,
+          7
         ],
         [
-          36,
-          44
+          22,
+          6
         ],
         [
-          35,
-          44
+          21,
+          6
         ],
         [
-          34,
-          44
+          20,
+          6
         ],
         [
-          33,
-          44
+          19,
+          6
         ],
         [
-          32,
-          44
+          18,
+          6
         ],
         [
-          31,
-          44
+          17,
+          5
+        ],
+        [
+          16,
+          5
+        ],
+        [
+          15,
+          5
+        ],
+        [
+          14,
+          5
+        ],
+        [
+          13,
+          6
+        ],
+        [
+          12,
+          6
+        ],
+        [
+          11,
+          6
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-004",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-04",
+        "object_name": "Los Angeles Main Channel - north reach",
+        "task_name_zh": "洛杉矶主航道北段",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-004",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.276233 33.753423, -118.273842 33.756131, -118.270703 33.758462, -118.267115 33.760666, -118.263004 33.762681, -118.25852 33.764318, -118.253662 33.765389, -118.24843 33.766459, -118.243199 33.767467, -118.238341 33.767907)",
+        "centroid_lon_lat": [
+          -118.25930489999999,
+          33.762290300000004
+        ]
+      },
+      "cells": [
+        [
+          11,
+          6
+        ],
+        [
+          10,
+          7
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          10
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          6,
+          12
+        ],
+        [
+          6,
+          13
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          6,
+          15
+        ],
+        [
+          6,
+          16
+        ],
+        [
+          5,
+          17
+        ],
+        [
+          5,
+          18
+        ],
+        [
+          5,
+          19
+        ],
+        [
+          5,
+          20
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-005",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-05",
+        "object_name": "Main Channel Turning Basin",
+        "task_name_zh": "主航道回旋水域",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-005",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.278924 33.756257, -118.276831 33.757517, -118.274439 33.757202, -118.272496 33.755628, -118.27272 33.753864, -118.274215 33.752353, -118.276682 33.751849, -118.27855 33.752983, -118.279447 33.754683, -118.278924 33.756257)",
+        "centroid_lon_lat": [
+          -118.27603377777778,
+          33.754704
+        ]
+      },
+      "cells": [
+        [
+          10,
+          5
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          9,
+          7
+        ],
+        [
+          10,
+          8
+        ],
+        [
+          11,
+          8
+        ],
+        [
+          11,
+          7
+        ],
+        [
+          12,
+          6
+        ],
+        [
+          11,
+          5
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-006",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-06",
+        "object_name": "West Basin",
+        "task_name_zh": "West Basin航道",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-006",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.276084 33.753738, -118.277578 33.756257, -118.279447 33.758776, -118.280942 33.76161, -118.282063 33.764444, -118.283184 33.767593)",
+        "centroid_lon_lat": [
+          -118.279883,
+          33.760403000000004
+        ]
+      },
+      "cells": [
+        [
+          11,
+          6
+        ],
+        [
+          10,
+          6
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          6,
+          4
+        ],
+        [
+          5,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-007",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-07",
+        "object_name": "East Basin Channel",
+        "task_name_zh": "East Basin航道",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-007",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.238341 33.767907, -118.234604 33.768096, -118.230867 33.767278, -118.228401 33.765389, -118.227504 33.762555, -118.227504 33.759406, -118.22713 33.756257, -118.226756 33.753108, -118.226383 33.749959, -118.225262 33.747125)",
+        "centroid_lon_lat": [
+          -118.22927519999999,
+          33.759707999999996
+        ]
+      },
+      "cells": [
+        [
+          5,
+          20
+        ],
+        [
+          4,
+          21
+        ],
+        [
+          4,
+          22
+        ],
+        [
+          5,
+          23
+        ],
+        [
+          6,
+          24
+        ],
+        [
+          7,
+          24
+        ],
+        [
+          8,
+          24
+        ],
+        [
+          9,
+          24
+        ],
+        [
+          10,
+          24
+        ],
+        [
+          11,
+          25
+        ],
+        [
+          12,
+          25
+        ],
+        [
+          13,
+          25
+        ],
+        [
+          14,
+          25
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-008",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-08",
+        "object_name": "Pier 300 channel/basin",
+        "task_name_zh": "Pier 300航道/港池",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-008",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.274963 33.732008, -118.270852 33.732638, -118.265994 33.733268, -118.260762 33.733897, -118.255531 33.734716, -118.250299 33.735598, -118.246188 33.736228)",
+        "centroid_lon_lat": [
+          -118.26065557142859,
+          33.73405042857143
+        ]
+      },
+      "cells": [
+        [
+          20,
+          7
+        ],
+        [
+          20,
+          8
+        ],
+        [
+          20,
+          9
+        ],
+        [
+          20,
+          10
+        ],
+        [
+          20,
+          11
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          13
+        ],
+        [
+          19,
+          14
+        ],
+        [
+          19,
+          15
+        ],
+        [
+          19,
+          16
+        ],
+        [
+          19,
+          17
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-009",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-09",
+        "object_name": "Pier 400 channel/basin",
+        "task_name_zh": "Pier 400航道/港池",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-009",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.269731 33.720353, -118.264499 33.721298, -118.259268 33.722558, -118.254036 33.723944, -118.248804 33.725519, -118.243572 33.727283, -118.238341 33.729173)",
+        "centroid_lon_lat": [
+          -118.25403585714285,
+          33.724304
+        ]
+      },
+      "cells": [
+        [
+          26,
+          9
+        ],
+        [
+          26,
+          10
+        ],
+        [
+          25,
+          11
+        ],
+        [
+          25,
+          12
+        ],
+        [
+          25,
+          13
+        ],
+        [
+          24,
+          14
+        ],
+        [
+          24,
+          15
+        ],
+        [
+          23,
+          16
+        ],
+        [
+          22,
+          17
+        ],
+        [
+          22,
+          18
+        ],
+        [
+          22,
+          19
+        ],
+        [
+          22,
+          20
+        ]
+      ]
+    },
+    {
+      "id": "CHANNEL-010",
+      "type": "CHANNEL_INSPECTION",
+      "risk": 3,
+      "max_interval": 2880,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
+      "metadata": {
+        "task_family": "HYDROGRAPHIC_SURVEY",
+        "geometry_mode": "CORRIDOR",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-W-10",
+        "object_name": "Fish Harbor and approach",
+        "task_name_zh": "Fish Harbor进出航道",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 2880,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 2880,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "coverage_planning": 1,
+          "obstacle_detection": 1,
+          "optional_bathymetry": 1
+        },
+        "inspection_scope": "航道边界、通航水域、水深/回淤、漂浮障碍物及异常占用的综合检测",
+        "data_product": "航道状态图、异常目标清单、覆盖轨迹与必要的测深/影像记录",
+        "management_use": "通航安全评估、维护疏浚触发、临时管制与调度支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "obstacle_scan_complete": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_CHANNEL_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "CHANNEL-010",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "LINESTRING (-118.275336 33.729803, -118.274963 33.732323, -118.274738 33.734842, -118.274813 33.737362, -118.275336 33.739882, -118.276084 33.741771)",
+        "centroid_lon_lat": [
+          -118.27521166666666,
+          33.735997166666664
+        ]
+      },
+      "cells": [
+        [
+          21,
+          7
+        ],
+        [
+          20,
+          7
+        ],
+        [
+          19,
+          7
+        ],
+        [
+          18,
+          7
+        ],
+        [
+          17,
+          7
+        ],
+        [
+          16,
+          6
         ]
       ]
     }
   ],
   "area_tasks": [
     {
-      "id": "NOAA-APPROACH-SEA-AREA-NAMED-WATER-AREA-2476641",
-      "type": "named_water_area",
-      "risk": 2,
-      "service_time": 8,
-      "screening_workload": 4.8,
-      "review_workload": 10.0,
-      "max_interval": 420,
-      "deadline": 420,
+      "id": "ANCHORAGE-001",
+      "type": "ANCHORAGE_INSPECTION",
+      "risk": 3,
+      "max_interval": 1440,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
-      "coverage_threshold": 0.85,
-      "priority": 2.0,
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
       "metadata": {
         "task_family": "SURFACE_SAFETY_PATROL",
         "geometry_mode": "AREA",
-        "release_mode": "SCHEDULED",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
         "scenario_generated": true,
-        "geometry_source_status": "official_noaa_geometry",
-        "work_order_status": "training_task_derived_not_official_work_order",
-        "parameter_status": "training_parameters_not_official_operational_schedule",
-        "object_name": "Fish Harbor",
-        "longitude": -118.26780369999999,
-        "latitude": 33.736176025,
-        "source_dataset": "NOAA ENC Direct Approach",
-        "source_agency": "NOAA Office of Coast Survey",
-        "source_date": "20090410",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/242",
-        "source_version_or_edition": "US4CA60M.000",
-        "access_date": "2026-06-29",
-        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "original_id": 2476641,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "ANCH-G",
+        "object_name": "Commercial Anchorage G",
+        "task_name_zh": "商业锚地G检测",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 1440,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 1440,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "wide_area_detection": 1,
+          "target_tracking": 1
+        },
+        "inspection_scope": "锚地边界、锚泊占用、船位偏移、障碍物与水面异常检测",
+        "data_product": "锚地占用/异常分布图、目标轨迹与告警记录",
+        "management_use": "锚地分配、秩序维护、拖锚/越界风险处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "target_detection_log_complete": true,
+          "boundary_violation_checked": true
+        },
+        "quality_acceptance_ref": "ACCEPT_ANCHORAGE_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR",
+          "SRC_ECFR_33_110_214"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "ANCHORAGE-001",
         "original_crs": "EPSG:4326",
-        "file_checksum": "ef41826f9cd6872233c655092f69bf77f18756b1ed2369f21412e0cc0f997a56",
-        "processing_script_version": "official-noaa-rest-v2",
-        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
-        "source_layer_id": 242,
-        "source_layer_name": "Approach.Sea_Area_Named_Water_Area",
-        "source_attributes": {
-          "OBJNAM": "Fish Harbor",
-          "INFORM": null,
-          "SORDAT": "20090410",
-          "SORIND": "US,US,graph,Chart 18746",
-          "DSNM": "US4CA60M.000"
-        }
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "MULTIPOLYGON (((-118.244371 33.739389, -118.244434 33.739148, -118.244523 33.738912, -118.244635 33.738684, -118.24477 33.738464, -118.244928 33.738256, -118.245107 33.73806, -118.245305 33.737877, -118.245521 33.73771, -118.245754 33.73756, -118.246001 33.737427, -118.246262 33.737313, -118.246533 33.737218, -118.246813 33.737144, -118.247099 33.73709, -118.24739 33.737058, -118.247683 33.737047, -118.247976 33.737058, -118.248267 33.73709, -118.248554 33.737144, -118.248833 33.737218, -118.249104 33.737313, -118.249365 33.737427, -118.249612 33.73756, -118.249845 33.73771, -118.250061 33.737877, -118.250259 33.73806, -118.250438 33.738256, -118.250596 33.738464, -118.250731 33.738684, -118.250844 33.738912, -118.250932 33.739148, -118.250995 33.739389, -118.251034 33.739635, -118.251046 33.739882, -118.251034 33.740129, -118.250995 33.740374, -118.250932 33.740615, -118.250844 33.740851, -118.250731 33.74108, -118.250596 33.741299, -118.250438 33.741508, -118.250259 33.741704, -118.250061 33.741886, -118.249845 33.742053, -118.249612 33.742204, -118.249365 33.742336, -118.249104 33.742451, -118.248833 33.742545, -118.248554 33.74262, -118.248267 33.742673, -118.247976 33.742705, -118.247683 33.742716, -118.24739 33.742705, -118.247099 33.742673, -118.246813 33.74262, -118.246533 33.742545, -118.246262 33.742451, -118.246001 33.742336, -118.245754 33.742204, -118.245521 33.742053, -118.245305 33.741886, -118.245107 33.741704, -118.244928 33.741508, -118.24477 33.741299, -118.244635 33.74108, -118.244523 33.740851, -118.244434 33.740615, -118.244371 33.740374, -118.244333 33.740129, -118.24432 33.739882, -118.244333 33.739635, -118.244371 33.739389)), ((-118.23107 33.738912, -118.231182 33.738684, -118.231318 33.738464, -118.231475 33.738256, -118.231654 33.73806, -118.231852 33.737877, -118.232068 33.73771, -118.232301 33.73756, -118.232549 33.737427, -118.232809 33.737313, -118.23308 33.737218, -118.23336 33.737144, -118.233646 33.73709, -118.233937 33.737058, -118.23423 33.737047, -118.234523 33.737058, -118.234814 33.73709, -118.235101 33.737144, -118.23538 33.737218, -118.235652 33.737313, -118.235912 33.737427, -118.236159 33.73756, -118.236392 33.73771, -118.236608 33.737877, -118.236807 33.73806, -118.236985 33.738256, -118.237143 33.738464, -118.237278 33.738684, -118.237391 33.738912, -118.237479 33.739148, -118.237542 33.739389, -118.237581 33.739635, -118.237593 33.739882, -118.237581 33.740129, -118.237542 33.740374, -118.237479 33.740615, -118.237391 33.740851, -118.237278 33.74108, -118.237143 33.741299, -118.236985 33.741508, -118.236807 33.741704, -118.236608 33.741886, -118.236392 33.742053, -118.236159 33.742204, -118.235912 33.742336, -118.235652 33.742451, -118.23538 33.742545, -118.235101 33.74262, -118.234814 33.742673, -118.234523 33.742705, -118.23423 33.742716, -118.233937 33.742705, -118.233646 33.742673, -118.23336 33.74262, -118.23308 33.742545, -118.232809 33.742451, -118.232549 33.742336, -118.232301 33.742204, -118.232068 33.742053, -118.231852 33.741886, -118.231654 33.741704, -118.231475 33.741508, -118.231318 33.741299, -118.231182 33.74108, -118.23107 33.740851, -118.231054 33.740808, -118.231038 33.740851, -118.230926 33.74108, -118.23079 33.741299, -118.230632 33.741508, -118.230454 33.741704, -118.230256 33.741886, -118.230039 33.742053, -118.229806 33.742204, -118.229559 33.742336, -118.229299 33.742451, -118.229028 33.742545, -118.228748 33.74262, -118.228461 33.742673, -118.228171 33.742705, -118.227877 33.742716, -118.227584 33.742705, -118.227293 33.742673, -118.227007 33.74262, -118.226727 33.742545, -118.226456 33.742451, -118.226196 33.742336, -118.225948 33.742204, -118.225716 33.742053, -118.225499 33.741886, -118.225301 33.741704, -118.225122 33.741508, -118.224965 33.741299, -118.224829 33.74108, -118.224717 33.740851, -118.224629 33.740615, -118.224565 33.740374, -118.224527 33.740129, -118.224514 33.739882, -118.224527 33.739635, -118.224565 33.739389, -118.224629 33.739148, -118.224717 33.738912, -118.224829 33.738684, -118.224965 33.738464, -118.225122 33.738256, -118.225301 33.73806, -118.225499 33.737877, -118.225716 33.73771, -118.225948 33.73756, -118.226196 33.737427, -118.226456 33.737313, -118.226727 33.737218, -118.227007 33.737144, -118.227293 33.73709, -118.227584 33.737058, -118.227877 33.737047, -118.228171 33.737058, -118.228461 33.73709, -118.228748 33.737144, -118.229028 33.737218, -118.229299 33.737313, -118.229559 33.737427, -118.229806 33.73756, -118.230039 33.73771, -118.230256 33.737877, -118.230454 33.73806, -118.230632 33.738256, -118.23079 33.738464, -118.230926 33.738684, -118.231038 33.738912, -118.231054 33.738955, -118.23107 33.738912)), ((-118.237645 33.739704, -118.237708 33.739463, -118.237796 33.739227, -118.237909 33.738999, -118.238044 33.738779, -118.238202 33.738571, -118.23838 33.738375, -118.238578 33.738192, -118.238795 33.738025, -118.239028 33.737875, -118.239275 33.737742, -118.239535 33.737628, -118.239806 33.737533, -118.240086 33.737459, -118.240373 33.737405, -118.240664 33.737373, -118.240957 33.737362, -118.24125 33.737373, -118.241541 33.737405, -118.241827 33.737459, -118.242107 33.737533, -118.242378 33.737628, -118.242638 33.737742, -118.242886 33.737875, -118.243118 33.738025, -118.243335 33.738192, -118.243533 33.738375, -118.243712 33.738571, -118.243869 33.738779, -118.244005 33.738999, -118.244117 33.739227, -118.244205 33.739463, -118.244269 33.739704, -118.244307 33.73995, -118.24432 33.740197, -118.244307 33.740444, -118.244269 33.740689, -118.244205 33.74093, -118.244117 33.741166, -118.244005 33.741395, -118.243869 33.741614, -118.243712 33.741822, -118.243533 33.742019, -118.243335 33.742201, -118.243118 33.742368, -118.242886 33.742519, -118.242638 33.742651, -118.242378 33.742766, -118.242107 33.74286, -118.241827 33.742935, -118.241541 33.742988, -118.24125 33.74302, -118.240957 33.743031, -118.240664 33.74302, -118.240373 33.742988, -118.240086 33.742935, -118.239806 33.74286, -118.239535 33.742766, -118.239275 33.742651, -118.239028 33.742519, -118.238795 33.742368, -118.238578 33.742201, -118.23838 33.742019, -118.238202 33.741822, -118.238044 33.741614, -118.237909 33.741395, -118.237796 33.741166, -118.237708 33.74093, -118.237645 33.740689, -118.237606 33.740444, -118.237593 33.740197, -118.237606 33.73995, -118.237645 33.739704)))",
+        "centroid_lon_lat": [
+          -118.2379752318841,
+          33.73996387318834
+        ]
       },
       "cells": [
         [
-          24,
-          11
+          16,
+          16
         ],
         [
-          24,
-          13
+          16,
+          18
         ],
         [
-          26,
-          11
+          16,
+          20
         ],
         [
-          26,
-          13
+          16,
+          22
+        ],
+        [
+          16,
+          24
+        ],
+        [
+          18,
+          16
+        ],
+        [
+          18,
+          18
+        ],
+        [
+          18,
+          20
+        ],
+        [
+          18,
+          22
+        ],
+        [
+          18,
+          24
         ]
       ]
     },
     {
-      "id": "NOAA-APPROACH-SEA-AREA-NAMED-WATER-AREA-2476663",
-      "type": "named_water_area",
-      "risk": 2,
-      "service_time": 8,
-      "screening_workload": 4.8,
-      "review_workload": 10.0,
-      "max_interval": 420,
-      "deadline": 420,
+      "id": "ANCHORAGE-002",
+      "type": "ANCHORAGE_INSPECTION",
+      "risk": 3,
+      "max_interval": 1440,
       "allowed_platforms": [
         "UAV",
         "USV"
       ],
-      "coverage_threshold": 0.85,
-      "priority": 2.0,
+      "coverage_threshold": 0.95,
+      "priority": 3.0,
       "metadata": {
         "task_family": "SURFACE_SAFETY_PATROL",
         "geometry_mode": "AREA",
-        "release_mode": "SCHEDULED",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
         "scenario_generated": true,
-        "geometry_source_status": "official_noaa_geometry",
-        "work_order_status": "training_task_derived_not_official_work_order",
-        "parameter_status": "training_parameters_not_official_operational_schedule",
-        "object_name": "Flood Control Channel",
-        "longitude": -118.2055711125,
-        "latitude": 33.773862137500004,
-        "source_dataset": "NOAA ENC Direct Approach",
-        "source_agency": "NOAA Office of Coast Survey",
-        "source_date": "20090410",
-        "source_url": "https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_approach/MapServer/242",
-        "source_version_or_edition": "US4CA60M.000",
-        "access_date": "2026-06-29",
-        "license_or_usage_terms": "NOAA ENC Direct to GIS public service; not intended for navigation. Geometry is from NOAA Office of Coast Survey REST services.",
-        "original_id": 2476663,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "ANCH-N",
+        "object_name": "General Anchorage N",
+        "task_name_zh": "一般锚地N检测",
+        "importance_class": "A",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 1440,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 1440,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "wide_area_detection": 1,
+          "target_tracking": 1
+        },
+        "inspection_scope": "小型船舶锚泊占用、越界、密度与水面异常检测",
+        "data_product": "锚地占用图、越界目标和异常事件清单",
+        "management_use": "小型船舶锚泊管理和港警处置支持",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "target_detection_log_complete": true,
+          "boundary_violation_checked": true
+        },
+        "quality_acceptance_ref": "ACCEPT_ANCHORAGE_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_NOAA_ENC_HARBOUR",
+          "SRC_ECFR_33_110_214"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "ANCHORAGE-002",
         "original_crs": "EPSG:4326",
-        "file_checksum": "e388f65820f8db2405ef4cd2b33a21a6defe55075d36e8a8a0e78990587a7a39",
-        "processing_script_version": "official-noaa-rest-v2",
-        "processing_note": "Official NOAA geometry was clipped to the Los Angeles training bbox and converted to a 250 m local grid. Scheduling workload, deadlines, risk, and release settings are training parameters, not official port work orders.",
-        "source_layer_id": 242,
-        "source_layer_name": "Approach.Sea_Area_Named_Water_Area",
-        "source_attributes": {
-          "OBJNAM": "Flood Control Channel",
-          "INFORM": null,
-          "SORDAT": "20090410",
-          "SORIND": "US,US,graph,Chart 18746",
-          "DSNM": "US4CA60M.000"
-        }
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "MULTIPOLYGON (((-118.24214 33.716916, -118.242218 33.716621, -118.242326 33.716332, -118.242463 33.716053, -118.242628 33.715785, -118.242821 33.71553, -118.243039 33.71529, -118.243282 33.715067, -118.243546 33.714863, -118.243831 33.714679, -118.244133 33.714516, -118.244451 33.714377, -118.244782 33.714261, -118.245124 33.71417, -118.245475 33.714105, -118.24583 33.714065, -118.246188 33.714052, -118.246547 33.714065, -118.246902 33.714105, -118.247252 33.71417, -118.247594 33.714261, -118.247926 33.714377, -118.248244 33.714516, -118.248546 33.714679, -118.248831 33.714863, -118.249095 33.715067, -118.249337 33.71529, -118.249556 33.71553, -118.249748 33.715785, -118.249914 33.716053, -118.250051 33.716332, -118.250159 33.716621, -118.250237 33.716916, -118.250283 33.717215, -118.250299 33.717517, -118.250283 33.71782, -118.250237 33.718119, -118.250159 33.718414, -118.250051 33.718703, -118.249914 33.718982, -118.249748 33.71925, -118.249556 33.719505, -118.249337 33.719745, -118.249095 33.719968, -118.248831 33.720172, -118.248546 33.720356, -118.248244 33.720519, -118.247926 33.720658, -118.247594 33.720774, -118.247252 33.720865, -118.246902 33.72093, -118.246547 33.72097, -118.246188 33.720983, -118.24583 33.72097, -118.245475 33.72093, -118.245124 33.720865, -118.244782 33.720774, -118.244451 33.720658, -118.244133 33.720519, -118.243831 33.720356, -118.243546 33.720172, -118.243282 33.719968, -118.243039 33.719745, -118.242821 33.719505, -118.242628 33.71925, -118.242463 33.718982, -118.242326 33.718703, -118.242218 33.718414, -118.24214 33.718119, -118.242093 33.71782, -118.242078 33.717517, -118.242093 33.717215, -118.24214 33.716916)), ((-118.215234 33.716916, -118.215312 33.716621, -118.21542 33.716332, -118.215557 33.716053, -118.215723 33.715785, -118.215915 33.71553, -118.216134 33.71529, -118.216376 33.715067, -118.21664 33.714863, -118.216925 33.714679, -118.217227 33.714516, -118.217545 33.714377, -118.217877 33.714261, -118.218219 33.71417, -118.218569 33.714105, -118.218924 33.714065, -118.219283 33.714052, -118.219641 33.714065, -118.219996 33.714105, -118.220346 33.71417, -118.220688 33.714261, -118.22102 33.714377, -118.221338 33.714516, -118.22164 33.714679, -118.221925 33.714863, -118.222189 33.715067, -118.222431 33.71529, -118.22265 33.71553, -118.222842 33.715785, -118.223008 33.716053, -118.223145 33.716332, -118.223253 33.716621, -118.223331 33.716916, -118.223377 33.717215, -118.223393 33.717517, -118.223377 33.71782, -118.223331 33.718119, -118.223253 33.718414, -118.223145 33.718703, -118.223008 33.718982, -118.222842 33.71925, -118.22265 33.719505, -118.222431 33.719745, -118.222189 33.719968, -118.221925 33.720172, -118.22164 33.720356, -118.221338 33.720519, -118.22102 33.720658, -118.220688 33.720774, -118.220346 33.720865, -118.219996 33.72093, -118.219641 33.72097, -118.219283 33.720983, -118.218924 33.72097, -118.218569 33.72093, -118.218219 33.720865, -118.217877 33.720774, -118.217545 33.720658, -118.217227 33.720519, -118.216925 33.720356, -118.21664 33.720172, -118.216376 33.719968, -118.216134 33.719745, -118.215915 33.719505, -118.215723 33.71925, -118.215557 33.718982, -118.21542 33.718703, -118.215312 33.718414, -118.215234 33.718119, -118.215188 33.71782, -118.215172 33.717517, -118.215188 33.717215, -118.215234 33.716916)), ((-118.224203 33.717231, -118.224281 33.716936, -118.224388 33.716647, -118.224526 33.716368, -118.224691 33.7161, -118.224884 33.715845, -118.225102 33.715605, -118.225344 33.715382, -118.225609 33.715178, -118.225893 33.714994, -118.226196 33.714831, -118.226514 33.714692, -118.226845 33.714576, -118.227187 33.714485, -118.227537 33.71442, -118.227893 33.71438, -118.228251 33.714367, -118.228609 33.71438, -118.228965 33.71442, -118.229315 33.714485, -118.229657 33.714576, -118.229988 33.714692, -118.230306 33.714831, -118.230609 33.714994, -118.230893 33.715178, -118.231158 33.715382, -118.2314 33.715605, -118.231618 33.715845, -118.231811 33.7161, -118.231977 33.716368, -118.232114 33.716647, -118.232222 33.716936, -118.232299 33.717231, -118.232346 33.71753, -118.232362 33.717833, -118.232346 33.718135, -118.232299 33.718434, -118.232222 33.718729, -118.232114 33.719018, -118.231977 33.719297, -118.231811 33.719565, -118.231618 33.71982, -118.2314 33.72006, -118.231158 33.720283, -118.230893 33.720487, -118.230609 33.720671, -118.230306 33.720834, -118.229988 33.720973, -118.229657 33.721089, -118.229315 33.72118, -118.228965 33.721245, -118.228609 33.721285, -118.228251 33.721298, -118.227893 33.721285, -118.227537 33.721245, -118.227187 33.72118, -118.226845 33.721089, -118.226514 33.720973, -118.226196 33.720834, -118.225893 33.720671, -118.225609 33.720487, -118.225344 33.720283, -118.225102 33.72006, -118.224884 33.71982, -118.224691 33.719565, -118.224526 33.719297, -118.224388 33.719018, -118.224281 33.718729, -118.224203 33.718434, -118.224156 33.718135, -118.224141 33.717833, -118.224156 33.71753, -118.224203 33.717231)), ((-118.233172 33.717546, -118.233249 33.717251, -118.233357 33.716962, -118.233494 33.716683, -118.23366 33.716415, -118.233853 33.71616, -118.234071 33.71592, -118.234313 33.715697, -118.234577 33.715493, -118.234862 33.715309, -118.235164 33.715146, -118.235483 33.715007, -118.235814 33.714891, -118.236156 33.7148, -118.236506 33.714735, -118.236861 33.714695, -118.23722 33.714682, -118.237578 33.714695, -118.237934 33.714735, -118.238284 33.7148, -118.238626 33.714891, -118.238957 33.715007, -118.239275 33.715146, -118.239577 33.715309, -118.239862 33.715493, -118.240126 33.715697, -118.240369 33.71592, -118.240587 33.71616, -118.24078 33.716415, -118.240945 33.716683, -118.241082 33.716962, -118.24119 33.717251, -118.241268 33.717546, -118.241315 33.717846, -118.24133 33.718148, -118.241315 33.71845, -118.241268 33.718749, -118.24119 33.719044, -118.241082 33.719333, -118.240945 33.719612, -118.24078 33.71988, -118.240587 33.720135, -118.240369 33.720375, -118.240126 33.720598, -118.239862 33.720802, -118.239577 33.720986, -118.239275 33.721149, -118.238957 33.721288, -118.238626 33.721404, -118.238284 33.721495, -118.237934 33.72156, -118.237578 33.7216, -118.23722 33.721613, -118.236861 33.7216, -118.236506 33.72156, -118.236156 33.721495, -118.235814 33.721404, -118.235483 33.721288, -118.235164 33.721149, -118.234862 33.720986, -118.234577 33.720802, -118.234313 33.720598, -118.234071 33.720375, -118.233853 33.720135, -118.23366 33.71988, -118.233494 33.719612, -118.233357 33.719333, -118.233249 33.719044, -118.233172 33.718749, -118.233125 33.71845, -118.233109 33.718148, -118.233125 33.717846, -118.233172 33.717546)))",
+        "centroid_lon_lat": [
+          -118.23273542361108,
+          33.71775375694445
+        ]
       },
       "cells": [
         [
-          4,
-          35
+          25,
+          16
         ],
         [
-          6,
-          35
+          25,
+          18
         ],
+        [
+          25,
+          20
+        ],
+        [
+          25,
+          22
+        ],
+        [
+          25,
+          24
+        ],
+        [
+          25,
+          26
+        ],
+        [
+          25,
+          28
+        ],
+        [
+          27,
+          16
+        ],
+        [
+          27,
+          18
+        ],
+        [
+          27,
+          20
+        ],
+        [
+          27,
+          22
+        ],
+        [
+          27,
+          24
+        ],
+        [
+          27,
+          26
+        ],
+        [
+          27,
+          28
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-001",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-17",
+        "object_name": "Berth 45 49 Outer Harbor",
+        "task_name_zh": "45–49号泊区（Outer Harbor）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-001",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.281689 33.737047, -118.279596 33.736606, -118.2787 33.731693, -118.280717 33.731189, -118.281913 33.733583, -118.281689 33.737047))",
+        "centroid_lon_lat": [
+          -118.28052299999999,
+          33.7340236
+        ]
+      },
+      "cells": [
+        [
+          18,
+          4
+        ],
+        [
+          20,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-002",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-18",
+        "object_name": "Berth 91 93 Cruise",
+        "task_name_zh": "91–93号邮轮泊区",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-002",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.281465 33.751849, -118.279372 33.751849, -118.279746 33.744291, -118.281839 33.744165, -118.281465 33.751849))",
+        "centroid_lon_lat": [
+          -118.2806055,
+          33.7480385
+        ]
+      },
+      "cells": [
+        [
+          12,
+          4
+        ],
+        [
+          14,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-003",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-19",
+        "object_name": "Berth 97 109 WBCT Cs",
+        "task_name_zh": "97–109号泊区（WBCT-CS）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-003",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.282436 33.767907, -118.280942 33.767718, -118.27855 33.763185, -118.278027 33.760036, -118.279297 33.756887, -118.280717 33.757517, -118.279671 33.760351, -118.280045 33.76287, -118.282436 33.767907))",
+        "centroid_lon_lat": [
+          -118.279960625,
+          33.76205887500001
+        ]
+      },
+      "cells": [
+        [
+          5,
+          4
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          7,
+          4
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          9,
+          4
+        ],
+        [
+          9,
+          6
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-004",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-20",
+        "object_name": "Berth 121 126 WBCT Ect",
+        "task_name_zh": "121–126号泊区（WBCT-ECT）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-004",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.277578 33.759721, -118.275934 33.760351, -118.273094 33.756887, -118.274365 33.755313, -118.27571 33.756257, -118.277578 33.759721))",
+        "centroid_lon_lat": [
+          -118.2753362,
+          33.757705800000004
+        ]
+      },
+      "cells": [
         [
           8,
-          35
+          6
         ],
         [
           10,
-          35
+          6
         ]
       ]
+    },
+    {
+      "id": "BERTH-005",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-21",
+        "object_name": "Berth 136 147 Trapac",
+        "task_name_zh": "136–147号泊区（TraPac）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-005",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.266741 33.762555, -118.263752 33.763814, -118.25852 33.765389, -118.253288 33.766333, -118.24843 33.767278, -118.247683 33.766018, -118.252541 33.765074, -118.257773 33.764129, -118.262631 33.762555, -118.26577 33.761295, -118.266741 33.762555))",
+        "centroid_lon_lat": [
+          -118.25771289999997,
+          33.764444000000005
+        ]
+      },
+      "cells": [
+        [
+          5,
+          10
+        ],
+        [
+          5,
+          12
+        ],
+        [
+          5,
+          14
+        ],
+        [
+          5,
+          16
+        ],
+        [
+          7,
+          10
+        ],
+        [
+          7,
+          12
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          7,
+          16
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-006",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-22",
+        "object_name": "Berth 212 225 YTI",
+        "task_name_zh": "212–225号泊区（YTI）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-006",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.23012 33.765389, -118.228251 33.764444, -118.228102 33.758776, -118.228999 33.754683, -118.230344 33.754998, -118.229372 33.759091, -118.23012 33.765389))",
+        "centroid_lon_lat": [
+          -118.229198,
+          33.759563500000006
+        ]
+      },
+      "cells": [
+        [
+          6,
+          23
+        ],
+        [
+          8,
+          23
+        ],
+        [
+          10,
+          23
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-007",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-23",
+        "object_name": "Berth 226 236 ETS",
+        "task_name_zh": "226–236号泊区（ETS）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-007",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.230493 33.753738, -118.22713 33.751849, -118.225635 33.747755, -118.226756 33.746495, -118.228625 33.74933, -118.23139 33.751849, -118.230493 33.753738))",
+        "centroid_lon_lat": [
+          -118.22833816666667,
+          33.75016933333333
+        ]
+      },
+      "cells": [
+        [
+          11,
+          23
+        ],
+        [
+          11,
+          25
+        ],
+        [
+          13,
+          23
+        ],
+        [
+          13,
+          25
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-008",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-24",
+        "object_name": "Berth 302 305 FMS",
+        "task_name_zh": "302–305号泊区（FMS）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-008",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.272347 33.734842, -118.267862 33.735598, -118.262631 33.736291, -118.257025 33.737047, -118.25142 33.737992, -118.246188 33.738748, -118.245815 33.737362, -118.251046 33.736606, -118.256652 33.735787, -118.262257 33.735031, -118.267489 33.734212, -118.271973 33.733457, -118.272347 33.734842))",
+        "centroid_lon_lat": [
+          -118.25939208333334,
+          33.73608108333333
+        ]
+      },
+      "cells": [
+        [
+          17,
+          8
+        ],
+        [
+          17,
+          10
+        ],
+        [
+          17,
+          12
+        ],
+        [
+          17,
+          14
+        ],
+        [
+          17,
+          16
+        ],
+        [
+          17,
+          18
+        ],
+        [
+          19,
+          8
+        ],
+        [
+          19,
+          10
+        ],
+        [
+          19,
+          12
+        ],
+        [
+          19,
+          14
+        ],
+        [
+          19,
+          16
+        ],
+        [
+          19,
+          18
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-009",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-25",
+        "object_name": "Berth 401 406 APMT",
+        "task_name_zh": "401–406号泊区（APMT）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-009",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.269357 33.721298, -118.264499 33.722243, -118.259268 33.723377, -118.254036 33.724763, -118.24843 33.726338, -118.243199 33.728039, -118.238341 33.729929, -118.237369 33.728543, -118.242451 33.726653, -118.247683 33.724763, -118.253288 33.723188, -118.25852 33.721739, -118.263752 33.720668, -118.26861 33.720038, -118.269357 33.721298))",
+        "centroid_lon_lat": [
+          -118.25348592857146,
+          33.7243985
+        ]
+      },
+      "cells": [
+        [
+          21,
+          9
+        ],
+        [
+          21,
+          11
+        ],
+        [
+          21,
+          13
+        ],
+        [
+          21,
+          15
+        ],
+        [
+          21,
+          17
+        ],
+        [
+          21,
+          19
+        ],
+        [
+          21,
+          21
+        ],
+        [
+          23,
+          9
+        ],
+        [
+          23,
+          11
+        ],
+        [
+          23,
+          13
+        ],
+        [
+          23,
+          15
+        ],
+        [
+          23,
+          17
+        ],
+        [
+          23,
+          19
+        ],
+        [
+          23,
+          21
+        ],
+        [
+          25,
+          9
+        ],
+        [
+          25,
+          11
+        ],
+        [
+          25,
+          13
+        ],
+        [
+          25,
+          15
+        ],
+        [
+          25,
+          17
+        ],
+        [
+          25,
+          19
+        ],
+        [
+          25,
+          21
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-010",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-26",
+        "object_name": "Berth 191 200 East Basin",
+        "task_name_zh": "191–200号泊区（East Basin）",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-010",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.226383 33.762555, -118.224514 33.761925, -118.224514 33.755313, -118.225262 33.750589, -118.226906 33.750904, -118.226009 33.755628, -118.226383 33.762555))",
+        "centroid_lon_lat": [
+          -118.22559799999999,
+          33.75615233333333
+        ]
+      },
+      "cells": [
+        [
+          7,
+          25
+        ],
+        [
+          9,
+          25
+        ],
+        [
+          11,
+          25
+        ]
+      ]
+    },
+    {
+      "id": "BERTH-011",
+      "type": "BERTH_AREA_INSPECTION",
+      "risk": 2,
+      "max_interval": 4320,
+      "allowed_platforms": [
+        "UAV",
+        "USV"
+      ],
+      "coverage_threshold": 0.95,
+      "priority": 2.0,
+      "metadata": {
+        "task_family": "WATERSIDE_ASSET_INSPECTION",
+        "geometry_mode": "AREA",
+        "release_mode": "PERIODIC",
+        "source_release_mode": "PERIODIC_OR_EVENT_TRIGGERED",
+        "scenario_generated": true,
+        "geometry_source_status": "chart_aligned_research_geometry",
+        "work_order_status": "training_task_from_user_provided_catalog_not_official_work_order",
+        "parameter_status": "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART",
+        "object_id": "OBJ-A-29",
+        "object_name": "Fish Harbor Waterside",
+        "task_name_zh": "Fish Harbor泊区",
+        "importance_class": "B",
+        "obligation_level": "MANDATORY",
+        "period_interval_min": 4320,
+        "calendar_anchor": "SCENARIO_START",
+        "calendar_update_mode": "ACTUAL_COMPLETION",
+        "deadline": null,
+        "max_revisit_interval": 4320,
+        "last_completion_time": null,
+        "next_due_time": null,
+        "hard_capability_vector": {
+          "geotagged_imaging": 1,
+          "coverage_planning": 1
+        },
+        "inspection_scope": "泊位前沿、靠泊水域、异常占用、漂浮物、水深与水侧可视状态检测",
+        "data_product": "泊区覆盖记录、异常目标/缺陷清单、影像与可选测深数据",
+        "management_use": "靠泊安全、泊位开放条件判断、维护计划与异常处置",
+        "quality_requirement": {
+          "area_coverage_min": 0.95,
+          "berth_front_observed": true,
+          "unobserved_sections_reported": true
+        },
+        "quality_acceptance_ref": "ACCEPT_BERTH_AREA_V1",
+        "completion_rule": "rho>=rho_min AND q_pass=1",
+        "source_ids": [
+          "SRC_NOAA_CHART_18751",
+          "SRC_LACITY_BERTH_LINES",
+          "SRC_POLA_TERMINAL_MAP"
+        ],
+        "source_dataset": "Port of Los Angeles Task Mapping V2.0",
+        "source_agency": "User-provided chart-aligned package based on NOAA and Port of Los Angeles public data",
+        "source_date": "2026-06-30",
+        "source_url": "local:D:/地图/洛杉矶",
+        "source_urls": [
+          "https://www.charts.noaa.gov/ENCs/CA_ENCs.zip",
+          "https://data.lacity.org/resource/9r7y-tdse.geojson?$limit=5000"
+        ],
+        "source_version_or_edition": "V2.0",
+        "access_date": "2026-06-30",
+        "license_or_usage_terms": "Research task mapping package derived from public chart/port data; not for navigation.",
+        "original_id": "BERTH-011",
+        "original_crs": "EPSG:4326",
+        "file_checksum": "9d467b1a5611120d951b27856d7742d3eac325523367582bd10c398e5dffb169",
+        "processing_script_version": "chart-aligned-task-mapping-v1",
+        "processing_note": "Imported from user-provided chart-aligned Los Angeles task catalog. Geometry was converted from WKT to the existing 250 m local training grid. Schedule parameters remain research/training inputs.",
+        "geometry_source_type": "CHART_ALIGNED_DIGITIZATION_FROM_NOAA_CHART_18751",
+        "geometry_accuracy_class": "CHART_ALIGNED_NOT_NATIVE_ENC_VECTOR",
+        "geometry_wkt": "POLYGON ((-118.277578 33.742086, -118.27571 33.742716, -118.273468 33.741141, -118.271973 33.738622, -118.272347 33.735787, -118.274215 33.733583, -118.276457 33.734212, -118.277429 33.736732, -118.277578 33.742086))",
+        "centroid_lon_lat": [
+          -118.274897125,
+          33.738109875000006
+        ]
+      },
+      "cells": [
+        [
+          16,
+          6
+        ],
+        [
+          16,
+          8
+        ],
+        [
+          18,
+          6
+        ],
+        [
+          18,
+          8
+        ],
+        [
+          20,
+          6
+        ],
+        [
+          20,
+          8
+        ]
+      ]
+    }
+  ],
+  "reinspection_tasks": [
+    {
+      "task_id": "RECHECK-001",
+      "task_role": "REINSPECTION",
+      "parent_task_id": "BUOY-003",
+      "base_task_type": "BUOY_INSPECTION",
+      "task_name_zh": "主航道浮标位置偏移复核",
+      "trigger_type": "POSITION_DEVIATION",
+      "release_mode": "INTERNAL_SUCCESSOR",
+      "obligation_level": "MANDATORY",
+      "status": "ACTIVE",
+      "is_static_baseline": false,
+      "scenario_note": "ILLUSTRATIVE_TRIGGERED_TASK_NOT_REAL_TIME_INCIDENT",
+      "version": "V2.0",
+      "geometry_wkt": "POINT (-118.277578 33.725078)",
+      "note": "Stored as metadata only; not released into the current scheduler training task set."
+    },
+    {
+      "task_id": "RECHECK-002",
+      "task_role": "REINSPECTION",
+      "parent_task_id": "ANCHORAGE-001",
+      "base_task_type": "ANCHORAGE_INSPECTION",
+      "task_name_zh": "锚地越界目标局部复核",
+      "trigger_type": "BOUNDARY_VIOLATION",
+      "release_mode": "INTERNAL_SUCCESSOR",
+      "obligation_level": "MANDATORY",
+      "status": "ACTIVE",
+      "is_static_baseline": false,
+      "scenario_note": "ILLUSTRATIVE_TRIGGERED_TASK_NOT_REAL_TIME_INCIDENT",
+      "version": "V2.0",
+      "geometry_wkt": "POLYGON ((-118.237593 33.740197, -118.237606 33.73995, -118.237645 33.739704, -118.237708 33.739463, -118.237796 33.739227, -118.237909 33.738999, -118.238044 33.738779, -118.238202 33.738571, -118.23838 33.738375, -118.238578 33.738192, -118.238795 33.738025, -118.239028 33.737875, -118.239275 33.737742, -118.239535 33.737628, -118.239806 33.737533, -118.240086 33.737459, -118.240373 33.737405, -118.240664 33.737373, -118.240957 33.737362, -118.24125 33.737373, -118.241541 33.737405, -118.241827 33.737459, -118.242107 33.737533, -118.242378 33.737628, -118.242638 33.737742, -118.242886 33.737875, -118.243118 33.738025, -118.243335 33.738192, -118.243533 33.738375, -118.243712 33.738571, -118.243869 33.738779, -118.244005 33.738999, -118.244117 33.739227, -118.244205 33.739463, -118.244269 33.739704, -118.244307 33.73995, -118.24432 33.740197, -118.244307 33.740444, -118.244269 33.740689, -118.244205 33.74093, -118.244117 33.741166, -118.244005 33.741395, -118.243869 33.741614, -118.243712 33.741822, -118.243533 33.742019, -118.243335 33.742201, -118.243118 33.742368, -118.242886 33.742519, -118.242638 33.742651, -118.242378 33.742766, -118.242107 33.74286, -118.241827 33.742935, -118.241541 33.742988, -118.24125 33.74302, -118.240957 33.743031, -118.240664 33.74302, -118.240373 33.742988, -118.240086 33.742935, -118.239806 33.74286, -118.239535 33.742766, -118.239275 33.742651, -118.239028 33.742519, -118.238795 33.742368, -118.238578 33.742201, -118.23838 33.742019, -118.238202 33.741822, -118.238044 33.741614, -118.237909 33.741395, -118.237796 33.741166, -118.237708 33.74093, -118.237645 33.740689, -118.237606 33.740444, -118.237593 33.740197))",
+      "note": "Stored as metadata only; not released into the current scheduler training task set."
+    },
+    {
+      "task_id": "RECHECK-003",
+      "task_role": "REINSPECTION",
+      "parent_task_id": "BERTH-008",
+      "base_task_type": "BERTH_AREA_INSPECTION",
+      "task_name_zh": "Pier 300泊区异常局部复核",
+      "trigger_type": "LOW_QUALITY_OR_ANOMALY",
+      "release_mode": "INTERNAL_SUCCESSOR",
+      "obligation_level": "MANDATORY",
+      "status": "ACTIVE",
+      "is_static_baseline": false,
+      "scenario_note": "ILLUSTRATIVE_TRIGGERED_TASK_NOT_REAL_TIME_INCIDENT",
+      "version": "V2.0",
+      "geometry_wkt": "POLYGON ((-118.263718 33.735294, -118.262148 33.735786, -118.260317 33.736236, -118.258355 33.736727, -118.256394 33.737342, -118.254562 33.737833, -118.254432 33.736932, -118.256263 33.736441, -118.258225 33.735908, -118.260186 33.735417, -118.262018 33.734885, -118.263587 33.734393, -118.263718 33.735294))",
+      "note": "Stored as metadata only; not released into the current scheduler training task set."
+    },
+    {
+      "task_id": "RECHECK-004",
+      "task_role": "REINSPECTION",
+      "parent_task_id": "CHANNEL-003",
+      "base_task_type": "CHANNEL_INSPECTION",
+      "task_name_zh": "主航道疑似障碍物航段复核",
+      "trigger_type": "OBSTACLE_OR_SHOALING_SUSPECTED",
+      "release_mode": "INTERNAL_SUCCESSOR",
+      "obligation_level": "MANDATORY",
+      "status": "ACTIVE",
+      "is_static_baseline": false,
+      "scenario_note": "ILLUSTRATIVE_TRIGGERED_TASK_NOT_REAL_TIME_INCIDENT",
+      "version": "V2.0",
+      "geometry_wkt": "LINESTRING (-118.278565 33.735298, -118.279297 33.738622, -118.279423 33.74234)",
+      "note": "Stored as metadata only; not released into the current scheduler training task set."
     }
   ]
 }

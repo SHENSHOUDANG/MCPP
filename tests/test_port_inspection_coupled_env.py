@@ -133,6 +133,10 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
 
         self.assertEqual(reset.info["contract_boundary"]["scenario_status"], "PENDING")
         self.assertFalse(reset.info["contract_boundary"]["historical_only"])
+        self.assertEqual(len(tasks_payload["point_tasks"]), 3)
+        self.assertEqual(len(tasks_payload["line_tasks"]), 10)
+        self.assertEqual(len(tasks_payload["area_tasks"]), 13)
+        self.assertEqual(len(tasks_payload["reinspection_tasks"]), 4)
         self.assertIn("point", geometries)
         self.assertIn("line", geometries)
         self.assertIn("area", geometries)
@@ -141,9 +145,11 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertTrue(task_records)
         for task in task_records:
             metadata = task["metadata"]
-            self.assertEqual(metadata["geometry_source_status"], "official_noaa_geometry")
-            self.assertEqual(metadata["source_agency"], "NOAA Office of Coast Survey")
-            self.assertIn("encdirect.noaa.gov", metadata["source_url"])
+            self.assertEqual(metadata["geometry_source_status"], "chart_aligned_research_geometry")
+            self.assertEqual(metadata["source_dataset"], "Port of Los Angeles Task Mapping V2.0")
+            self.assertEqual(metadata["parameter_status"], "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART")
+            self.assertIn("SRC_NOAA_CHART_18751", metadata["source_ids"])
+            self.assertIsNone(metadata["deadline"])
 
     def test_idle_depot_platform_can_start_replenishment(self) -> None:
         config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
