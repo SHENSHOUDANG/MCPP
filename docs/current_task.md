@@ -140,3 +140,12 @@
 - HAPPO reuses the existing scheduler environment, local observation vectors, action masks, rollout batch, and centralized critic input; no task lifecycle, candidate generation, mask semantics, or environment state transition was changed.
 - The HAPPO candidate uses one decentralized actor per platform and a centralized set critic. Training dispatches to a sequential per-agent actor update while MAPPO/PPO candidates keep their existing update path.
 - This is not a final algorithm freeze. Existing `heterogeneous_mappo` remains a heterogeneous-actor MAPPO variant, not HAPPO.
+
+### 2026-06-30 Yangshan V1.3.3 training baseline
+
+- Added `configs/port_yangshan_training_v133.toml` as a Yangshan manual-task engineering training entry.
+- The scenario uses `task_lifecycle = "v1_2_direct_service"` and imports the user-provided V1.3.3 active task catalog as 22 point, 46 corridor, and 3 area tasks.
+- `deadline_min` blanks remain `null`; inactive `active_in_v1_3=0/0.0` tasks are excluded from the scheduler action space.
+- Source geometries are read from `yangshan_stage2.gpkg` task layers and snapped to the scheduler feature grid; centroids are metadata/features only and do not replace service geometry.
+- The config is marked `HISTORICAL` and requires `--allow-historical-baseline` for training. It does not replace Los Angeles as the primary V1.2 empirical scenario or freeze the item-9 algorithm choice.
+- The one-command comparison entry now defaults to `shared_mappo`, `centralized_ppo`, and `happo`; `heterogeneous_mappo` is no longer part of the default training comparison once HAPPO is available.

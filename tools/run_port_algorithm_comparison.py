@@ -20,6 +20,9 @@ if str(TOOLS) not in sys.path:
 from train_port_scheduler_rl import SUPPORTED_ALGORITHMS, _normalize_algorithm
 
 
+DEFAULT_COMPARISON_ALGORITHMS = ("shared_mappo", "centralized_ppo", "happo")
+
+
 def main() -> None:
     import argparse
 
@@ -27,7 +30,7 @@ def main() -> None:
     parser.add_argument("--config", default="configs/port_los_angeles_training_v1.toml")
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=20260615)
-    parser.add_argument("--algorithms", default=",".join(SUPPORTED_ALGORITHMS))
+    parser.add_argument("--algorithms", default=",".join(DEFAULT_COMPARISON_ALGORITHMS))
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--checkpoint-interval", type=int, default=0)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default=None)

@@ -242,3 +242,20 @@ interpretation and next decision
 - Added HAPPO-specific sequential per-agent actor update dispatch while retaining the existing MAPPO/PPO update path for other candidates.
 - Comparison tooling now includes HAPPO through `SUPPORTED_ALGORITHMS`; outputs remain ignored engineering artifacts under `data/ports/*/algorithm_comparison/` or `smoke_training/`.
 - Validation: `.venv/Scripts/python.exe -m unittest tests.test_port_inspection_coupled_env tests.test_port_algorithm_comparison -v` passed 11 tests; `tools/train_port_scheduler_rl.py --config configs/port_los_angeles_training_v1.toml --steps 8 --algorithm happo --device cpu --num-envs 1 --env-workers 1 --output-dir data/ports/los_angeles_training_v1/smoke_training/happo --checkpoint-interval 0` completed and wrote `scheduler_happo.pt`.
+
+### 2026-06-30 Yangshan V1.3.3 direct-service training baseline
+
+- Operation: engineering training-data entry, no `AMENDS` or `REPLACES`.
+- Target clause: Yangshan remains historical/manual under V1.2; Los Angeles remains the primary empirical scenario. Current item 9 algorithm selection remains open.
+- Added `tools/import_yangshan_v133_training.py`, `configs/port_yangshan_training_v133.toml`, and `configs/platform_profiles_yangshan_training_v133.toml`.
+- The importer reads `D:/map/yangshan2/task_catalog_v1_3_3.csv` plus `yangshan_stage2.gpkg`, excludes inactive `active_in_v1_3=0/0.0` rows, and generates 71 direct-service training tasks: 22 point, 46 corridor, and 3 area tasks.
+- Blank `deadline_min` values are preserved as `null`; the scheduler config uses `task_lifecycle = "v1_2_direct_service"` and therefore does not restore legacy screening/review semantics.
+- Generated scheduler JSON is under `data/ports/yangshan_training_v133/`; raw source packages, import summaries, checkpoints, and training outputs remain outside Git per artifact policy.
+- Training must pass `--allow-historical-baseline`; results are engineering baselines only and not final V1.2 experiment evidence.
+
+### 2026-06-30 PPO-family comparison default
+
+- Operation: engineering comparison default update, no `AMENDS` or `REPLACES`.
+- Target clause: item 9 remains open; this does not select a final upper-level algorithm.
+- Updated `tools/run_port_algorithm_comparison.py` so one-command comparison defaults to `shared_mappo`, `centralized_ppo`, and `happo`.
+- `heterogeneous_mappo` remains callable for legacy/manual checks but is no longer in the default comparison because the HAPPO interface is now available for heterogeneous decentralized actors.

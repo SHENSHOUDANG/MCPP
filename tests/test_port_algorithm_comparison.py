@@ -9,7 +9,7 @@ TOOLS = ROOT / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
-from run_port_algorithm_comparison import _comparison_row_from_summary, _parse_algorithms
+from run_port_algorithm_comparison import DEFAULT_COMPARISON_ALGORITHMS, _comparison_row_from_summary, _parse_algorithms
 
 
 class PortAlgorithmComparisonTests(unittest.TestCase):
@@ -18,6 +18,10 @@ class PortAlgorithmComparisonTests(unittest.TestCase):
             _parse_algorithms("mappo, shared-policy-mappo centralized_context_ppo happo mappo"),
             ["heterogeneous_mappo", "shared_mappo", "centralized_ppo", "happo"],
         )
+
+    def test_default_comparison_algorithms_exclude_heterogeneous_mappo(self) -> None:
+        self.assertEqual(DEFAULT_COMPARISON_ALGORITHMS, ("shared_mappo", "centralized_ppo", "happo"))
+        self.assertNotIn("heterogeneous_mappo", DEFAULT_COMPARISON_ALGORITHMS)
 
     def test_comparison_row_reads_scheduler_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

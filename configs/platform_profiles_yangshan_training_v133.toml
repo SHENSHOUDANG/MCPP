@@ -1,0 +1,46 @@
+[profiles.UAV_YANGSHAN_TRAINING]
+platform_type = "UAV"
+speed_mps = 10.0
+inspection_speed_mps = 4.0
+max_speed_mps = 23.0
+endurance_min = 36.0
+nominal_endurance_min = 45.0
+return_reserve_ratio = 0.20
+return_safety_factor = 1.20
+charge_start_ratio = 0.85
+replenish_steps = 5
+energy_capacity = 1.0
+energy_rate = 1.0
+communication_range_m = 3000.0
+positioning_error_m = 0.5
+task_reach_radius_m = 10.0
+wind_shutdown_threshold_mps = 12.0
+sensor_radius_m = 400.0
+payload_kg = 1.0
+coverage_width_cells = 2
+allowed_task_types = ["point", "line", "area"]
+preferred_task_types = ["point", "area"]
+
+[profiles.USV_YANGSHAN_TRAINING]
+platform_type = "USV"
+speed_mps = 2.0
+inspection_speed_mps = 1.2
+max_speed_mps = 5.0
+endurance_min = 288.0
+nominal_endurance_min = 360.0
+return_reserve_ratio = 0.20
+return_safety_factor = 1.20
+charge_start_ratio = 0.85
+replenish_steps = 20
+energy_capacity = 1.0
+energy_rate = 1.0
+communication_range_m = 5000.0
+positioning_error_m = 2.0
+obstacle_detection_range_m = 10.0
+safety_clearance_m = 5.0
+task_reach_radius_m = 5.0
+sensor_radius_m = 150.0
+payload_kg = 80.0
+coverage_width_cells = 1
+allowed_task_types = ["point", "line", "area"]
+preferred_task_types = ["line", "area"]

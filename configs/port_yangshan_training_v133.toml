@@ -1,0 +1,63 @@
+grid_path = "data/ports/yangshan_training_v133/yangshan_training_v133_grid.json"
+tasks_path = "data/ports/yangshan_training_v133/yangshan_training_v133_tasks.json"
+output_dir = "data/ports/yangshan_training_v133"
+map_source = "yangshan_manual_task_package_v1_3_3"
+platform_profiles_path = "configs/platform_profiles_yangshan_training_v133.toml"
+uav_count = 4
+usv_count = 4
+
+platform_profile_sequence = [
+  "UAV_YANGSHAN_TRAINING",
+  "UAV_YANGSHAN_TRAINING",
+  "UAV_YANGSHAN_TRAINING",
+  "UAV_YANGSHAN_TRAINING",
+  "USV_YANGSHAN_TRAINING",
+  "USV_YANGSHAN_TRAINING",
+  "USV_YANGSHAN_TRAINING",
+  "USV_YANGSHAN_TRAINING",
+]
+
+[contract]
+model_contract_version = "V1.2"
+scenario_status = "HISTORICAL"
+historical_only = true
+final_experiment_eligible = false
+notice = "Yangshan V1.3.3 manual task package is enabled as an engineering training baseline only. It does not replace Los Angeles as the primary V1.2 empirical scenario and must not be reported as final evidence."
+
+[platform_depots]
+uav = [26, 41]
+usv = [26, 41]
+
+[scheduling]
+task_lifecycle = "v1_2_direct_service"
+risk_weight = 14.0
+urgency_weight = 6.0
+distance_weight = 0.07
+load_weight = 0.28
+compatibility_bonus = 5.0
+
+[scheduler_rl]
+max_steps = 360
+candidate_k = 12
+device = "auto"
+num_envs = 1
+env_workers = 1
+cpu_threads = 6
+interop_threads = 2
+gpu_memory_fraction = 0.35
+process_priority = "below_normal"
+learning_rate = 0.0003
+gamma = 0.98
+gae_lambda = 0.95
+clip_ratio = 0.2
+update_epochs = 4
+rollout_steps = 32
+hidden_dim = 128
+
+[scheduler_rl.reward]
+team_close_reward = 8.0
+service_progress_reward = 1.0
+energy_cost = 0.5
+time_cost = 0.01
+invalid_penalty = 5.0
+conflict_penalty = 1.0
