@@ -70,7 +70,12 @@ class HeterogeneousMappo(nn.Module):
         self.usv_actor = SharedActor(observation_dim, action_dim, hidden_dim)
         self.critic = DeepSetsCritic(observation_dim, hidden_dim)
 
-    def logits(self, observations: torch.Tensor, agent_types: torch.Tensor) -> torch.Tensor:
+    def logits(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        agent_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         if observations.ndim != 3:
             raise ValueError("observations must have shape [batch, agents, obs_dim]")
         batch, agents, obs_dim = observations.shape
@@ -95,7 +100,7 @@ class HeterogeneousMappo(nn.Module):
         action_masks: torch.Tensor,
         agent_mask: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        logits = self.logits(observations, agent_types)
+        logits = self.logits(observations, agent_types, agent_mask)
         logits = _mask_logits(logits, action_masks)
         dist = Categorical(logits=logits)
         actions = dist.sample()
@@ -111,7 +116,154 @@ class HeterogeneousMappo(nn.Module):
         agent_mask: torch.Tensor,
         actions: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        logits = self.logits(observations, agent_types)
+        logits = self.logits(observations, agent_types, agent_mask)
+        logits = _mask_logits(logits, action_masks)
+        dist = Categorical(logits=logits)
+        log_probs = dist.log_prob(actions) * agent_mask.to(logits.dtype)
+        entropy = dist.entropy() * agent_mask.to(logits.dtype)
+        values = self.value(observations, agent_types, agent_mask)
+        return log_probs, entropy, values
+
+
+class SharedPolicyMappo(nn.Module):
+    """One decentralized actor shared by UAV and USV agents plus a centralized set critic."""
+
+    def __init__(self, observation_dim: int, action_dim: int, hidden_dim: int) -> None:
+        super().__init__()
+        self.observation_dim = int(observation_dim)
+        self.action_dim = int(action_dim)
+        self.actor = SharedActor(observation_dim, action_dim, hidden_dim)
+        self.critic = DeepSetsCritic(observation_dim, hidden_dim)
+
+    def logits(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        agent_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if observations.ndim != 3:
+            raise ValueError("observations must have shape [batch, agents, obs_dim]")
+        batch, agents, obs_dim = observations.shape
+        flat_logits = self.actor(observations.reshape(batch * agents, obs_dim))
+        return flat_logits.reshape(batch, agents, self.action_dim)
+
+    def value(self, observations: torch.Tensor, agent_types: torch.Tensor, agent_mask: torch.Tensor) -> torch.Tensor:
+        return self.critic(observations, agent_types, agent_mask)
+
+    def act(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        action_masks: torch.Tensor,
+        agent_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.logits(observations, agent_types, agent_mask)
+        logits = _mask_logits(logits, action_masks)
+        dist = Categorical(logits=logits)
+        actions = dist.sample()
+        log_probs = dist.log_prob(actions) * agent_mask.to(logits.dtype)
+        values = self.value(observations, agent_types, agent_mask)
+        return actions, log_probs, values
+
+    def evaluate_actions(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        action_masks: torch.Tensor,
+        agent_mask: torch.Tensor,
+        actions: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.logits(observations, agent_types, agent_mask)
+        logits = _mask_logits(logits, action_masks)
+        dist = Categorical(logits=logits)
+        log_probs = dist.log_prob(actions) * agent_mask.to(logits.dtype)
+        entropy = dist.entropy() * agent_mask.to(logits.dtype)
+        values = self.value(observations, agent_types, agent_mask)
+        return log_probs, entropy, values
+
+
+class PooledContextActor(nn.Module):
+    def __init__(self, observation_dim: int, action_dim: int, hidden_dim: int) -> None:
+        super().__init__()
+        self.agent_encoder = nn.Sequential(
+            nn.Linear(observation_dim + 2, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.Tanh(),
+        )
+        self.context_encoder = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.Tanh(),
+        )
+        self.head = nn.Sequential(
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, action_dim),
+        )
+
+    def forward(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        agent_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        type_features = torch.stack([agent_types == 0, agent_types == 1], dim=-1).to(observations.dtype)
+        encoded = self.agent_encoder(torch.cat([observations, type_features], dim=-1))
+        if agent_mask is None:
+            agent_mask = torch.ones(observations.shape[:2], dtype=torch.bool, device=observations.device)
+        mask = agent_mask.to(observations.dtype).unsqueeze(-1)
+        pooled = (encoded * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1.0)
+        context = self.context_encoder(pooled).unsqueeze(1).expand(-1, observations.shape[1], -1)
+        return self.head(torch.cat([encoded, context], dim=-1))
+
+
+class CentralizedPpo(nn.Module):
+    """A centralized-context PPO candidate for comparing against decentralized actor variants."""
+
+    def __init__(self, observation_dim: int, action_dim: int, hidden_dim: int) -> None:
+        super().__init__()
+        self.observation_dim = int(observation_dim)
+        self.action_dim = int(action_dim)
+        self.actor = PooledContextActor(observation_dim, action_dim, hidden_dim)
+        self.critic = DeepSetsCritic(observation_dim, hidden_dim)
+
+    def logits(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        agent_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if observations.ndim != 3:
+            raise ValueError("observations must have shape [batch, agents, obs_dim]")
+        return self.actor(observations, agent_types, agent_mask)
+
+    def value(self, observations: torch.Tensor, agent_types: torch.Tensor, agent_mask: torch.Tensor) -> torch.Tensor:
+        return self.critic(observations, agent_types, agent_mask)
+
+    def act(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        action_masks: torch.Tensor,
+        agent_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.logits(observations, agent_types, agent_mask)
+        logits = _mask_logits(logits, action_masks)
+        dist = Categorical(logits=logits)
+        actions = dist.sample()
+        log_probs = dist.log_prob(actions) * agent_mask.to(logits.dtype)
+        values = self.value(observations, agent_types, agent_mask)
+        return actions, log_probs, values
+
+    def evaluate_actions(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        action_masks: torch.Tensor,
+        agent_mask: torch.Tensor,
+        actions: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.logits(observations, agent_types, agent_mask)
         logits = _mask_logits(logits, action_masks)
         dist = Categorical(logits=logits)
         log_probs = dist.log_prob(actions) * agent_mask.to(logits.dtype)

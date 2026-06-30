@@ -103,3 +103,11 @@
 - Added a reproducible renderer for a Los Angeles official-geometry training effect figure.
 - The figure now uses a NOAA ENC Direct Harbour chart export as the basemap and overlays the current `PENDING` NOAA-derived point, line, and area tasks, grid risk, depot, and provenance summary.
 - Generated PNG files belong under ignored `reports/` and must not be treated as final experiment evidence.
+
+### 2026-06-30 Multi-algorithm scheduler training comparison
+
+- Current formal review remains item 9; no final upper-level algorithm is selected by this engineering change.
+- `tools/train_port_scheduler_rl.py` now accepts `--algorithm` for `heterogeneous_mappo`, `shared_mappo`, and `centralized_ppo` training candidates.
+- `tools/run_port_algorithm_comparison.py` runs the configured candidates on the Los Angeles `PENDING` training scenario and writes comparable JSON/CSV summaries.
+- Comparison outputs belong under ignored `data/ports/*/algorithm_comparison/` and are not final baseline, ablation, or innovation evidence.
+- IPPO, graph/attention policy, hybrid optimization, and the final rejected/accepted algorithm rationale remain pending item-9 decisions.

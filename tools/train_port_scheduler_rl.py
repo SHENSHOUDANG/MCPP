@@ -27,21 +27,43 @@ import torch
 from torch import nn
 
 from check_port_inspection_env import build_env
-from mathbased_mcpp.port_inspection.mappo import HeterogeneousMappo, PortMappoBatch
+from mathbased_mcpp.port_inspection.mappo import CentralizedPpo, HeterogeneousMappo, PortMappoBatch, SharedPolicyMappo
 from mathbased_mcpp.port_inspection.v12_contract import (
     ContractValidationError,
     classify_config_boundary,
     require_historical_baseline_ack,
 )
 
+SchedulerModel = HeterogeneousMappo | SharedPolicyMappo | CentralizedPpo
+MetricValue = float | int | str
+
+ALGORITHM_ALIASES = {
+    "mappo": "heterogeneous_mappo",
+    "heterogeneous_mappo": "heterogeneous_mappo",
+    "heterogeneous_mappo_ctde": "heterogeneous_mappo",
+    "shared_mappo": "shared_mappo",
+    "shared_policy_mappo": "shared_mappo",
+    "centralized_ppo": "centralized_ppo",
+    "centralized_context_ppo": "centralized_ppo",
+}
+
+SUPPORTED_ALGORITHMS = ("heterogeneous_mappo", "shared_mappo", "centralized_ppo")
+ALGORITHM_CHOICES = tuple(sorted(set(ALGORITHM_ALIASES) | {key.replace("_", "-") for key in ALGORITHM_ALIASES}))
+
 
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Train a UAV-USV port scheduler prototype with CTDE MAPPO.")
+    parser = argparse.ArgumentParser(description="Train a UAV-USV port scheduler prototype with PPO-family candidates.")
     parser.add_argument("--config", default="configs/port_los_angeles_training_v1.toml")
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=20260615)
+    parser.add_argument(
+        "--algorithm",
+        choices=ALGORITHM_CHOICES,
+        default=None,
+        help="Training candidate to run. Defaults to scheduler_rl.algorithm or heterogeneous_mappo.",
+    )
     parser.add_argument("--checkpoint-interval", type=int, default=100000)
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--resume", nargs="?", const="auto", default=None)
@@ -73,6 +95,7 @@ def main() -> None:
         raise SystemExit(str(exc)) from exc
     print(f"contract_boundary={json.dumps(boundary.as_dict(), ensure_ascii=False)}", flush=True)
     rl_config = dict(config.get("scheduler_rl", {}))
+    algorithm = _normalize_algorithm(str(args.algorithm or rl_config.get("algorithm", "heterogeneous_mappo")))
     _configure_cpu_threads(args, rl_config)
     _configure_process_priority(str(args.process_priority or rl_config.get("process_priority", "below_normal")))
     device = _select_device(str(args.device or rl_config.get("device", "auto")))
@@ -86,7 +109,8 @@ def main() -> None:
     output_dir = output_root / "scheduler_rl"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    model = HeterogeneousMappo(
+    model = _build_scheduler_model(
+        algorithm=algorithm,
         observation_dim=env.local_observation_dim,
         action_dim=env.action_choices,
         hidden_dim=int(rl_config.get("hidden_dim", 128)),
@@ -101,13 +125,14 @@ def main() -> None:
     value_coef = float(rl_config.get("value_coef", 0.5))
 
     agent_types = _agent_types(env)
-    rows: list[dict[str, float | int]] = []
+    checkpoint_stem = _checkpoint_stem(algorithm)
+    rows: list[dict[str, MetricValue]] = []
     total_steps = 0
     episode_index = 0
     resume_state: dict[str, Any] = {}
     next_checkpoint_step = max(int(args.checkpoint_interval), 0)
     if args.resume:
-        checkpoint_path = _resolve_resume_path(output_dir, args.resume)
+        checkpoint_path = _resolve_resume_path(output_dir, args.resume, checkpoint_stem)
         if checkpoint_path is not None:
             resume_state = _load_checkpoint(
                 checkpoint_path=checkpoint_path,
@@ -147,6 +172,7 @@ def main() -> None:
     else:
         episode_rewards = [0.0 for _ in envs]
     print(
+        f"algorithm={algorithm} "
         f"device={device} torch={torch.__version__} "
         f"cuda_available={torch.cuda.is_available()} cpu_threads={torch.get_num_threads()} "
         f"num_envs={num_envs} env_workers={env_workers}",
@@ -183,6 +209,7 @@ def main() -> None:
         for event in episode_events:
             episode_index += 1
             row = dict(event)
+            row["algorithm"] = algorithm
             row["episode"] = episode_index
             row["steps"] = min(int(total_steps), int(args.steps))
             rows.append(row)
@@ -204,7 +231,8 @@ def main() -> None:
                 env=env,
                 agent_types=agent_types,
                 config_path=args.config,
-                path=output_dir / f"scheduler_mappo_step{total_steps}.pt",
+                path=output_dir / f"{checkpoint_stem}_step{total_steps}.pt",
+                algorithm=algorithm,
                 total_steps=total_steps,
                 episode_index=episode_index,
                 rows=rows,
@@ -221,7 +249,8 @@ def main() -> None:
         env=env,
         agent_types=agent_types,
         config_path=args.config,
-        path=output_dir / "scheduler_mappo.pt",
+        path=output_dir / f"{checkpoint_stem}.pt",
+        algorithm=algorithm,
         total_steps=total_steps,
         episode_index=episode_index,
         rows=rows,
@@ -231,18 +260,50 @@ def main() -> None:
         episode_rewards=episode_rewards,
     )
     _write_metrics(output_dir / "scheduler_metrics.csv", rows)
-    summary = rows[-1] if rows else {"steps": total_steps, "episode_reward": 0.0}
+    summary = rows[-1] if rows else {"algorithm": algorithm, "steps": total_steps, "episode_reward": 0.0}
     (output_dir / "scheduler_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"steps={total_steps}")
     print(f"episodes={episode_index}")
-    print(f"checkpoint={output_dir / 'scheduler_mappo.pt'}")
+    print(f"algorithm={algorithm}")
+    print(f"checkpoint={output_dir / (checkpoint_stem + '.pt')}")
     print(f"metrics={output_dir / 'scheduler_metrics.csv'}")
     print(f"summary={output_dir / 'scheduler_summary.json'}")
 
 
+def _normalize_algorithm(name: str) -> str:
+    normalized = name.strip().lower().replace("-", "_")
+    if normalized not in ALGORITHM_ALIASES:
+        supported = ", ".join(SUPPORTED_ALGORITHMS)
+        raise ValueError(f"unsupported scheduler algorithm: {name!r}; supported: {supported}")
+    return ALGORITHM_ALIASES[normalized]
+
+
+def _build_scheduler_model(
+    algorithm: str,
+    observation_dim: int,
+    action_dim: int,
+    hidden_dim: int,
+) -> SchedulerModel:
+    normalized = _normalize_algorithm(algorithm)
+    if normalized == "heterogeneous_mappo":
+        return HeterogeneousMappo(observation_dim=observation_dim, action_dim=action_dim, hidden_dim=hidden_dim)
+    if normalized == "shared_mappo":
+        return SharedPolicyMappo(observation_dim=observation_dim, action_dim=action_dim, hidden_dim=hidden_dim)
+    if normalized == "centralized_ppo":
+        return CentralizedPpo(observation_dim=observation_dim, action_dim=action_dim, hidden_dim=hidden_dim)
+    raise AssertionError(f"unhandled scheduler algorithm: {normalized}")
+
+
+def _checkpoint_stem(algorithm: str) -> str:
+    normalized = _normalize_algorithm(algorithm)
+    if normalized == "heterogeneous_mappo":
+        return "scheduler_mappo"
+    return f"scheduler_{normalized}"
+
+
 def _collect_rollout(
     env,
-    model: HeterogeneousMappo,
+    model: SchedulerModel,
     obs: np.ndarray,
     agent_types: np.ndarray,
     rollout_steps: int,
@@ -323,7 +384,7 @@ def _collect_rollout(
 
 def _collect_multi_env_rollout(
     envs: list[Any],
-    model: HeterogeneousMappo,
+    model: SchedulerModel,
     obs_by_env: list[np.ndarray],
     agent_types: np.ndarray,
     rollout_steps: int,
@@ -334,7 +395,7 @@ def _collect_multi_env_rollout(
     episode_index: int,
     episode_rewards: list[float],
     env_workers: int = 1,
-) -> tuple[PortMappoBatch, list[np.ndarray], list[dict[str, float | int]]]:
+) -> tuple[PortMappoBatch, list[np.ndarray], list[dict[str, MetricValue]]]:
     observations: list[np.ndarray] = []
     actions: list[np.ndarray] = []
     log_probs: list[np.ndarray] = []
@@ -345,7 +406,7 @@ def _collect_multi_env_rollout(
     agent_masks: list[np.ndarray] = []
     alive_masks: list[np.ndarray] = []
     env_indices: list[int] = []
-    episode_events: list[dict[str, float | int]] = []
+    episode_events: list[dict[str, MetricValue]] = []
     num_envs = len(envs)
     if num_envs == 0:
         raise ValueError("at least one environment is required")
@@ -439,7 +500,7 @@ def _step_envs(envs: list[Any], action_batch: np.ndarray, executor: ThreadPoolEx
 
 
 def _bootstrap_values(
-    model: HeterogeneousMappo,
+    model: SchedulerModel,
     obs_by_env: list[np.ndarray],
     agent_types: np.ndarray,
     envs: list[Any],
@@ -489,7 +550,7 @@ def _alive_mask(env) -> np.ndarray:
     return _agent_mask(env)
 
 
-def _episode_row(env, info: dict[str, Any], episode_reward: float, env_index: int) -> dict[str, float | int]:
+def _episode_row(env, info: dict[str, Any], episode_reward: float, env_index: int) -> dict[str, MetricValue]:
     return {
         "env_index": int(env_index),
         "episode_reward": float(episode_reward),
@@ -506,7 +567,7 @@ def _episode_row(env, info: dict[str, Any], episode_reward: float, env_index: in
 
 
 def _mappo_update(
-    model: HeterogeneousMappo,
+    model: SchedulerModel,
     optimizer: torch.optim.Optimizer,
     batch: PortMappoBatch,
     clip_ratio: float,
@@ -568,8 +629,9 @@ def _agent_types(env) -> np.ndarray:
     return np.asarray([0 if platform.platform_type == "UAV" else 1 for platform in env.platforms], dtype=np.int64)
 
 
-def _write_metrics(path: Path, rows: list[dict[str, float | int]]) -> None:
+def _write_metrics(path: Path, rows: list[dict[str, MetricValue]]) -> None:
     fieldnames = [
+        "algorithm",
         "episode",
         "env_index",
         "steps",
@@ -591,15 +653,16 @@ def _write_metrics(path: Path, rows: list[dict[str, float | int]]) -> None:
 
 
 def _save_checkpoint(
-    model: HeterogeneousMappo,
+    model: SchedulerModel,
     optimizer: torch.optim.Optimizer | None,
     env,
     agent_types: np.ndarray,
     config_path: str,
     path: Path,
+    algorithm: str,
     total_steps: int = 0,
     episode_index: int = 0,
-    rows: list[dict[str, float | int]] | None = None,
+    rows: list[dict[str, MetricValue]] | None = None,
     args: dict[str, Any] | None = None,
     envs: list[Any] | None = None,
     obs_by_env: list[np.ndarray] | None = None,
@@ -613,7 +676,8 @@ def _save_checkpoint(
             "action_dim": env.action_choices,
             "agent_types": agent_types.tolist(),
             "config": config_path,
-            "model": "heterogeneous_mappo_ctde",
+            "model": _normalize_algorithm(algorithm),
+            "algorithm": _normalize_algorithm(algorithm),
             "total_steps": int(total_steps),
             "episode_index": int(episode_index),
             "rows": rows or [],
@@ -629,7 +693,7 @@ def _save_checkpoint(
 
 def _load_checkpoint(
     checkpoint_path: Path,
-    model: HeterogeneousMappo,
+    model: SchedulerModel,
     optimizer: torch.optim.Optimizer | None,
     device: torch.device,
 ) -> dict[str, Any]:
@@ -686,7 +750,7 @@ def _checkpoint_envs(envs: list[Any]) -> list[Any]:
     return snapshot
 
 
-def _validate_restored_envs(envs: list[Any], model: HeterogeneousMappo) -> None:
+def _validate_restored_envs(envs: list[Any], model: SchedulerModel) -> None:
     for index, env in enumerate(envs):
         observation_dim = int(getattr(env, "local_observation_dim", -1))
         action_dim = int(getattr(env, "action_choices", -1))
@@ -698,7 +762,7 @@ def _validate_restored_envs(envs: list[Any], model: HeterogeneousMappo) -> None:
             )
 
 
-def _resolve_resume_path(output_dir: Path, requested: str) -> Path | None:
+def _resolve_resume_path(output_dir: Path, requested: str, checkpoint_stem: str) -> Path | None:
     if requested != "auto":
         path = Path(requested)
         if not path.is_absolute():
@@ -706,8 +770,8 @@ def _resolve_resume_path(output_dir: Path, requested: str) -> Path | None:
         if path.exists():
             return path
         raise FileNotFoundError(f"resume checkpoint not found: {path}")
-    candidates = list(output_dir.glob("scheduler_mappo_step*.pt"))
-    final_checkpoint = output_dir / "scheduler_mappo.pt"
+    candidates = list(output_dir.glob(f"{checkpoint_stem}_step*.pt"))
+    final_checkpoint = output_dir / f"{checkpoint_stem}.pt"
     if final_checkpoint.exists():
         candidates.append(final_checkpoint)
     if not candidates:
@@ -733,10 +797,10 @@ def _next_checkpoint_step(total_steps: int, checkpoint_interval: int) -> int:
     return ((total_steps // checkpoint_interval) + 1) * checkpoint_interval
 
 
-def _load_existing_metrics(path: Path, max_steps: int) -> list[dict[str, float | int]]:
+def _load_existing_metrics(path: Path, max_steps: int) -> list[dict[str, MetricValue]]:
     if not path.exists():
         return []
-    rows: list[dict[str, float | int]] = []
+    rows: list[dict[str, MetricValue]] = []
     with path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             parsed = _parse_metric_row(row)
@@ -745,8 +809,8 @@ def _load_existing_metrics(path: Path, max_steps: int) -> list[dict[str, float |
     return rows
 
 
-def _parse_metric_row(row: dict[str, str]) -> dict[str, float | int]:
-    parsed: dict[str, float | int] = {}
+def _parse_metric_row(row: dict[str, str]) -> dict[str, MetricValue]:
+    parsed: dict[str, MetricValue] = {}
     int_fields = {
         "episode",
         "env_index",
@@ -761,9 +825,9 @@ def _parse_metric_row(row: dict[str, str]) -> dict[str, float | int]:
     }
     for key, value in row.items():
         if value in ("", None):
-            parsed[key] = -1 if key == "env_index" else 0
+            parsed[key] = "" if key == "algorithm" else (-1 if key == "env_index" else 0)
             continue
-        parsed[key] = int(float(value)) if key in int_fields else float(value)
+        parsed[key] = value if key == "algorithm" else (int(float(value)) if key in int_fields else float(value))
     parsed.setdefault("env_index", -1)
     return parsed
 

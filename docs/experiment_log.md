@@ -199,3 +199,10 @@ interpretation and next decision
 - Added `tools/render_los_angeles_training_effect.py` to render the official NOAA-derived LA training scenario as a PNG effect figure over a NOAA ENC Direct Harbour chart basemap.
 - Default output is `reports/los_angeles_training_effect.png`; the NOAA chart export and rendered PNG remain outside Git under the artifact policy.
 - Verification: renderer smoke output was created and `tests/test_los_angeles_effect_render.py` covers PNG generation from checked-in JSON with and without a chart basemap.
+
+### 2026-06-30 Multi-algorithm scheduler comparison entry
+
+- Added a training algorithm switch for `heterogeneous_mappo`, `shared_mappo`, and `centralized_ppo` so Los Angeles scheduler training can compare multiple PPO-family candidates before item 9 freezes the final upper-level algorithm.
+- Added `tools/run_port_algorithm_comparison.py` to run selected candidates with a shared config/seed/step budget and collect `algorithm_comparison_summary.json` plus CSV.
+- Added `data/ports/*/algorithm_comparison/` to ignored artifacts; per-candidate checkpoints and summaries remain engineering training outputs outside Git.
+- This change records no final MAPPO/IPPO/centralized PPO decision. Graph/attention, hybrid optimization, IPPO, final metrics, rejected alternatives, and paper claims remain `PENDING` until the relevant freeze items are approved.

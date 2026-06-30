@@ -17,6 +17,7 @@ data/ports/*/scheduler_rl_*backup/
 data/ports/*/smoke_training/
 data/ports/*/training_logs/
 data/ports/*/baselines/
+data/ports/*/algorithm_comparison/
 data/ports/*/unified_eval/
 data/ports/*/unified_eval_step*/
 data/ports/*/source/

@@ -19,9 +19,9 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 from check_port_inspection_env import build_env
-from mathbased_mcpp.port_inspection.mappo import HeterogeneousMappo
+from mathbased_mcpp.port_inspection.mappo import CentralizedPpo, HeterogeneousMappo, PortMappoBatch, SharedPolicyMappo
 from mathbased_mcpp.port_inspection.schema import MODE_REPLENISH, STAGE_SCREENING, STAGE_REVIEW, TASK_AWAITING_REVIEW, TASK_CLOSED
-from train_port_scheduler_rl import _agent_types, _collect_rollout, _mappo_update, _obs_matrix
+from train_port_scheduler_rl import SUPPORTED_ALGORITHMS, _agent_types, _build_scheduler_model, _collect_rollout, _mappo_update, _obs_matrix
 
 import torch
 
@@ -206,15 +206,49 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         _mappo_update(model, optimizer, batch, clip_ratio=0.2, update_epochs=1, entropy_coef=0.01, value_coef=0.5)
 
     def test_centralized_critic_accepts_variable_agent_counts(self) -> None:
-        model = HeterogeneousMappo(observation_dim=12, action_dim=11, hidden_dim=16)
-        for agent_count in (2, 5):
-            observations = torch.zeros((1, agent_count, 12), dtype=torch.float32)
-            agent_types = torch.tensor([[0, 1, 0, 1, 1][:agent_count]], dtype=torch.long)
-            agent_mask = torch.ones((1, agent_count), dtype=torch.bool)
-            values = model.value(observations, agent_types, agent_mask)
-            logits = model.logits(observations, agent_types)
+        models = [
+            HeterogeneousMappo(observation_dim=12, action_dim=11, hidden_dim=16),
+            SharedPolicyMappo(observation_dim=12, action_dim=11, hidden_dim=16),
+            CentralizedPpo(observation_dim=12, action_dim=11, hidden_dim=16),
+        ]
+        for model in models:
+            for agent_count in (2, 5):
+                observations = torch.zeros((1, agent_count, 12), dtype=torch.float32)
+                agent_types = torch.tensor([[0, 1, 0, 1, 1][:agent_count]], dtype=torch.long)
+                agent_mask = torch.ones((1, agent_count), dtype=torch.bool)
+                values = model.value(observations, agent_types, agent_mask)
+                logits = model.logits(observations, agent_types, agent_mask)
+                self.assertEqual(values.shape, (1,))
+                self.assertEqual(logits.shape, (1, agent_count, 11))
+
+    def test_scheduler_algorithm_candidates_share_update_interface(self) -> None:
+        observations = torch.zeros((3, 4, 12), dtype=torch.float32)
+        actions = torch.zeros((3, 4), dtype=torch.long)
+        action_masks = torch.ones((3, 4, 11), dtype=torch.bool)
+        agent_types = torch.tensor([[0, 1, 0, 1]] * 3, dtype=torch.long)
+        agent_masks = torch.ones((3, 4), dtype=torch.bool)
+
+        for algorithm in SUPPORTED_ALGORITHMS:
+            model = _build_scheduler_model(algorithm, observation_dim=12, action_dim=11, hidden_dim=16)
+            sampled_actions, log_probs, values = model.act(observations[:1], agent_types[:1], action_masks[:1], agent_masks[:1])
+            self.assertEqual(sampled_actions.shape, (1, 4))
+            self.assertEqual(log_probs.shape, (1, 4))
             self.assertEqual(values.shape, (1,))
-            self.assertEqual(logits.shape, (1, agent_count, 11))
+
+            batch = PortMappoBatch(
+                observations=observations,
+                actions=actions,
+                old_log_probs=torch.zeros((3, 4), dtype=torch.float32),
+                returns=torch.tensor([0.5, 0.25, -0.1], dtype=torch.float32),
+                advantages=torch.tensor([0.2, 0.1, -0.3], dtype=torch.float32),
+                values=torch.zeros(3, dtype=torch.float32),
+                action_masks=action_masks,
+                agent_types=agent_types,
+                agent_masks=agent_masks,
+                alive_masks=agent_masks,
+            )
+            optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+            _mappo_update(model, optimizer, batch, clip_ratio=0.2, update_epochs=1, entropy_coef=0.01, value_coef=0.5)
 
 
 def _load_config(path: Path) -> dict[str, object]:
