@@ -306,17 +306,32 @@ def _environment_control(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]
 
 
 def _environment_snapshot(env) -> dict[str, Any]:
-    task_truth = [
-        {
-            "task_id": task.task_id,
-            "risk": int(task.risk),
-            "true_anomaly": bool(task.true_anomaly),
-            "screening_workload": float(task.screening_workload),
-            "review_workload": float(task.review_workload),
-            "max_interval": float(task.max_interval),
-        }
-        for task in env.tasks
-    ]
+    if getattr(env, "task_lifecycle", "") == "v1_2_direct_service":
+        task_truth = [
+            {
+                "task_id": task.task_id,
+                "task_family": task.task_family,
+                "geometry": task.geometry,
+                "geometry_mode": task.geometry_mode,
+                "risk": int(task.risk),
+                "required_work": float(task.required_work),
+                "max_interval": float(task.max_interval),
+                "deadline": task.deadline,
+            }
+            for task in env.tasks
+        ]
+    else:
+        task_truth = [
+            {
+                "task_id": task.task_id,
+                "risk": int(task.risk),
+                "true_anomaly": bool(task.true_anomaly),
+                "screening_workload": float(task.screening_workload),
+                "review_workload": float(task.review_workload),
+                "max_interval": float(task.max_interval),
+            }
+            for task in env.tasks
+        ]
     payload = {
         "scenario_seed": getattr(env, "_scenario_seed", None),
         "current_step": int(env.current_step),

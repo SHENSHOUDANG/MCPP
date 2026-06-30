@@ -236,14 +236,23 @@ def _draw_depot(ax, depot: tuple[int, int], grid, bbox: dict[str, float], width:
 
 def _draw_summary(ax, env, history: list[dict[str, Any]], seed: int, strategy: str) -> None:
     accepted = [item for row in history for item in row.get("accepted", [])]
-    screening = sum(1 for item in accepted if item.get("stage") == "screening")
-    review = sum(1 for item in accepted if item.get("stage") == "review")
-    text = (
-        f"UAV-USV schedule on ArcGIS imagery\n"
-        f"strategy: {strategy} | seed: {seed} | steps: {env.current_step}\n"
-        f"completed: {len(env.completed_tasks)}/{env.num_tasks} | screening: {screening} | review: {review}\n"
-        f"path length: {env.total_path_length} cells | review queue: {env.review_queue_length()}"
-    )
+    if getattr(env, "task_lifecycle", "") == "v1_2_direct_service":
+        service = sum(1 for item in accepted if item.get("stage") == "service")
+        text = (
+            f"UAV-USV service schedule on chart imagery\n"
+            f"strategy: {strategy} | seed: {seed} | steps: {env.current_step}\n"
+            f"completed: {len(env.completed_tasks)}/{env.num_tasks} | service actions: {service}\n"
+            f"path length: {env.total_path_length} cells | open tasks: {env.open_task_count()}"
+        )
+    else:
+        screening = sum(1 for item in accepted if item.get("stage") == "screening")
+        review = sum(1 for item in accepted if item.get("stage") == "review")
+        text = (
+            f"UAV-USV schedule on ArcGIS imagery\n"
+            f"strategy: {strategy} | seed: {seed} | steps: {env.current_step}\n"
+            f"completed: {len(env.completed_tasks)}/{env.num_tasks} | screening: {screening} | review: {review}\n"
+            f"path length: {env.total_path_length} cells | review queue: {env.review_queue_length()}"
+        )
     ax.text(
         0.015,
         0.025,

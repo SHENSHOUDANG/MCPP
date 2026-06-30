@@ -76,6 +76,7 @@ def build_env(config: dict[str, object]) -> PortInspectionSchedulingEnv:
         reward_weights={key: float(value) for key, value in reward_weights.items()},
         candidate_weights={key: float(value) for key, value in scheduling_config.items() if isinstance(value, (int, float))},
         review_trigger=dict(config.get("review_trigger", {})),
+        task_lifecycle=str(scheduling_config.get("task_lifecycle", config.get("task_lifecycle", "legacy_screen_review"))),
     )
     env.contract_boundary = classify_config_boundary(config).as_dict()
     return env

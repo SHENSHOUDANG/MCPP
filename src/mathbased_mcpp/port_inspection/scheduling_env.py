@@ -19,14 +19,21 @@ from .schema import (
     MODE_REPLENISH,
     MODE_RETURN,
     MODE_REVIEW,
+    MODE_SERVICE,
     MODE_TRAVEL,
     MODE_SCREEN,
     Platform,
     PortGridMap,
     STAGE_REVIEW,
     STAGE_SCREENING,
+    STAGE_SERVICE,
+    TASK_ACTIVE,
     TASK_AWAITING_REVIEW,
+    TASK_ASSIGNED,
     TASK_CLOSED,
+    TASK_COMPLETED,
+    TASK_IN_SERVICE,
+    TASK_INTERRUPTED,
     TASK_RESERVED_REVIEW,
     TASK_RESERVED_SCREENING,
     TASK_REVIEWING,
@@ -74,15 +81,15 @@ class _Proposal:
 
 
 CANDIDATE_FEATURE_DIM = 8
+LIFECYCLE_LEGACY_SCREEN_REVIEW = "legacy_screen_review"
+LIFECYCLE_V12_DIRECT_SERVICE = "v1_2_direct_service"
 
 
 class PortInspectionSchedulingEnv:
-    """High-level UAV screening / USV review scheduling environment.
+    """High-level port inspection scheduler with configurable task lifecycle.
 
-    The environment keeps movement and service completion event-based for the
-    first coupled baseline: one accepted high-level action completes one task
-    stage. The business state machine, candidate masks, dynamic review queue,
-    conflict arbitration, and reward accounting follow the V1.0 model.
+    V1.2 scenarios use direct task service states. The legacy screening/review
+    lifecycle is retained only for historical engineering baselines.
     """
 
     def __init__(
@@ -95,11 +102,15 @@ class PortInspectionSchedulingEnv:
         candidate_k: int = 8,
         candidate_weights: dict[str, float] | None = None,
         review_trigger: dict[str, Any] | None = None,
+        task_lifecycle: str = LIFECYCLE_LEGACY_SCREEN_REVIEW,
     ) -> None:
         self.grid = grid
         self.base_tasks = copy.deepcopy(tasks)
         self.base_platforms = copy.deepcopy(platforms)
         self.max_steps = max(int(max_steps), 1)
+        self.task_lifecycle = str(task_lifecycle or LIFECYCLE_LEGACY_SCREEN_REVIEW)
+        if self.task_lifecycle not in {LIFECYCLE_LEGACY_SCREEN_REVIEW, LIFECYCLE_V12_DIRECT_SERVICE}:
+            raise ValueError(f"unknown task_lifecycle: {self.task_lifecycle}")
         self.reward_weights = reward_weights or {}
         self.candidate_k = max(int(candidate_k), 1)
         self.candidate_weights = {
@@ -137,6 +148,7 @@ class PortInspectionSchedulingEnv:
         self.total_returns = 0
         self.total_screened = 0
         self.total_reviewed = 0
+        self.total_serviced = 0
         self.total_anomaly_closed = 0
         self.total_anomaly_missed = 0
         self.completed_tasks: set[str] = set()
@@ -179,6 +191,9 @@ class PortInspectionSchedulingEnv:
     @property
     def action_dim(self) -> int:
         return self.num_platforms * self.action_choices
+
+    def _uses_direct_service(self) -> bool:
+        return self.task_lifecycle == LIFECYCLE_V12_DIRECT_SERVICE
 
     @property
     def observation_dim(self) -> int:
@@ -226,8 +241,10 @@ class PortInspectionSchedulingEnv:
             platform.metadata.pop("pending_cost", None)
         for task in self.tasks:
             task.completed = False
-            task.state = TASK_UNSCREENED
+            task.state = TASK_ACTIVE if self._uses_direct_service() else TASK_UNSCREENED
             task.uninspected_time = float(task.metadata.get("initial_uninspected_time", 0.0))
+            task.completed_work = 0.0
+            task.remaining_work = float(max(task.required_work, 1.0))
             task.screening_workload_remaining = float(task.screening_workload)
             task.review_workload_remaining = float(task.review_workload)
             task.screening_confidence = 0.0
@@ -245,7 +262,7 @@ class PortInspectionSchedulingEnv:
             task.reservation_time = None
             task.release_time = None
             task.close_time = None
-            task.true_anomaly = self._sample_true_anomaly(task)
+            task.true_anomaly = False if self._uses_direct_service() else self._sample_true_anomaly(task)
         self.current_step = 0
         self.total_path_length = 0
         self.total_energy = 0.0
@@ -255,6 +272,7 @@ class PortInspectionSchedulingEnv:
         self.total_returns = 0
         self.total_screened = 0
         self.total_reviewed = 0
+        self.total_serviced = 0
         self.total_anomaly_closed = 0
         self.total_anomaly_missed = 0
         self.completed_tasks = set()
@@ -366,10 +384,14 @@ class PortInspectionSchedulingEnv:
             weights=self.reward_weights,
             screened_tasks=progress["screened_tasks"],
             reviewed_tasks=progress["reviewed_tasks"],
+            service_tasks=progress["service_tasks"],
             closed_tasks=progress["closed_tasks"],
             conflict_count=conflict_count + invalid_count,
             review_queue_length=review_queue_length,
         )
+        if self._uses_direct_service():
+            terms.pop("screen_progress_reward", None)
+            terms.pop("review_progress_reward", None)
         self.last_reward_terms = terms
         self._cost_cache = {}
         self._clear_view_cache()
@@ -483,6 +505,7 @@ class PortInspectionSchedulingEnv:
                 float(metrics["total_returns"]) / max(self.current_step, 1),
                 float(metrics["screened_tasks"]) / max(len(self.tasks), 1),
                 float(metrics["reviewed_tasks"]) / max(len(self.tasks), 1),
+                float(metrics["serviced_tasks"]) / max(len(self.tasks), 1),
                 float(metrics["anomaly_closed"]) / max(len(self.tasks), 1),
                 float(metrics["anomaly_missed"]) / max(len(self.tasks), 1),
             ]
@@ -528,7 +551,7 @@ class PortInspectionSchedulingEnv:
                 self.current_step / self.max_steps,
                 len(self.completed_tasks) / max(len(self.tasks), 1),
                 self.review_queue_length() / max(len(self.tasks), 1),
-                self.screening_open_count() / max(len(self.tasks), 1),
+                self.open_task_count() / max(len(self.tasks), 1),
                 total_risk_exposure(self.tasks) / max(len(self.tasks), 1) / 40.0,
                 late_task_count(self.tasks) / max(len(self.tasks), 1),
                 self.total_path_length / 2000.0,
@@ -543,21 +566,24 @@ class PortInspectionSchedulingEnv:
         candidate_sets = self.candidate_lists()
         masks = self.action_masks(candidate_sets)
         metrics = self.metrics()
+        public_metrics = self._public_metrics(metrics)
         return {
             "reward_terms": dict(self.last_reward_terms),
             "contract_boundary": dict(getattr(self, "contract_boundary", {})),
+            "task_lifecycle": self.task_lifecycle,
             "completed_tasks": sorted(self.completed_tasks),
             "closed_tasks": sorted(self.completed_tasks),
-            "screening_open_tasks": [task.task_id for task in self.tasks if task.state == TASK_UNSCREENED],
-            "review_queue_tasks": [task.task_id for task in self.tasks if task.state == TASK_AWAITING_REVIEW],
+            "active_tasks": [task.task_id for task in self.tasks if self._task_stage(task) == STAGE_SERVICE],
+            "screening_open_tasks": [] if self._uses_direct_service() else [task.task_id for task in self.tasks if task.state == TASK_UNSCREENED],
+            "review_queue_tasks": [] if self._uses_direct_service() else [task.task_id for task in self.tasks if task.state == TASK_AWAITING_REVIEW],
             "review_queue_length": self.review_queue_length(),
             "late_tasks": [task.task_id for task in self.tasks if not task.completed and task.uninspected_time > task.max_interval],
             "task_states": {task.task_id: task.state for task in self.tasks},
             "task_confidence": {task.task_id: task.screening_confidence for task in self.tasks if task.screened_by},
             "total_path_length": self.total_path_length,
             "total_energy": self.total_energy,
-            "risk_exposure_sum": metrics["risk_exposure_sum"],
-            "metrics": metrics,
+            "risk_exposure_sum": public_metrics["risk_exposure_sum"],
+            "metrics": public_metrics,
             "platform_loads": {platform.platform_id: platform.current_load for platform in self.platforms},
             "action_masks": masks.astype(int).tolist(),
             "candidate_mask": masks[:, : self.candidate_k].astype(int).tolist(),
@@ -576,13 +602,39 @@ class PortInspectionSchedulingEnv:
             "conflicts": list(self.last_conflicts),
         }
 
+    def _public_metrics(self, metrics: dict[str, float | int]) -> dict[str, float | int]:
+        if not self._uses_direct_service():
+            return dict(metrics)
+        hidden_legacy_keys = {
+            "review_queue_length",
+            "mean_review_wait",
+            "max_review_wait",
+            "screening_open_count",
+            "screened_tasks",
+            "reviewed_tasks",
+            "anomaly_closed",
+            "anomaly_missed",
+        }
+        return {key: value for key, value in metrics.items() if key not in hidden_legacy_keys}
+
     def review_queue_length(self) -> int:
+        if self._uses_direct_service():
+            return 0
         return sum(1 for task in self.tasks if task.state == TASK_AWAITING_REVIEW)
 
     def screening_open_count(self) -> int:
+        if self._uses_direct_service():
+            return 0
         return sum(1 for task in self.tasks if task.state == TASK_UNSCREENED)
 
+    def open_task_count(self) -> int:
+        if self._uses_direct_service():
+            return sum(1 for task in self.tasks if task.state == TASK_ACTIVE)
+        return self.screening_open_count()
+
     def review_wait_stats(self) -> tuple[float, float]:
+        if self._uses_direct_service():
+            return 0.0, 0.0
         waits = [self._review_waiting_time(task) for task in self.tasks if task.state == TASK_AWAITING_REVIEW]
         if not waits:
             return 0.0, 0.0
@@ -594,7 +646,7 @@ class PortInspectionSchedulingEnv:
         uav_count = max(sum(1 for platform in self.platforms if platform.platform_type == "UAV"), 1)
         usv_count = max(sum(1 for platform in self.platforms if platform.platform_type == "USV"), 1)
         values = [
-            self.screening_open_count() / max(len(self.tasks), 1),
+            self.open_task_count() / max(len(self.tasks), 1),
             self.review_queue_length() / max(len(self.tasks), 1),
             uav_idle / uav_count,
             usv_idle / usv_count,
@@ -609,6 +661,8 @@ class PortInspectionSchedulingEnv:
             "review_queue_length": self.review_queue_length(),
             "mean_review_wait": mean_wait,
             "max_review_wait": max_wait,
+            "open_task_count": self.open_task_count(),
+            "active_task_count": sum(1 for task in self.tasks if self._task_stage(task) == STAGE_SERVICE),
             "screening_open_count": self.screening_open_count(),
             "late_task_count": late_task_count(self.tasks),
             "late_task_fraction": late_task_count(self.tasks) / task_count,
@@ -619,6 +673,7 @@ class PortInspectionSchedulingEnv:
             "total_returns": self.total_returns,
             "screened_tasks": self.total_screened,
             "reviewed_tasks": self.total_reviewed,
+            "serviced_tasks": self.total_serviced,
             "anomaly_closed": self.total_anomaly_closed,
             "anomaly_missed": self.total_anomaly_missed,
             "total_path_length": self.total_path_length,
@@ -659,6 +714,8 @@ class PortInspectionSchedulingEnv:
                 bool(task.completed),
                 task.reserved_by,
                 round(float(task.uninspected_time), 8),
+                round(float(task.completed_work), 8),
+                round(float(task.remaining_work), 8),
                 round(float(task.screening_confidence), 8),
                 round(float(task.review_deadline), 8),
                 round(float(task.generation_time), 8),
@@ -675,6 +732,7 @@ class PortInspectionSchedulingEnv:
             int(self.total_returns),
             int(self.total_screened),
             int(self.total_reviewed),
+            int(self.total_serviced),
             int(self.total_anomaly_closed),
             int(self.total_anomaly_missed),
             tuple(sorted(self.completed_tasks)),
@@ -736,6 +794,10 @@ class PortInspectionSchedulingEnv:
         return entries[: self.candidate_k]
 
     def _task_stage(self, task: InspectionTask) -> str | None:
+        if self._uses_direct_service():
+            if task.state == TASK_ACTIVE:
+                return STAGE_SERVICE
+            return None
         if task.state == TASK_UNSCREENED:
             return STAGE_SCREENING
         if task.state == TASK_AWAITING_REVIEW:
@@ -760,16 +822,17 @@ class PortInspectionSchedulingEnv:
 
     def _candidate_score(self, platform: Platform, task: InspectionTask, stage: str, cost: TaskCost) -> float:
         weights = self.candidate_weights
+        review_wait = self._review_waiting_time(task) if stage == STAGE_REVIEW else 0.0
         return (
             weights["risk_weight"] * task.risk
             + weights["urgency_weight"] * self._urgency(task, stage, cost)
-            + weights["review_wait_weight"] * self._review_waiting_time(task)
+            + weights["review_wait_weight"] * review_wait
             - weights["distance_weight"] * cost.travel_time
         )
 
     def _urgency(self, task: InspectionTask, stage: str, cost: TaskCost) -> float:
         deadline = self._deadline(task, stage)
-        if deadline <= 0:
+        if deadline is None or deadline <= 0:
             return min(task.uninspected_time / max(task.max_interval, 1), 2.0)
         projected_finish = self.current_step + ceil(cost.completion_time)
         slack = max(deadline - projected_finish, 0.0)
@@ -780,14 +843,16 @@ class PortInspectionSchedulingEnv:
             return 0.0
         return max(0.0, float(self.current_step) - float(task.generation_time))
 
-    def _deadline(self, task: InspectionTask, stage: str) -> float:
+    def _deadline(self, task: InspectionTask, stage: str) -> float | None:
         if stage == STAGE_REVIEW and task.review_deadline > 0:
             return float(task.review_deadline)
-        return float(task.deadline or task.max_interval)
+        if task.deadline is None:
+            return None
+        return float(task.deadline)
 
     def _deadline_feasible(self, task: InspectionTask, stage: str, cost: TaskCost) -> bool:
         deadline = self._deadline(task, stage)
-        if deadline <= 0:
+        if deadline is None or deadline <= 0:
             return True
         return self.current_step + ceil(cost.completion_time) <= deadline
 
@@ -815,12 +880,17 @@ class PortInspectionSchedulingEnv:
         if travel_steps > 0:
             platform.mode = MODE_TRAVEL
         else:
-            transition_task_state(task, TASK_SCREENING if stage == STAGE_SCREENING else TASK_REVIEWING)
-            platform.mode = MODE_SCREEN if stage == STAGE_SCREENING else MODE_REVIEW
+            if stage == STAGE_SERVICE:
+                transition_task_state(task, TASK_IN_SERVICE)
+                platform.mode = MODE_SERVICE
+            else:
+                transition_task_state(task, TASK_SCREENING if stage == STAGE_SCREENING else TASK_REVIEWING)
+                platform.mode = MODE_SCREEN if stage == STAGE_SCREENING else MODE_REVIEW
 
     def _advance_platforms(self) -> dict[str, Any]:
         screened_tasks: list[InspectionTask] = []
         reviewed_tasks: list[InspectionTask] = []
+        service_tasks: list[InspectionTask] = []
         closed_tasks: list[InspectionTask] = []
         path_length = 0
         energy_cost = 0.0
@@ -850,11 +920,17 @@ class PortInspectionSchedulingEnv:
                     self.total_path_length += segment_length
                     task = self._current_task(platform)
                     if task is not None and platform.current_stage is not None:
-                        transition_task_state(task, TASK_SCREENING if platform.current_stage == STAGE_SCREENING else TASK_REVIEWING)
-                    platform.mode = MODE_SCREEN if platform.current_stage == STAGE_SCREENING else MODE_REVIEW
+                        if platform.current_stage == STAGE_SERVICE:
+                            transition_task_state(task, TASK_IN_SERVICE)
+                        else:
+                            transition_task_state(task, TASK_SCREENING if platform.current_stage == STAGE_SCREENING else TASK_REVIEWING)
+                    if platform.current_stage == STAGE_SERVICE:
+                        platform.mode = MODE_SERVICE
+                    else:
+                        platform.mode = MODE_SCREEN if platform.current_stage == STAGE_SCREENING else MODE_REVIEW
                 continue
 
-            if platform.mode in {MODE_SCREEN, MODE_REVIEW}:
+            if platform.mode in {MODE_SCREEN, MODE_REVIEW, MODE_SERVICE}:
                 platform.remaining_service_time = max(0.0, platform.remaining_service_time - 1.0)
                 platform.energy = max(0.0, platform.energy - step_energy)
                 self.total_energy += step_energy
@@ -864,7 +940,12 @@ class PortInspectionSchedulingEnv:
                     if task is None:
                         self._clear_platform_assignment(platform)
                         continue
-                    if platform.mode == MODE_SCREEN:
+                    if platform.mode == MODE_SERVICE:
+                        service_tasks.append(task)
+                        self.total_serviced += 1
+                        if self._complete_service(task, platform):
+                            closed_tasks.append(task)
+                    elif platform.mode == MODE_SCREEN:
                         screened_tasks.append(task)
                         self.total_screened += 1
                         if self._complete_screening(task, platform):
@@ -901,6 +982,7 @@ class PortInspectionSchedulingEnv:
         return {
             "screened_tasks": screened_tasks,
             "reviewed_tasks": reviewed_tasks,
+            "service_tasks": service_tasks,
             "closed_tasks": closed_tasks,
             "path_length": path_length,
             "energy_cost": energy_cost,
@@ -950,11 +1032,28 @@ class PortInspectionSchedulingEnv:
     def _reserve(self, task: InspectionTask, platform: Platform, stage: str) -> None:
         task.reserved_by = platform.platform_id
         task.reservation_time = float(self.current_step)
-        if stage == STAGE_SCREENING:
+        if stage == STAGE_SERVICE:
+            transition_task_state(task, TASK_ASSIGNED)
+        elif stage == STAGE_SCREENING:
             transition_task_state(task, TASK_RESERVED_SCREENING)
         else:
             transition_task_state(task, TASK_RESERVED_REVIEW)
         platform.current_task_id = task.task_id
+
+    def _complete_service(self, task: InspectionTask, platform: Platform) -> bool:
+        task.completed_work = max(float(task.required_work), float(task.completed_work))
+        task.remaining_work = 0.0
+        task.reserved_by = None
+        task.reservation_time = None
+        task.release_time = float(self.current_step)
+        self._clear_platform_assignment(platform)
+        progress = task.completed_work / max(float(task.required_work), 1e-6)
+        if progress >= float(task.work_threshold) and task.quality_pass:
+            self._close_task(task)
+            return True
+        transition_task_state(task, TASK_INTERRUPTED)
+        transition_task_state(task, TASK_ACTIVE)
+        return False
 
     def _complete_screening(self, task: InspectionTask, platform: Platform) -> bool:
         task.screening_workload_remaining = 0.0
@@ -994,7 +1093,10 @@ class PortInspectionSchedulingEnv:
         self._close_task(task)
 
     def _close_task(self, task: InspectionTask) -> None:
-        transition_task_state(task, TASK_CLOSED)
+        if task.state == TASK_IN_SERVICE:
+            transition_task_state(task, TASK_COMPLETED)
+        else:
+            transition_task_state(task, TASK_CLOSED)
         task.completed = True
         task.close_time = float(self.current_step)
         task.reserved_by = None
@@ -1057,6 +1159,8 @@ class PortInspectionSchedulingEnv:
         return int.from_bytes(digest, byteorder="big", signed=False)
 
     def _stage_service_time(self, task: InspectionTask, stage: str) -> float:
+        if stage == STAGE_SERVICE:
+            return max(float(task.remaining_work or task.required_work or task.service_time), 1.0)
         if stage == STAGE_SCREENING:
             return max(float(task.screening_workload), 1.0)
         return max(float(task.review_workload), 1.0)
@@ -1189,9 +1293,9 @@ class PortInspectionSchedulingEnv:
         ]
 
     def _task_features(self, task: InspectionTask) -> list[float]:
-        active_stage = task.active_stage or STAGE_SCREENING
+        active_stage = task.active_stage or (STAGE_SERVICE if self._uses_direct_service() else STAGE_SCREENING)
         deadline = self._deadline(task, active_stage)
-        slack = 0.0 if task.completed else max(deadline - self.current_step, 0.0) / max(self.max_steps, 1)
+        slack = 0.0 if task.completed or deadline is None else max(deadline - self.current_step, 0.0) / max(self.max_steps, 1)
         return [
             self._state_code(task.state),
             self._stage_code(active_stage) if not task.completed else 0.0,
@@ -1236,6 +1340,8 @@ class PortInspectionSchedulingEnv:
         }
 
     def _stage_code(self, stage: str) -> float:
+        if stage == STAGE_SERVICE:
+            return 0.5
         if stage == STAGE_SCREENING:
             return 1.0
         if stage == STAGE_REVIEW:
@@ -1247,6 +1353,7 @@ class PortInspectionSchedulingEnv:
             MODE_IDLE: 0.0,
             MODE_TRAVEL: 0.1,
             MODE_SCREEN: 0.2,
+            MODE_SERVICE: 0.3,
             MODE_REVIEW: 0.4,
             MODE_RETURN: 0.6,
             MODE_REPLENISH: 0.8,
@@ -1262,6 +1369,10 @@ class PortInspectionSchedulingEnv:
             TASK_REVIEWING: 0.65,
             TASK_SCREENED_PENDING: 0.8,
             TASK_CLOSED: 1.0,
+            TASK_ACTIVE: 0.15,
+            TASK_ASSIGNED: 0.35,
+            TASK_IN_SERVICE: 0.65,
+            TASK_COMPLETED: 1.0,
         }.get(state, 0.0)
 
     def _geometry_code(self, geometry: str) -> float:

@@ -20,7 +20,15 @@ if str(TOOLS) not in sys.path:
 
 from check_port_inspection_env import build_env
 from mathbased_mcpp.port_inspection.mappo import CentralizedPpo, HeterogeneousMappo, PortMappoBatch, SharedPolicyMappo
-from mathbased_mcpp.port_inspection.schema import MODE_REPLENISH, STAGE_SCREENING, STAGE_REVIEW, TASK_AWAITING_REVIEW, TASK_CLOSED
+from mathbased_mcpp.port_inspection.schema import (
+    MODE_REPLENISH,
+    STAGE_REVIEW,
+    STAGE_SCREENING,
+    STAGE_SERVICE,
+    TASK_AWAITING_REVIEW,
+    TASK_CLOSED,
+    TASK_COMPLETED,
+)
 from train_port_scheduler_rl import SUPPORTED_ALGORITHMS, _agent_types, _build_scheduler_model, _collect_rollout, _mappo_update, _obs_matrix
 
 import torch
@@ -133,6 +141,8 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
 
         self.assertEqual(reset.info["contract_boundary"]["scenario_status"], "PENDING")
         self.assertFalse(reset.info["contract_boundary"]["historical_only"])
+        self.assertEqual(env.task_lifecycle, "v1_2_direct_service")
+        self.assertEqual(reset.info["task_lifecycle"], "v1_2_direct_service")
         self.assertEqual(len(tasks_payload["point_tasks"]), 3)
         self.assertEqual(len(tasks_payload["line_tasks"]), 10)
         self.assertEqual(len(tasks_payload["area_tasks"]), 13)
@@ -141,8 +151,18 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertIn("line", geometries)
         self.assertIn("area", geometries)
         self.assertGreater(env.action_masks().sum(), env.num_platforms)
+        self.assertEqual(reset.info["review_queue_length"], 0)
+        self.assertEqual(reset.info["review_queue_tasks"], [])
+        self.assertEqual(reset.info["screening_open_tasks"], [])
+        self.assertTrue(reset.info["active_tasks"])
         self.assertNotIn("engineering_seed", json.dumps(tasks_payload))
         self.assertTrue(task_records)
+        candidate_stages = {
+            detail["task_stage"]
+            for platform_candidates in reset.info["candidate_details"]
+            for detail in platform_candidates
+        }
+        self.assertEqual(candidate_stages, {STAGE_SERVICE})
         for task in task_records:
             metadata = task["metadata"]
             self.assertEqual(metadata["geometry_source_status"], "chart_aligned_research_geometry")
@@ -150,6 +170,38 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
             self.assertEqual(metadata["parameter_status"], "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART")
             self.assertIn("SRC_NOAA_CHART_18751", metadata["source_ids"])
             self.assertIsNone(metadata["deadline"])
+
+    def test_los_angeles_v12_service_completion_does_not_create_review_queue(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")
+        env = build_env(config)
+        env.reset(seed=17)
+
+        platform_index, service = next(
+            (platform_index, candidate)
+            for platform_index, candidates in enumerate(env.candidate_lists())
+            for candidate in candidates
+            if candidate.task_stage == STAGE_SERVICE
+        )
+        actions = [env.wait_action for _ in env.platforms]
+        actions[platform_index] = service.relative_position
+        result = env.step(actions)
+        accepted = next(
+            item
+            for item in result.info["accepted_actions"]
+            if item["platform_id"] == env.platforms[platform_index].platform_id
+        )
+        task = next(task for task in env.tasks if task.task_id == accepted["task_id"])
+        self.assertEqual(accepted["stage"], STAGE_SERVICE)
+
+        _continue_until(env, lambda: task.state == TASK_COMPLETED)
+
+        self.assertEqual(task.state, TASK_COMPLETED)
+        self.assertTrue(task.completed)
+        self.assertIn(task.task_id, env.completed_tasks)
+        self.assertFalse(task.review_required)
+        self.assertIsNone(task.screening_result)
+        self.assertEqual(env.review_queue_length(), 0)
+        self.assertEqual(env.info()["review_queue_tasks"], [])
 
     def test_idle_depot_platform_can_start_replenishment(self) -> None:
         config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")

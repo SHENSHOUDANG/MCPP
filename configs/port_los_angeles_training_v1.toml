@@ -23,9 +23,9 @@ final_experiment_eligible = false
 notice = "Los Angeles training scenario uses the user-provided Port of Los Angeles Task Mapping V2.0 chart-aligned package. Geometry is validated against public NOAA/POLA sources but is not native ENC vector geometry; training parameters remain non-final until GIS and algorithm review are frozen."
 
 [scheduling]
+task_lifecycle = "v1_2_direct_service"
 risk_weight = 12.0
 urgency_weight = 6.0
-review_wait_weight = 0.5
 distance_weight = 0.06
 load_weight = 0.25
 compatibility_bonus = 4.0
@@ -50,26 +50,8 @@ hidden_dim = 96
 
 [scheduler_rl.reward]
 team_close_reward = 8.0
-screen_progress_reward = 1.0
-review_progress_reward = 1.5
+service_progress_reward = 1.0
 energy_cost = 0.5
 time_cost = 0.01
 invalid_penalty = 5.0
 conflict_penalty = 1.0
-
-[review_trigger]
-confidence_threshold = 0.65
-mandatory_review_risk = 3
-base_review_deadline = 120.0
-risk_deadline_scale = 12.0
-confidence_deadline_scale = 8.0
-replenish_steps = 6
-sensitivity = 0.85
-specificity = 0.80
-confidence_noise = 0.08
-uncertainty_base = 0.35
-
-[review_trigger.anomaly_probability_by_risk]
-1 = 0.08
-2 = 0.22
-3 = 0.42

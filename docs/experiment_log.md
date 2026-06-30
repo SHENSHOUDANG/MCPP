@@ -222,3 +222,13 @@ interpretation and next decision
 - Updated `data/ports/yangshan_task_initial_v1/yangshan_task_initial_v1_grid.json`, `configs/port_yangshan_task_initial_v1.toml`, and the Yangshan scenario README to use platform depot cell `[82, 108]` for both UAV and USV.
 - Updated `tools/import_yangshan_task_initial.py` so future regeneration defaults to the same user-defined depot and requires `--use-coastline-derived-depot` to reproduce the older auto-coastline fallback.
 - Boundary note: Yangshan remains `HISTORICAL`; this is not final V1.2 experiment evidence and does not change the Los Angeles training task mapping.
+
+### 2026-06-30 Los Angeles scheduler lifecycle alignment
+
+- Operation: implementation alignment, no `AMENDS` or `REPLACES`.
+- Target clause: frozen V1.2 task-state and completion semantics in items 3-8; current formal review remains item 9.
+- Changed `configs/port_los_angeles_training_v1.toml` to `task_lifecycle = "v1_2_direct_service"` and removed the obsolete Los Angeles `[review_trigger]` block.
+- Added V1.2 direct-service state support in the scheduler environment: `ACTIVE -> ASSIGNED -> IN_SERVICE -> COMPLETED`.
+- Historical `screening/review` behavior is retained only behind `legacy_screen_review` for `yangshan_task_initial_v1`.
+- Reward/logging for Los Angeles direct-service runs now reports `service_progress_reward` and public metrics such as `open_task_count`/`serviced_tasks`, without screening/review progress fields.
+- Validation: `.venv/Scripts/python.exe -m unittest tests.test_port_inspection_coupled_env -v` passed 9 tests; `tools/check_port_inspection_env.py --config configs/port_los_angeles_training_v1.toml --steps 3 --seed 7` shows only direct-service reward terms.

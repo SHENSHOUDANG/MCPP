@@ -8,6 +8,7 @@ GridCell = tuple[int, int]
 
 STAGE_SCREENING = "screening"
 STAGE_REVIEW = "review"
+STAGE_SERVICE = "service"
 
 TASK_UNSCREENED = "unscreened"
 TASK_RESERVED_SCREENING = "reserved_screening"
@@ -18,6 +19,15 @@ TASK_RESERVED_REVIEW = "reserved_review"
 TASK_REVIEWING = "reviewing"
 TASK_CLOSED = "closed"
 
+TASK_UNRELEASED = "UNRELEASED"
+TASK_ACTIVE = "ACTIVE"
+TASK_ASSIGNED = "ASSIGNED"
+TASK_IN_SERVICE = "IN_SERVICE"
+TASK_COMPLETED = "COMPLETED"
+TASK_INTERRUPTED = "INTERRUPTED"
+TASK_CANCELLED = "CANCELLED"
+TASK_SUBSTITUTED = "SUBSTITUTED"
+
 TASK_STATE_TO_CODE = {
     TASK_UNSCREENED: 0,
     TASK_RESERVED_SCREENING: 1,
@@ -27,6 +37,14 @@ TASK_STATE_TO_CODE = {
     TASK_RESERVED_REVIEW: 5,
     TASK_REVIEWING: 6,
     TASK_CLOSED: 7,
+    TASK_UNRELEASED: 10,
+    TASK_ACTIVE: 11,
+    TASK_ASSIGNED: 12,
+    TASK_IN_SERVICE: 13,
+    TASK_COMPLETED: 14,
+    TASK_INTERRUPTED: 15,
+    TASK_CANCELLED: 16,
+    TASK_SUBSTITUTED: 17,
 }
 TASK_CODE_TO_STATE = {value: key for key, value in TASK_STATE_TO_CODE.items()}
 LEGAL_TASK_TRANSITIONS = {
@@ -38,12 +56,21 @@ LEGAL_TASK_TRANSITIONS = {
     TASK_RESERVED_REVIEW: {TASK_REVIEWING},
     TASK_REVIEWING: {TASK_CLOSED},
     TASK_CLOSED: set(),
+    TASK_UNRELEASED: {TASK_ACTIVE, TASK_CANCELLED},
+    TASK_ACTIVE: {TASK_ASSIGNED, TASK_CANCELLED, TASK_SUBSTITUTED},
+    TASK_ASSIGNED: {TASK_IN_SERVICE, TASK_ACTIVE, TASK_INTERRUPTED, TASK_CANCELLED},
+    TASK_IN_SERVICE: {TASK_COMPLETED, TASK_INTERRUPTED, TASK_CANCELLED},
+    TASK_COMPLETED: set(),
+    TASK_INTERRUPTED: {TASK_ACTIVE, TASK_CANCELLED},
+    TASK_CANCELLED: set(),
+    TASK_SUBSTITUTED: set(),
 }
 
 MODE_IDLE = "idle"
 MODE_TRAVEL = "travel"
 MODE_SCREEN = "screen"
 MODE_REVIEW = "review"
+MODE_SERVICE = "service"
 MODE_RETURN = "return"
 MODE_REPLENISH = "replenish"
 
@@ -117,6 +144,16 @@ class InspectionTask:
     priority: float = 1.0
     uninspected_time: float = 0.0
     completed: bool = False
+    task_family: str = ""
+    geometry_mode: str = ""
+    release_mode: str = "PERIODIC"
+    required_work: float = 1.0
+    completed_work: float = 0.0
+    remaining_work: float = 1.0
+    work_threshold: float = 1.0
+    quality_pass: bool = True
+    quality_requirement: dict[str, Any] = field(default_factory=dict)
+    quality_acceptance_ref: str = ""
     executor: str = "rule_based"
     parent_task_id: str | None = None
     state: str = TASK_UNSCREENED
@@ -129,7 +166,7 @@ class InspectionTask:
     screening_result: int | None = None
     review_required: bool = False
     review_result: int | None = None
-    deadline: float = 0.0
+    deadline: float | None = 0.0
     review_deadline: float = 0.0
     generation_time: float = 0.0
     screened_by: str | None = None
@@ -153,6 +190,8 @@ class InspectionTask:
 
     @property
     def active_stage(self) -> str | None:
+        if self.state in {TASK_ACTIVE, TASK_ASSIGNED, TASK_IN_SERVICE}:
+            return STAGE_SERVICE
         if self.state in {TASK_UNSCREENED, TASK_RESERVED_SCREENING, TASK_SCREENING}:
             return STAGE_SCREENING
         if self.state in {TASK_AWAITING_REVIEW, TASK_RESERVED_REVIEW, TASK_REVIEWING}:
@@ -161,7 +200,7 @@ class InspectionTask:
 
     @property
     def is_closed(self) -> bool:
-        return self.completed or self.state == TASK_CLOSED
+        return self.completed or self.state in {TASK_CLOSED, TASK_COMPLETED}
 
     @property
     def state_code(self) -> int:
@@ -203,6 +242,8 @@ class Platform:
     def can_execute(self, task: InspectionTask, stage: str | None = None) -> bool:
         if task.geometry not in self.allowed_task_types:
             return False
+        if stage == STAGE_SERVICE:
+            return self.platform_type in task.allowed_platforms
         if stage == STAGE_SCREENING:
             return self.platform_type == "UAV"
         if stage == STAGE_REVIEW:

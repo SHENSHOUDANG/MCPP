@@ -125,3 +125,11 @@
 - User provided Yangshan depot coordinate `30 deg 36.27 min N, 122 deg 5.70 min E`.
 - The coordinate is recorded as WGS84 `lat=30.6045`, `lon=122.095`, transformed to EPSG:32651 as `(413246.952064, 3386120.770780)`, and snapped to the current 100 m Yangshan grid cell `[82, 108]`.
 - `yangshan_task_initial_v1` remains `HISTORICAL`; this depot update is a baseline data/config correction and does not alter the Los Angeles `PENDING` training scenario or freeze the final algorithm choice.
+
+### 2026-06-30 LA V1.2 direct-service lifecycle alignment
+
+- The Los Angeles `PENDING` training environment now uses `task_lifecycle = "v1_2_direct_service"`.
+- Upper-level candidates are platform-task `service` assignments over released V1.2 tasks; they no longer expose screening candidates, review candidates, screening confidence, or an anomaly-triggered review queue.
+- Task state transitions in this lifecycle are `ACTIVE -> ASSIGNED -> IN_SERVICE -> COMPLETED`. `deadline = null` remains `None` and is not converted to `0`.
+- Yangshan remains explicitly `legacy_screen_review` for historical baseline compatibility only.
+- This is an implementation alignment with the frozen V1.2 task-state semantics, not a final item-9 algorithm decision.

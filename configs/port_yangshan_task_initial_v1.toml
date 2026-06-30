@@ -29,6 +29,7 @@ uav = [82, 108]
 usv = [82, 108]
 
 [scheduling]
+task_lifecycle = "legacy_screen_review"
 risk_weight = 14.0
 distance_weight = 0.07
 load_weight = 0.28

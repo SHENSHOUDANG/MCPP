@@ -72,35 +72,38 @@ def run_greedy_env_rollout(env, config: dict[str, Any], seed: int, strategy: str
         result = env.step(action)
         total_reward += float(result.reward)
         info = result.info
-        trace.append(
-            {
-                "step": env.current_step,
-                "action": json.dumps(action, ensure_ascii=False),
-                "platform_id": decision["platform_id"],
-                "task_id": decision["task_id"],
-                "task_geometry": decision["task_geometry"],
-                "task_stage": decision["task_stage"],
-                "risk": decision["risk"],
-                "score": decision["score"],
-                "path_length": decision["path_length"],
-                "energy_cost": decision["energy_cost"],
-                "reward": float(result.reward),
-                "completed_count": len(info["completed_tasks"]),
-                "late_count": len(info["late_tasks"]),
-                "risk_exposure_sum": float(info["risk_exposure_sum"]),
-                "total_path_length": int(info["total_path_length"]),
-                "total_energy": float(info["total_energy"]),
-                "accepted_actions": json.dumps(info["accepted_actions"], ensure_ascii=False),
-                "conflicts": json.dumps(info["conflicts"], ensure_ascii=False),
-                "review_queue_length": int(info["review_queue_length"]),
-                "valid_action_count": int(env.action_masks().sum()),
-            }
-        )
+        row = {
+            "step": env.current_step,
+            "task_lifecycle": getattr(env, "task_lifecycle", "legacy_screen_review"),
+            "action": json.dumps(action, ensure_ascii=False),
+            "platform_id": decision["platform_id"],
+            "task_id": decision["task_id"],
+            "task_geometry": decision["task_geometry"],
+            "task_stage": decision["task_stage"],
+            "risk": decision["risk"],
+            "score": decision["score"],
+            "path_length": decision["path_length"],
+            "energy_cost": decision["energy_cost"],
+            "reward": float(result.reward),
+            "completed_count": len(info["completed_tasks"]),
+            "late_count": len(info["late_tasks"]),
+            "risk_exposure_sum": float(info["risk_exposure_sum"]),
+            "total_path_length": int(info["total_path_length"]),
+            "total_energy": float(info["total_energy"]),
+            "accepted_actions": json.dumps(info["accepted_actions"], ensure_ascii=False),
+            "conflicts": json.dumps(info["conflicts"], ensure_ascii=False),
+            "open_task_count": int(env.open_task_count()),
+            "valid_action_count": int(env.action_masks().sum()),
+        }
+        if getattr(env, "task_lifecycle", "") != "v1_2_direct_service":
+            row["review_queue_length"] = int(info["review_queue_length"])
+        trace.append(row)
         done = result.done
 
     info = env.info()
     summary = {
         "strategy": strategy,
+        "task_lifecycle": getattr(env, "task_lifecycle", "legacy_screen_review"),
         "steps": env.current_step,
         "episode_reward": total_reward,
         "completed_tasks": len(env.completed_tasks),
@@ -112,8 +115,10 @@ def run_greedy_env_rollout(env, config: dict[str, Any], seed: int, strategy: str
         "total_path_length": int(info["total_path_length"]),
         "total_energy": float(info["total_energy"]),
         "platform_loads": info["platform_loads"],
-        "review_queue_length": int(info["review_queue_length"]),
+        "open_task_count": int(env.open_task_count()),
     }
+    if getattr(env, "task_lifecycle", "") != "v1_2_direct_service":
+        summary["review_queue_length"] = int(info["review_queue_length"])
     return summary, trace
 
 

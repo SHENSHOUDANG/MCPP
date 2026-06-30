@@ -27,7 +27,7 @@ if str(ROOT / "tools") not in sys.path:
 
 from check_port_inspection_env import build_env
 from evaluate_port_scheduler_greedy import _choose_action
-from mathbased_mcpp.port_inspection.schema import STAGE_REVIEW, STAGE_SCREENING
+from mathbased_mcpp.port_inspection.schema import STAGE_REVIEW, STAGE_SCREENING, STAGE_SERVICE
 from mathbased_mcpp.port_inspection.simple_planner import shortest_path
 
 
@@ -52,13 +52,16 @@ def main() -> None:
 
     summary = {
         "output": str(output),
+        "task_lifecycle": getattr(env, "task_lifecycle", "legacy_screen_review"),
         "steps": env.current_step,
         "completed_tasks": len(env.completed_tasks),
         "task_count": env.num_tasks,
         "total_path_length": env.total_path_length,
         "total_energy": env.total_energy,
-        "review_queue_length": env.review_queue_length(),
+        "open_task_count": env.open_task_count(),
     }
+    if getattr(env, "task_lifecycle", "") != "v1_2_direct_service":
+        summary["review_queue_length"] = env.review_queue_length()
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
@@ -128,9 +131,15 @@ def render_schedule_result(env, history: list[dict[str, Any]], output_path: Path
     ax.set_yticks(np.arange(-0.5, grid.height, 5), minor=True)
     ax.grid(which="minor", color="#ffffff", linewidth=0.35, alpha=0.38)
 
+    if getattr(env, "task_lifecycle", "") == "v1_2_direct_service":
+        uav_label = "UAV service path"
+        usv_label = "USV service path"
+    else:
+        uav_label = "UAV screening path"
+        usv_label = "USV review path"
     legend_items = [
-        Line2D([0], [0], color="#175ddc", lw=1.8, linestyle="-", label="UAV screening path"),
-        Line2D([0], [0], color="#c0342b", lw=2.1, linestyle="-", label="USV review path"),
+        Line2D([0], [0], color="#175ddc", lw=1.8, linestyle="-", label=uav_label),
+        Line2D([0], [0], color="#c0342b", lw=2.1, linestyle="-", label=usv_label),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="#175ddc", markeredgecolor="#111", label="Point task"),
         Line2D([0], [0], color="#7c2d92", lw=3.5, label="Line task"),
         Line2D([0], [0], marker="s", color="w", markerfacecolor="#f6b23d", markeredgecolor="#8a5a00", label="Area task"),
@@ -225,6 +234,18 @@ def _draw_side_panel(panel: plt.Axes, env, history: list[dict[str, Any]], bbox: 
     accepted = [item for row in history for item in row.get("accepted", [])]
     screening = sum(1 for item in accepted if item.get("stage") == STAGE_SCREENING)
     review = sum(1 for item in accepted if item.get("stage") == STAGE_REVIEW)
+    service = sum(1 for item in accepted if item.get("stage") == STAGE_SERVICE)
+    if getattr(env, "task_lifecycle", "") == "v1_2_direct_service":
+        action_lines = [
+            f"service actions: {service}",
+            f"open tasks: {env.open_task_count()}",
+        ]
+    else:
+        action_lines = [
+            f"screening actions: {screening}",
+            f"review actions: {review}",
+            f"review queue: {env.review_queue_length()}",
+        ]
     lines = [
         "Run summary",
         "",
@@ -232,9 +253,7 @@ def _draw_side_panel(panel: plt.Axes, env, history: list[dict[str, Any]], bbox: 
         f"seed: {seed}",
         f"steps: {env.current_step}",
         f"completed: {len(env.completed_tasks)}/{env.num_tasks}",
-        f"screening actions: {screening}",
-        f"review actions: {review}",
-        f"review queue: {env.review_queue_length()}",
+        *action_lines,
         f"path length: {env.total_path_length} cells",
         f"energy: {env.total_energy:.2f}",
         "",
