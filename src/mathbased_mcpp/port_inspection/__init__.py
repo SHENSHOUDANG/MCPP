@@ -1,5 +1,5 @@
 from .grid_map import load_port_grid
-from .mappo import HeterogeneousMappo
+from .mappo import Happo, HeterogeneousMappo
 from .scheduling_env import PortInspectionSchedulingEnv
 from .simple_planner import assign_tasks, create_platforms
 from .task_model import load_inspection_tasks
@@ -12,6 +12,7 @@ __all__ = [
     "load_inspection_tasks",
     "load_port_grid",
     "validate_v12_task_record",
+    "Happo",
     "HeterogeneousMappo",
     "PortInspectionSchedulingEnv",
 ]

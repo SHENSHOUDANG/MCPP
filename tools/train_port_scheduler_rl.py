@@ -27,14 +27,14 @@ import torch
 from torch import nn
 
 from check_port_inspection_env import build_env
-from mathbased_mcpp.port_inspection.mappo import CentralizedPpo, HeterogeneousMappo, PortMappoBatch, SharedPolicyMappo
+from mathbased_mcpp.port_inspection.mappo import CentralizedPpo, Happo, HeterogeneousMappo, PortMappoBatch, SharedPolicyMappo
 from mathbased_mcpp.port_inspection.v12_contract import (
     ContractValidationError,
     classify_config_boundary,
     require_historical_baseline_ack,
 )
 
-SchedulerModel = HeterogeneousMappo | SharedPolicyMappo | CentralizedPpo
+SchedulerModel = HeterogeneousMappo | SharedPolicyMappo | CentralizedPpo | Happo
 MetricValue = float | int | str
 
 ALGORITHM_ALIASES = {
@@ -45,9 +45,12 @@ ALGORITHM_ALIASES = {
     "shared_policy_mappo": "shared_mappo",
     "centralized_ppo": "centralized_ppo",
     "centralized_context_ppo": "centralized_ppo",
+    "happo": "happo",
+    "happo_ctde": "happo",
+    "heterogeneous_agent_ppo": "happo",
 }
 
-SUPPORTED_ALGORITHMS = ("heterogeneous_mappo", "shared_mappo", "centralized_ppo")
+SUPPORTED_ALGORITHMS = ("heterogeneous_mappo", "shared_mappo", "centralized_ppo", "happo")
 ALGORITHM_CHOICES = tuple(sorted(set(ALGORITHM_ALIASES) | {key.replace("_", "-") for key in ALGORITHM_ALIASES}))
 
 
@@ -114,6 +117,7 @@ def main() -> None:
         observation_dim=env.local_observation_dim,
         action_dim=env.action_choices,
         hidden_dim=int(rl_config.get("hidden_dim", 128)),
+        num_agents=env.num_platforms,
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=float(rl_config.get("learning_rate", 3e-4)))
     gamma = float(rl_config.get("gamma", 0.98))
@@ -197,7 +201,8 @@ def main() -> None:
             env_workers=env_workers,
         )
         total_steps += int(batch.observations.shape[0])
-        _mappo_update(
+        _scheduler_update(
+            algorithm=algorithm,
             model=model,
             optimizer=optimizer,
             batch=batch,
@@ -283,6 +288,7 @@ def _build_scheduler_model(
     observation_dim: int,
     action_dim: int,
     hidden_dim: int,
+    num_agents: int | None = None,
 ) -> SchedulerModel:
     normalized = _normalize_algorithm(algorithm)
     if normalized == "heterogeneous_mappo":
@@ -291,6 +297,15 @@ def _build_scheduler_model(
         return SharedPolicyMappo(observation_dim=observation_dim, action_dim=action_dim, hidden_dim=hidden_dim)
     if normalized == "centralized_ppo":
         return CentralizedPpo(observation_dim=observation_dim, action_dim=action_dim, hidden_dim=hidden_dim)
+    if normalized == "happo":
+        if num_agents is None:
+            raise ValueError("num_agents is required when building the HAPPO scheduler model")
+        return Happo(
+            observation_dim=observation_dim,
+            action_dim=action_dim,
+            hidden_dim=hidden_dim,
+            num_agents=num_agents,
+        )
     raise AssertionError(f"unhandled scheduler algorithm: {normalized}")
 
 
@@ -298,6 +313,8 @@ def _checkpoint_stem(algorithm: str) -> str:
     normalized = _normalize_algorithm(algorithm)
     if normalized == "heterogeneous_mappo":
         return "scheduler_mappo"
+    if normalized == "happo":
+        return "scheduler_happo"
     return f"scheduler_{normalized}"
 
 
@@ -566,6 +583,97 @@ def _episode_row(env, info: dict[str, Any], episode_reward: float, env_index: in
     }
 
 
+def _scheduler_update(
+    algorithm: str,
+    model: SchedulerModel,
+    optimizer: torch.optim.Optimizer,
+    batch: PortMappoBatch,
+    clip_ratio: float,
+    update_epochs: int,
+    entropy_coef: float,
+    value_coef: float,
+) -> None:
+    if _normalize_algorithm(algorithm) == "happo":
+        if not isinstance(model, Happo):
+            raise TypeError("HAPPO update requires a Happo model")
+        _happo_update(
+            model=model,
+            optimizer=optimizer,
+            batch=batch,
+            clip_ratio=clip_ratio,
+            update_epochs=update_epochs,
+            entropy_coef=entropy_coef,
+            value_coef=value_coef,
+        )
+        return
+    _mappo_update(
+        model=model,
+        optimizer=optimizer,
+        batch=batch,
+        clip_ratio=clip_ratio,
+        update_epochs=update_epochs,
+        entropy_coef=entropy_coef,
+        value_coef=value_coef,
+    )
+
+
+def _happo_update(
+    model: Happo,
+    optimizer: torch.optim.Optimizer,
+    batch: PortMappoBatch,
+    clip_ratio: float,
+    update_epochs: int,
+    entropy_coef: float,
+    value_coef: float,
+) -> None:
+    advantages = (batch.advantages - batch.advantages.mean()) / (batch.advantages.std(unbiased=False) + 1e-8)
+    for _ in range(update_epochs):
+        values = model.value(batch.observations, batch.agent_types, batch.agent_masks)
+        value_loss = 0.5 * (batch.returns - values).pow(2).mean()
+        optimizer.zero_grad()
+        (value_coef * value_loss).backward()
+        nn.utils.clip_grad_norm_(model.critic.parameters(), 0.5)
+        optimizer.step()
+
+        ratio_prefix = torch.ones_like(advantages)
+        for agent_index in range(model.num_agents):
+            active_mask = batch.agent_masks[:, agent_index].to(torch.float32)
+            if active_mask.sum() <= 0:
+                continue
+            log_probs, entropy, _ = model.evaluate_actions(
+                observations=batch.observations,
+                agent_types=batch.agent_types,
+                action_masks=batch.action_masks,
+                agent_mask=batch.agent_masks,
+                actions=batch.actions,
+            )
+            old_log_prob = batch.old_log_probs[:, agent_index]
+            ratio = torch.exp(log_probs[:, agent_index] - old_log_prob)
+            policy_terms = torch.min(
+                ratio_prefix * ratio * advantages,
+                ratio_prefix * torch.clamp(ratio, 1.0 - clip_ratio, 1.0 + clip_ratio) * advantages,
+            )
+            policy_loss = -(policy_terms * active_mask).sum() / active_mask.sum().clamp_min(1.0)
+            entropy_loss = -(entropy[:, agent_index] * active_mask).sum() / active_mask.sum().clamp_min(1.0)
+            loss = policy_loss + entropy_coef * entropy_loss
+
+            optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.actor_parameters(agent_index), 0.5)
+            optimizer.step()
+
+            with torch.no_grad():
+                updated_log_probs, _, _ = model.evaluate_actions(
+                    observations=batch.observations,
+                    agent_types=batch.agent_types,
+                    action_masks=batch.action_masks,
+                    agent_mask=batch.agent_masks,
+                    actions=batch.actions,
+                )
+                updated_ratio = torch.exp(updated_log_probs[:, agent_index] - old_log_prob)
+                ratio_prefix = (ratio_prefix * updated_ratio).detach()
+
+
 def _mappo_update(
     model: SchedulerModel,
     optimizer: torch.optim.Optimizer,
@@ -674,6 +782,7 @@ def _save_checkpoint(
             "optimizer_state_dict": optimizer.state_dict() if optimizer is not None else None,
             "observation_dim": env.local_observation_dim,
             "action_dim": env.action_choices,
+            "num_agents": env.num_platforms,
             "agent_types": agent_types.tolist(),
             "config": config_path,
             "model": _normalize_algorithm(algorithm),
@@ -759,6 +868,12 @@ def _validate_restored_envs(envs: list[Any], model: SchedulerModel) -> None:
                 "resume checkpoint environment shape does not match the current scheduler model: "
                 f"env[{index}] obs/action=({observation_dim}, {action_dim}) "
                 f"model=({model.observation_dim}, {model.action_dim})"
+            )
+        model_agents = getattr(model, "num_agents", None)
+        if model_agents is not None and int(model_agents) != int(getattr(env, "num_platforms", -1)):
+            raise ValueError(
+                "resume checkpoint environment agent count does not match the HAPPO scheduler model: "
+                f"env[{index}] agents={getattr(env, 'num_platforms', -1)} model={model_agents}"
             )
 
 

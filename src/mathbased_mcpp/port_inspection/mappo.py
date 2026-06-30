@@ -125,6 +125,76 @@ class HeterogeneousMappo(nn.Module):
         return log_probs, entropy, values
 
 
+class Happo(nn.Module):
+    """Per-agent decentralized actors plus a centralized set critic."""
+
+    def __init__(self, observation_dim: int, action_dim: int, hidden_dim: int, num_agents: int) -> None:
+        super().__init__()
+        self.observation_dim = int(observation_dim)
+        self.action_dim = int(action_dim)
+        self.num_agents = int(num_agents)
+        if self.num_agents <= 0:
+            raise ValueError("num_agents must be positive for HAPPO")
+        self.actors = nn.ModuleList(
+            SharedActor(observation_dim, action_dim, hidden_dim)
+            for _ in range(self.num_agents)
+        )
+        self.critic = DeepSetsCritic(observation_dim, hidden_dim)
+
+    def logits(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        agent_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if observations.ndim != 3:
+            raise ValueError("observations must have shape [batch, agents, obs_dim]")
+        batch, agents, obs_dim = observations.shape
+        if agents != self.num_agents:
+            raise ValueError(f"HAPPO expected {self.num_agents} agents but received {agents}")
+        logits = torch.empty(batch, agents, self.action_dim, dtype=observations.dtype, device=observations.device)
+        for agent_index, actor in enumerate(self.actors):
+            logits[:, agent_index, :] = actor(observations[:, agent_index, :].reshape(batch, obs_dim))
+        return logits
+
+    def value(self, observations: torch.Tensor, agent_types: torch.Tensor, agent_mask: torch.Tensor) -> torch.Tensor:
+        return self.critic(observations, agent_types, agent_mask)
+
+    def act(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        action_masks: torch.Tensor,
+        agent_mask: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.logits(observations, agent_types, agent_mask)
+        logits = _mask_logits(logits, action_masks)
+        dist = Categorical(logits=logits)
+        actions = dist.sample()
+        log_probs = dist.log_prob(actions) * agent_mask.to(logits.dtype)
+        values = self.value(observations, agent_types, agent_mask)
+        return actions, log_probs, values
+
+    def evaluate_actions(
+        self,
+        observations: torch.Tensor,
+        agent_types: torch.Tensor,
+        action_masks: torch.Tensor,
+        agent_mask: torch.Tensor,
+        actions: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.logits(observations, agent_types, agent_mask)
+        logits = _mask_logits(logits, action_masks)
+        dist = Categorical(logits=logits)
+        log_probs = dist.log_prob(actions) * agent_mask.to(logits.dtype)
+        entropy = dist.entropy() * agent_mask.to(logits.dtype)
+        values = self.value(observations, agent_types, agent_mask)
+        return log_probs, entropy, values
+
+    def actor_parameters(self, agent_index: int):
+        return self.actors[int(agent_index)].parameters()
+
+
 class SharedPolicyMappo(nn.Module):
     """One decentralized actor shared by UAV and USV agents plus a centralized set critic."""
 

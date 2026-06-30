@@ -232,3 +232,13 @@ interpretation and next decision
 - Historical `screening/review` behavior is retained only behind `legacy_screen_review` for `yangshan_task_initial_v1`.
 - Reward/logging for Los Angeles direct-service runs now reports `service_progress_reward` and public metrics such as `open_task_count`/`serviced_tasks`, without screening/review progress fields.
 - Validation: `.venv/Scripts/python.exe -m unittest tests.test_port_inspection_coupled_env -v` passed 9 tests; `tools/check_port_inspection_env.py --config configs/port_los_angeles_training_v1.toml --steps 3 --seed 7` shows only direct-service reward terms.
+
+### 2026-06-30 HAPPO scheduler candidate interface
+
+- Operation: engineering candidate addition, no `AMENDS` or `REPLACES`.
+- Target clause: current item 9 algorithm comparison remains open; this does not select or freeze the final upper-level scheduler algorithm.
+- Added `happo` / `happo_ctde` / `heterogeneous_agent_ppo` aliases to `tools/train_port_scheduler_rl.py`.
+- Added a `Happo` model interface with one decentralized actor per platform and the existing centralized set critic, reusing the unchanged scheduler local observation and action-mask API.
+- Added HAPPO-specific sequential per-agent actor update dispatch while retaining the existing MAPPO/PPO update path for other candidates.
+- Comparison tooling now includes HAPPO through `SUPPORTED_ALGORITHMS`; outputs remain ignored engineering artifacts under `data/ports/*/algorithm_comparison/` or `smoke_training/`.
+- Validation: `.venv/Scripts/python.exe -m unittest tests.test_port_inspection_coupled_env tests.test_port_algorithm_comparison -v` passed 11 tests; `tools/train_port_scheduler_rl.py --config configs/port_los_angeles_training_v1.toml --steps 8 --algorithm happo --device cpu --num-envs 1 --env-workers 1 --output-dir data/ports/los_angeles_training_v1/smoke_training/happo --checkpoint-interval 0` completed and wrote `scheduler_happo.pt`.

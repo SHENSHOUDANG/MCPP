@@ -19,7 +19,7 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 from check_port_inspection_env import build_env
-from mathbased_mcpp.port_inspection.mappo import CentralizedPpo, HeterogeneousMappo, PortMappoBatch, SharedPolicyMappo
+from mathbased_mcpp.port_inspection.mappo import CentralizedPpo, Happo, HeterogeneousMappo, PortMappoBatch, SharedPolicyMappo
 from mathbased_mcpp.port_inspection.schema import (
     MODE_REPLENISH,
     STAGE_REVIEW,
@@ -29,7 +29,15 @@ from mathbased_mcpp.port_inspection.schema import (
     TASK_CLOSED,
     TASK_COMPLETED,
 )
-from train_port_scheduler_rl import SUPPORTED_ALGORITHMS, _agent_types, _build_scheduler_model, _collect_rollout, _mappo_update, _obs_matrix
+from train_port_scheduler_rl import (
+    SUPPORTED_ALGORITHMS,
+    _agent_types,
+    _build_scheduler_model,
+    _collect_rollout,
+    _mappo_update,
+    _obs_matrix,
+    _scheduler_update,
+)
 
 import torch
 
@@ -279,6 +287,15 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
                 self.assertEqual(values.shape, (1,))
                 self.assertEqual(logits.shape, (1, agent_count, 11))
 
+        happo = Happo(observation_dim=12, action_dim=11, hidden_dim=16, num_agents=5)
+        observations = torch.zeros((1, 5, 12), dtype=torch.float32)
+        agent_types = torch.tensor([[0, 1, 0, 1, 1]], dtype=torch.long)
+        agent_mask = torch.ones((1, 5), dtype=torch.bool)
+        values = happo.value(observations, agent_types, agent_mask)
+        logits = happo.logits(observations, agent_types, agent_mask)
+        self.assertEqual(values.shape, (1,))
+        self.assertEqual(logits.shape, (1, 5, 11))
+
     def test_scheduler_algorithm_candidates_share_update_interface(self) -> None:
         observations = torch.zeros((3, 4, 12), dtype=torch.float32)
         actions = torch.zeros((3, 4), dtype=torch.long)
@@ -287,7 +304,7 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         agent_masks = torch.ones((3, 4), dtype=torch.bool)
 
         for algorithm in SUPPORTED_ALGORITHMS:
-            model = _build_scheduler_model(algorithm, observation_dim=12, action_dim=11, hidden_dim=16)
+            model = _build_scheduler_model(algorithm, observation_dim=12, action_dim=11, hidden_dim=16, num_agents=4)
             sampled_actions, log_probs, values = model.act(observations[:1], agent_types[:1], action_masks[:1], agent_masks[:1])
             self.assertEqual(sampled_actions.shape, (1, 4))
             self.assertEqual(log_probs.shape, (1, 4))
@@ -306,7 +323,16 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
                 alive_masks=agent_masks,
             )
             optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-            _mappo_update(model, optimizer, batch, clip_ratio=0.2, update_epochs=1, entropy_coef=0.01, value_coef=0.5)
+            _scheduler_update(
+                algorithm,
+                model,
+                optimizer,
+                batch,
+                clip_ratio=0.2,
+                update_epochs=1,
+                entropy_coef=0.01,
+                value_coef=0.5,
+            )
 
 
 def _load_config(path: Path) -> dict[str, object]:

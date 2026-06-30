@@ -133,3 +133,10 @@
 - Task state transitions in this lifecycle are `ACTIVE -> ASSIGNED -> IN_SERVICE -> COMPLETED`. `deadline = null` remains `None` and is not converted to `0`.
 - Yangshan remains explicitly `legacy_screen_review` for historical baseline compatibility only.
 - This is an implementation alignment with the frozen V1.2 task-state semantics, not a final item-9 algorithm decision.
+
+### 2026-06-30 HAPPO scheduler candidate interface
+
+- Added HAPPO as an engineering candidate for item-9 upper-level scheduler comparison.
+- HAPPO reuses the existing scheduler environment, local observation vectors, action masks, rollout batch, and centralized critic input; no task lifecycle, candidate generation, mask semantics, or environment state transition was changed.
+- The HAPPO candidate uses one decentralized actor per platform and a centralized set critic. Training dispatches to a sequential per-agent actor update while MAPPO/PPO candidates keep their existing update path.
+- This is not a final algorithm freeze. Existing `heterogeneous_mappo` remains a heterogeneous-actor MAPPO variant, not HAPPO.

@@ -15,8 +15,8 @@ from run_port_algorithm_comparison import _comparison_row_from_summary, _parse_a
 class PortAlgorithmComparisonTests(unittest.TestCase):
     def test_parse_algorithms_normalizes_aliases_and_removes_duplicates(self) -> None:
         self.assertEqual(
-            _parse_algorithms("mappo, shared-policy-mappo centralized_context_ppo mappo"),
-            ["heterogeneous_mappo", "shared_mappo", "centralized_ppo"],
+            _parse_algorithms("mappo, shared-policy-mappo centralized_context_ppo happo mappo"),
+            ["heterogeneous_mappo", "shared_mappo", "centralized_ppo", "happo"],
         )
 
     def test_comparison_row_reads_scheduler_summary(self) -> None:
