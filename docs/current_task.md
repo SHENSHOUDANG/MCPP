@@ -149,3 +149,11 @@
 - Source geometries are read from `yangshan_stage2.gpkg` task layers and snapped to the scheduler feature grid; centroids are metadata/features only and do not replace service geometry.
 - The config is marked `HISTORICAL` and requires `--allow-historical-baseline` for training. It does not replace Los Angeles as the primary V1.2 empirical scenario or freeze the item-9 algorithm choice.
 - The one-command comparison entry now defaults to `shared_mappo`, `centralized_ppo`, and `happo`; `heterogeneous_mappo` is no longer part of the default training comparison once HAPPO is available.
+
+### 2026-06-30 Time-energy reward and full-candidate cleanup
+
+- Current formal review remains item 9; this is an engineering training-objective adjustment, not a final reward or algorithm freeze.
+- Scheduler reward weights now put more pressure on completion time and physical energy use: `time_cost = 0.08` and `energy_cost = 3.0`.
+- Completion/progress and invalid/conflict terms were reduced to keep task completion necessary while making equal-completion policies compare more strongly on time and energy.
+- Port scheduler configs no longer set fixed `candidate_k = 10/12`; without an explicit cap, action slots cover all released scheduling tasks, so Top-K pruning no longer silently removes feasible tasks from training.
+- Explicit `candidate_k` remains supported only as a deliberate pruning cap for smoke checks or ablations.

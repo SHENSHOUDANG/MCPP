@@ -49,6 +49,8 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         env.reset(seed=7)
 
         self.assertEqual(env.action_dim, env.num_platforms * env.action_choices)
+        self.assertIsNone(env.candidate_limit)
+        self.assertEqual(env.candidate_k, env.num_tasks)
         self.assertEqual(env.action_choices, env.candidate_k + 3)
         self.assertEqual(env.continue_action, env.candidate_k)
         self.assertEqual(env.wait_action, env.candidate_k + 1)
@@ -151,6 +153,10 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertFalse(reset.info["contract_boundary"]["historical_only"])
         self.assertEqual(env.task_lifecycle, "v1_2_direct_service")
         self.assertEqual(reset.info["task_lifecycle"], "v1_2_direct_service")
+        self.assertIsNone(env.candidate_limit)
+        self.assertEqual(env.action_choices, env.num_tasks + 3)
+        self.assertEqual(reset.info["candidate_limit"], None)
+        self.assertEqual(reset.info["candidate_slots"], env.num_tasks)
         self.assertEqual(len(tasks_payload["point_tasks"]), 3)
         self.assertEqual(len(tasks_payload["line_tasks"]), 10)
         self.assertEqual(len(tasks_payload["area_tasks"]), 13)
@@ -178,6 +184,17 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
             self.assertEqual(metadata["parameter_status"], "RESEARCH_GEOMETRY_VALIDATED_AGAINST_SOURCE_CHART")
             self.assertIn("SRC_NOAA_CHART_18751", metadata["source_ids"])
             self.assertIsNone(metadata["deadline"])
+
+    def test_training_reward_weights_prioritize_time_and_energy(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_yangshan_training_v133.toml")
+        env = build_env(config)
+
+        self.assertEqual(env.reward_weights["time_cost"], 0.08)
+        self.assertEqual(env.reward_weights["energy_cost"], 3.0)
+        self.assertEqual(env.reward_weights["team_close_reward"], 5.0)
+        self.assertEqual(env.reward_weights["service_progress_reward"], 0.4)
+        self.assertEqual(env.reward_weights["invalid_penalty"], 3.0)
+        self.assertEqual(env.reward_weights["conflict_penalty"], 0.5)
 
     def test_los_angeles_v12_service_completion_does_not_create_review_queue(self) -> None:
         config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")

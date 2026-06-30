@@ -259,3 +259,12 @@ interpretation and next decision
 - Target clause: item 9 remains open; this does not select a final upper-level algorithm.
 - Updated `tools/run_port_algorithm_comparison.py` so one-command comparison defaults to `shared_mappo`, `centralized_ppo`, and `happo`.
 - `heterogeneous_mappo` remains callable for legacy/manual checks but is no longer in the default comparison because the HAPPO interface is now available for heterogeneous decentralized actors.
+
+### 2026-06-30 Scheduler reward and candidate pruning cleanup
+
+- Operation: engineering training-objective adjustment, no `AMENDS` or `REPLACES`.
+- Target clause: current item 9 reward/candidate-set design remains open; this does not freeze the final upper-level reward function or accepted algorithm.
+- Updated the port scheduler reward defaults and active training configs to emphasize lower completion time and lower physical energy use: `time_cost = 0.08`, `energy_cost = 3.0`.
+- Reduced non-time/energy shaping terms: direct-service `team_close_reward = 5.0`, `service_progress_reward = 0.4`, `invalid_penalty = 3.0`, and `conflict_penalty = 0.5`; legacy screening/review progress weights were similarly reduced where the historical config is retained.
+- Removed fixed `candidate_k = 10/12` from port scheduler training configs. The environment now defaults to full released-task action slots and treats explicit `candidate_k` only as an intentional pruning cap for smoke checks or ablations.
+- Updated `tools/import_yangshan_task_initial.py` so future regeneration does not reintroduce the old Top-K-12 or old reward values.

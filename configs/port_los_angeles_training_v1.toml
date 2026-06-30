@@ -32,7 +32,6 @@ compatibility_bonus = 4.0
 
 [scheduler_rl]
 max_steps = 160
-candidate_k = 10
 device = "auto"
 num_envs = 1
 env_workers = 1
@@ -49,9 +48,9 @@ rollout_steps = 16
 hidden_dim = 96
 
 [scheduler_rl.reward]
-team_close_reward = 8.0
-service_progress_reward = 1.0
-energy_cost = 0.5
-time_cost = 0.01
-invalid_penalty = 5.0
-conflict_penalty = 1.0
+team_close_reward = 5.0
+service_progress_reward = 0.4
+energy_cost = 3.0
+time_cost = 0.08
+invalid_penalty = 3.0
+conflict_penalty = 0.5

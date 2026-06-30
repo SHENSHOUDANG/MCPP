@@ -596,7 +596,6 @@ compatibility_bonus = 5.0
 
 [scheduler_rl]
 max_steps = 240
-candidate_k = 12
 learning_rate = 0.0003
 gamma = 0.98
 gae_lambda = 0.95
@@ -606,13 +605,13 @@ rollout_steps = 32
 hidden_dim = 128
 
 [scheduler_rl.reward]
-team_close_reward = 8.0
-screen_progress_reward = 1.0
-review_progress_reward = 1.5
-energy_cost = 0.5
-time_cost = 0.01
-invalid_penalty = 5.0
-conflict_penalty = 1.0
+team_close_reward = 5.0
+screen_progress_reward = 0.4
+review_progress_reward = 0.6
+energy_cost = 3.0
+time_cost = 0.08
+invalid_penalty = 3.0
+conflict_penalty = 0.5
 
 [review_trigger]
 confidence_threshold = 0.65

@@ -19,14 +19,14 @@ def compute_reward_terms(
     review_queue_length: int = 0,
 ) -> dict[str, float]:
     cfg = {
-        "team_close_reward": 8.0,
-        "screen_progress_reward": 1.0,
-        "review_progress_reward": 1.5,
-        "service_progress_reward": 1.0,
-        "energy_cost": 0.5,
-        "time_cost": 0.01,
-        "invalid_penalty": 5.0,
-        "conflict_penalty": 1.0,
+        "team_close_reward": 5.0,
+        "screen_progress_reward": 0.4,
+        "review_progress_reward": 0.6,
+        "service_progress_reward": 0.4,
+        "energy_cost": 3.0,
+        "time_cost": 0.08,
+        "invalid_penalty": 3.0,
+        "conflict_penalty": 0.5,
     }
     if weights:
         cfg.update({key: float(value) for key, value in weights.items()})

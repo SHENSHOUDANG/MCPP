@@ -67,12 +67,13 @@ def build_env(config: dict[str, object]) -> PortInspectionSchedulingEnv:
     rl_config = dict(config.get("scheduler_rl", {}))
     reward_weights = dict(rl_config.get("reward", {}))
     scheduling_config = dict(config.get("scheduling", {}))
+    candidate_k = rl_config.get("candidate_k", config.get("candidate_k"))
     env = PortInspectionSchedulingEnv(
         grid=grid,
         tasks=tasks,
         platforms=platforms,
         max_steps=int(rl_config.get("max_steps", 64)),
-        candidate_k=int(rl_config.get("candidate_k", config.get("candidate_k", 8))),
+        candidate_k=None if candidate_k is None else int(candidate_k),
         reward_weights={key: float(value) for key, value in reward_weights.items()},
         candidate_weights={key: float(value) for key, value in scheduling_config.items() if isinstance(value, (int, float))},
         review_trigger=dict(config.get("review_trigger", {})),

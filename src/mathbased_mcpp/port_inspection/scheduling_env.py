@@ -89,7 +89,9 @@ class PortInspectionSchedulingEnv:
     """High-level port inspection scheduler with configurable task lifecycle.
 
     V1.2 scenarios use direct task service states. The legacy screening/review
-    lifecycle is retained only for historical engineering baselines.
+    lifecycle is retained only for historical engineering baselines. Candidate
+    slots cover all released tasks by default; an explicit candidate_k is only a
+    pruning cap for controlled ablations or resource-constrained smoke checks.
     """
 
     def __init__(
@@ -99,7 +101,7 @@ class PortInspectionSchedulingEnv:
         platforms: list[Platform],
         max_steps: int = 64,
         reward_weights: dict[str, float] | None = None,
-        candidate_k: int = 8,
+        candidate_k: int | None = None,
         candidate_weights: dict[str, float] | None = None,
         review_trigger: dict[str, Any] | None = None,
         task_lifecycle: str = LIFECYCLE_LEGACY_SCREEN_REVIEW,
@@ -112,7 +114,8 @@ class PortInspectionSchedulingEnv:
         if self.task_lifecycle not in {LIFECYCLE_LEGACY_SCREEN_REVIEW, LIFECYCLE_V12_DIRECT_SERVICE}:
             raise ValueError(f"unknown task_lifecycle: {self.task_lifecycle}")
         self.reward_weights = reward_weights or {}
-        self.candidate_k = max(int(candidate_k), 1)
+        self.candidate_limit = self._candidate_limit_from_config(candidate_k)
+        self.candidate_k = self.candidate_limit or max(len(tasks), 1)
         self.candidate_weights = {
             "risk_weight": 10.0,
             "urgency_weight": 6.0,
@@ -171,6 +174,15 @@ class PortInspectionSchedulingEnv:
     @property
     def num_tasks(self) -> int:
         return len(self.tasks)
+
+    @staticmethod
+    def _candidate_limit_from_config(candidate_k: int | None) -> int | None:
+        if candidate_k is None:
+            return None
+        value = int(candidate_k)
+        if value <= 0:
+            return None
+        return value
 
     @property
     def action_choices(self) -> int:
@@ -437,7 +449,7 @@ class PortInspectionSchedulingEnv:
             if platform.mode != MODE_IDLE:
                 masks[platform_index, self.continue_action] = True
                 continue
-            for candidate in candidates[: self.candidate_k]:
+            for candidate in candidates:
                 masks[platform_index, candidate.relative_position] = candidate.feasible
             masks[platform_index, self.wait_action] = True
             depot = self._platform_depot(platform)
@@ -587,6 +599,8 @@ class PortInspectionSchedulingEnv:
             "platform_loads": {platform.platform_id: platform.current_load for platform in self.platforms},
             "action_masks": masks.astype(int).tolist(),
             "candidate_mask": masks[:, : self.candidate_k].astype(int).tolist(),
+            "candidate_limit": self.candidate_limit,
+            "candidate_slots": self.candidate_k,
             "agent_mask": [1 if platform.alive else 0 for platform in self.platforms],
             "alive_mask": [1 if platform.alive else 0 for platform in self.platforms],
             "available_actions": {
