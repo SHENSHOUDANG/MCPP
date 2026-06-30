@@ -39,12 +39,12 @@ compatibility_bonus = 5.0
 [scheduler_rl]
 max_steps = 360
 device = "auto"
-num_envs = 1
-env_workers = 1
-cpu_threads = 6
+num_envs = 2
+env_workers = 2
+cpu_threads = 12
 interop_threads = 2
-gpu_memory_fraction = 0.35
-process_priority = "below_normal"
+gpu_memory_fraction = 0.80
+process_priority = "normal"
 learning_rate = 0.0003
 gamma = 0.98
 gae_lambda = 0.95

@@ -157,3 +157,8 @@
 - Completion/progress and invalid/conflict terms were reduced to keep task completion necessary while making equal-completion policies compare more strongly on time and energy.
 - Port scheduler configs no longer set fixed `candidate_k = 10/12`; without an explicit cap, action slots cover all released scheduling tasks, so Top-K pruning no longer silently removes feasible tasks from training.
 - Explicit `candidate_k` remains supported only as a deliberate pruning cap for smoke checks or ablations.
+
+### 2026-06-30 Yangshan HAPPO resource profile
+
+- Increased only the Yangshan V1.3.3 scheduler resource profile for slower HAPPO runs while keeping CPU use within the user-approved 2x bound: `num_envs = 2`, `env_workers = 2`, `cpu_threads = 12`, `interop_threads = 2`, `gpu_memory_fraction = 0.80`, and `process_priority = "normal"`.
+- Algorithm semantics are unchanged: `update_epochs`, full-candidate action slots, reward weights, task lifecycle, and HAPPO update logic were not changed.

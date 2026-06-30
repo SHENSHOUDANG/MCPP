@@ -268,3 +268,10 @@ interpretation and next decision
 - Reduced non-time/energy shaping terms: direct-service `team_close_reward = 5.0`, `service_progress_reward = 0.4`, `invalid_penalty = 3.0`, and `conflict_penalty = 0.5`; legacy screening/review progress weights were similarly reduced where the historical config is retained.
 - Removed fixed `candidate_k = 10/12` from port scheduler training configs. The environment now defaults to full released-task action slots and treats explicit `candidate_k` only as an intentional pruning cap for smoke checks or ablations.
 - Updated `tools/import_yangshan_task_initial.py` so future regeneration does not reintroduce the old Top-K-12 or old reward values.
+
+### 2026-06-30 Yangshan HAPPO resource profile
+
+- Operation: resource profile adjustment only, no `AMENDS` or `REPLACES`.
+- Target clause: item 9 algorithm comparison remains open; no reward, candidate-set, state, action, mask, or update-rule semantics changed.
+- Updated `configs/port_yangshan_training_v133.toml` to use more GPU while keeping CPU use within the user-approved 2x bound: `num_envs = 2`, `env_workers = 2`, `cpu_threads = 12`, `interop_threads = 2`, `gpu_memory_fraction = 0.80`, and `process_priority = "normal"`.
+- Kept `update_epochs = 4`, full-candidate action slots, reward weights, task lifecycle, and HAPPO sequential actor update unchanged.
