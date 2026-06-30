@@ -12,7 +12,7 @@ Raw QGIS/GeoPackage/CSV source packages are not stored in Git; regenerate them w
 - Dynamic seed tasks: 3
 - Total point tasks: 222
 - Risk counts: {3: 66, 1: 120, 2: 36}
-- Platform depots: {'UAV': [73, 110], 'USV': [73, 110]}
-- Depot placement: user-defined shoreline depot on `source_port_coastline`; the supplied QGIS map has no explicit depot marker, so UAV and USV share this coast-edge base instead of using a water-surface point.
+- Platform depots: {'UAV': [82, 108], 'USV': [82, 108]}
+- Depot placement: user-provided WGS84 coordinate `30 deg 36.27 min N, 122 deg 5.70 min E`, transformed to EPSG:32651 as `(413246.952064, 3386120.770780)` and snapped to the Yangshan 100 m grid cell `[82, 108]`.
 
 The scheduler consumes the existing `PortInspectionSchedulingEnv` JSON schema, so coordinates are encoded as UTM-derived feature bins. These bins are not a rasterized path-planning map and no low-level path action is emitted.

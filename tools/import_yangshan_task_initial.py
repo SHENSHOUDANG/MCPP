@@ -16,6 +16,9 @@ from typing import Any
 DEFAULT_SOURCE_DIR = Path("D:/地图/任务初版")
 DEFAULT_OUTPUT_DIR = Path("data/ports/yangshan_task_initial_v1")
 DEFAULT_CONFIG = Path("configs/port_yangshan_task_initial_v1.toml")
+DEFAULT_USER_DEPOT_LAT = 30.6045
+DEFAULT_USER_DEPOT_LON = 122.095
+DEFAULT_USER_DEPOT_TEXT = "30 deg 36.27 min N, 122 deg 5.70 min E"
 
 SOURCE_FILES = {
     "report": ("洋山港任务信息补齐报告.md", "source_report.md"),
@@ -34,6 +37,13 @@ def main() -> None:
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     parser.add_argument("--dataset-name", default="yangshan_task_initial_v1")
     parser.add_argument("--coordinate-resolution-m", type=float, default=100.0)
+    parser.add_argument("--depot-lat", type=float, default=DEFAULT_USER_DEPOT_LAT)
+    parser.add_argument("--depot-lon", type=float, default=DEFAULT_USER_DEPOT_LON)
+    parser.add_argument(
+        "--use-coastline-derived-depot",
+        action="store_true",
+        help="Use the historical nearest-coastline fallback instead of the user-provided WGS84 depot.",
+    )
     args = parser.parse_args()
 
     source_dir = Path(args.source_dir)
@@ -49,7 +59,22 @@ def main() -> None:
     dynamic_rows = read_csv(copied["dynamic"])
     fixed_tasks = [fixed_task(row, origin) for row in fixed_rows]
     dynamic_tasks = [dynamic_task(row, origin) for row in dynamic_rows]
-    depots = build_depots(gpkg["coastline_points"], fixed_tasks + dynamic_tasks, origin)
+    user_depot = None
+    if not args.use_coastline_derived_depot:
+        coordinate_text = DEFAULT_USER_DEPOT_TEXT
+        if args.depot_lat != DEFAULT_USER_DEPOT_LAT or args.depot_lon != DEFAULT_USER_DEPOT_LON:
+            coordinate_text = f"WGS84 lat={args.depot_lat}, lon={args.depot_lon}"
+        user_depot = {
+            "latitude": args.depot_lat,
+            "longitude": args.depot_lon,
+            "coordinate_text": coordinate_text,
+        }
+    depots = build_depots(
+        gpkg["coastline_points"],
+        fixed_tasks + dynamic_tasks,
+        origin,
+        user_depot=user_depot,
+    )
     all_cells = {tuple(depot["cell"]) for depot in depots}
     all_cells.update(tuple(task["cell"]) for task in fixed_tasks + dynamic_tasks)
     width = max(cell[1] for cell in all_cells) + 1
@@ -85,6 +110,7 @@ def main() -> None:
             "source_extent_utm": gpkg["extent"],
             "generated_depots": depots,
             "platform_depots": platform_depots,
+            "user_defined_depot_source": depot_source_metadata(depots[0]) if user_depot is not None else None,
             "fixed_task_count": len(fixed_tasks),
             "dynamic_seed_count": len(dynamic_tasks),
             "task_count": len(fixed_tasks) + len(dynamic_tasks),
@@ -307,32 +333,101 @@ def build_depots(
     coastline_points: list[tuple[float, float]],
     tasks: list[dict[str, Any]],
     origin: dict[str, float],
+    user_depot: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     if not coastline_points:
         raise ValueError("the GeoPackage must provide source_port_coastline geometry for depot placement")
     if not tasks:
         raise ValueError("at least one task is required before placing a depot")
 
-    task_points = [(float(task["metadata"]["x_utm"]), float(task["metadata"]["y_utm"])) for task in tasks]
-    centroid_x = sum(point[0] for point in task_points) / len(task_points)
-    centroid_y = sum(point[1] for point in task_points) / len(task_points)
-    x_utm, y_utm = min(
-        coastline_points,
-        key=lambda point: (point[0] - centroid_x) ** 2 + (point[1] - centroid_y) ** 2,
-    )
-    cell = utm_to_cell(x_utm, y_utm, origin)
-    depot = {
-        "depot_id": "COAST_AUTO_01",
-        "source_kind": "user_defined_coastline",
-        "placement_rule": "nearest source_port_coastline vertex to task centroid",
-        "x_utm": x_utm,
-        "y_utm": y_utm,
-        "cell": cell,
-    }
+    if user_depot is not None:
+        lon = float(user_depot["longitude"])
+        lat = float(user_depot["latitude"])
+        x_utm, y_utm = wgs84_to_utm_zone51(lon=lon, lat=lat)
+        cell = utm_to_cell(x_utm, y_utm, origin)
+        depot = {
+            "depot_id": "USER_DEPOT_20260630",
+            "source_kind": "user_provided_wgs84_coordinate",
+            "placement_rule": "WGS84 coordinate transformed to EPSG:32651 and snapped to the Yangshan 100 m grid",
+            "coordinate_text": str(user_depot.get("coordinate_text", "user-provided WGS84 coordinate")),
+            "longitude": lon,
+            "latitude": lat,
+            "source_crs": "EPSG:4326",
+            "projected_crs": "EPSG:32651",
+            "x_utm": x_utm,
+            "y_utm": y_utm,
+            "cell": cell,
+        }
+    else:
+        task_points = [(float(task["metadata"]["x_utm"]), float(task["metadata"]["y_utm"])) for task in tasks]
+        centroid_x = sum(point[0] for point in task_points) / len(task_points)
+        centroid_y = sum(point[1] for point in task_points) / len(task_points)
+        x_utm, y_utm = min(
+            coastline_points,
+            key=lambda point: (point[0] - centroid_x) ** 2 + (point[1] - centroid_y) ** 2,
+        )
+        cell = utm_to_cell(x_utm, y_utm, origin)
+        depot = {
+            "depot_id": "COAST_AUTO_01",
+            "source_kind": "user_defined_coastline",
+            "placement_rule": "nearest source_port_coastline vertex to task centroid",
+            "x_utm": x_utm,
+            "y_utm": y_utm,
+            "cell": cell,
+        }
     return [
         {**depot, "platform_type": "UAV"},
         {**depot, "platform_type": "USV"},
     ]
+
+
+def wgs84_to_utm_zone51(*, lon: float, lat: float) -> tuple[float, float]:
+    semi_major = 6378137.0
+    flattening = 1 / 298.257223563
+    eccentricity_sq = flattening * (2 - flattening)
+    second_eccentricity_sq = eccentricity_sq / (1 - eccentricity_sq)
+    scale = 0.9996
+    phi = math.radians(lat)
+    lam = math.radians(lon)
+    central_meridian = math.radians(123.0)
+
+    sin_phi = math.sin(phi)
+    cos_phi = math.cos(phi)
+    tan_phi = math.tan(phi)
+    n_radius = semi_major / math.sqrt(1 - eccentricity_sq * sin_phi * sin_phi)
+    tan_sq = tan_phi * tan_phi
+    c_term = second_eccentricity_sq * cos_phi * cos_phi
+    a_term = cos_phi * (lam - central_meridian)
+    meridian_arc = semi_major * (
+        (1 - eccentricity_sq / 4 - 3 * eccentricity_sq**2 / 64 - 5 * eccentricity_sq**3 / 256) * phi
+        - (3 * eccentricity_sq / 8 + 3 * eccentricity_sq**2 / 32 + 45 * eccentricity_sq**3 / 1024)
+        * math.sin(2 * phi)
+        + (15 * eccentricity_sq**2 / 256 + 45 * eccentricity_sq**3 / 1024) * math.sin(4 * phi)
+        - (35 * eccentricity_sq**3 / 3072) * math.sin(6 * phi)
+    )
+
+    easting = 500000 + scale * n_radius * (
+        a_term
+        + (1 - tan_sq + c_term) * a_term**3 / 6
+        + (5 - 18 * tan_sq + tan_sq**2 + 72 * c_term - 58 * second_eccentricity_sq) * a_term**5 / 120
+    )
+    northing = scale * (
+        meridian_arc
+        + n_radius
+        * tan_phi
+        * (
+            a_term**2 / 2
+            + (5 - tan_sq + 9 * c_term + 4 * c_term**2) * a_term**4 / 24
+            + (61 - 58 * tan_sq + tan_sq**2 + 600 * c_term - 330 * second_eccentricity_sq)
+            * a_term**6
+            / 720
+        )
+    )
+    return easting, northing
+
+
+def depot_source_metadata(depot: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in depot.items() if key != "platform_type"}
 
 
 def fixed_task(row: dict[str, str], origin: dict[str, float]) -> dict[str, Any]:
@@ -553,9 +648,11 @@ No legacy project map is reused.
 - Total point tasks: {summary["task_count"]}
 - Risk counts: {summary["risk_counts"]}
 - Platform depots: {summary["platform_depots"]}
-- Depot placement: user-defined shoreline depot on `source_port_coastline`;
-  the supplied QGIS map has no explicit depot marker, so UAV and USV share
-  this coast-edge base instead of using a water-surface point.
+- Depot placement: user-provided WGS84 coordinate stored in
+  `metadata.user_defined_depot_source`,
+  transformed to EPSG:32651 and snapped to the Yangshan grid. Use
+  `--use-coastline-derived-depot` only to reproduce the older coastline
+  fallback baseline.
 
 The scheduler still consumes the existing `PortInspectionSchedulingEnv` JSON
 schema, so coordinates are encoded as UTM-derived feature bins. These bins are

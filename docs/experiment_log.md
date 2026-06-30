@@ -214,3 +214,11 @@ interpretation and next decision
 - Preserved 4 `reinspection_catalog_v2_0.csv` records as metadata-only illustrative internal successor tasks; they are not automatically released into the scheduler training action space.
 - Embedded source file SHA-256 values for `task_catalog_v2_0.csv`, `reinspection_catalog_v2_0.csv`, `geometry_alignment_qa_v2_0.csv`, and `port_of_los_angeles_task_mapping_v2_0.gpkg`.
 - Data status remains `PENDING_CHART_ALIGNED_TASK_MAPPING_TRAINING`: the package is validated against public NOAA/POLA sources but is not native ENC vector geometry and is not final experiment evidence.
+
+### 2026-06-30 Yangshan user-defined depot coordinate
+
+- Set the historical Yangshan depot from the user-provided WGS84 coordinate `30 deg 36.27 min N, 122 deg 5.70 min E`.
+- Decimal coordinate: `lat=30.6045`, `lon=122.095`; projected EPSG:32651 coordinate: `(413246.952064, 3386120.770780)`.
+- Updated `data/ports/yangshan_task_initial_v1/yangshan_task_initial_v1_grid.json`, `configs/port_yangshan_task_initial_v1.toml`, and the Yangshan scenario README to use platform depot cell `[82, 108]` for both UAV and USV.
+- Updated `tools/import_yangshan_task_initial.py` so future regeneration defaults to the same user-defined depot and requires `--use-coastline-derived-depot` to reproduce the older auto-coastline fallback.
+- Boundary note: Yangshan remains `HISTORICAL`; this is not final V1.2 experiment evidence and does not change the Los Angeles training task mapping.

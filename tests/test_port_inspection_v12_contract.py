@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from math import isinf
 from pathlib import Path
 import sys
@@ -76,6 +77,27 @@ class V12ContractTests(unittest.TestCase):
         self.assertFalse(boundary.final_experiment_eligible)
         with self.assertRaises(ContractValidationError):
             require_historical_baseline_ack(boundary, False, purpose="test training")
+
+    def test_yangshan_user_defined_depot_coordinate_is_configured(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_yangshan_task_initial_v1.toml")
+        grid = json.loads((ROOT / str(config["grid_path"])).read_text(encoding="utf-8"))
+        expected_cell = [82, 108]
+
+        self.assertEqual(grid["depot"], expected_cell)
+        self.assertEqual(config["platform_depots"]["uav"], expected_cell)
+        self.assertEqual(config["platform_depots"]["usv"], expected_cell)
+        self.assertIn(expected_cell, grid["free_cells"])
+
+        source = grid["metadata"]["user_defined_depot_source"]
+        self.assertEqual(source["depot_id"], "USER_DEPOT_20260630")
+        self.assertEqual(source["source_crs"], "EPSG:4326")
+        self.assertEqual(source["projected_crs"], "EPSG:32651")
+        self.assertAlmostEqual(source["latitude"], 30.6045, places=7)
+        self.assertAlmostEqual(source["longitude"], 122.095, places=7)
+        self.assertEqual(source["cell"], expected_cell)
+        self.assertTrue(
+            all(depot["depot_id"] == "USER_DEPOT_20260630" for depot in grid["metadata"]["generated_depots"])
+        )
 
     def test_los_angeles_config_is_pending_training_prototype(self) -> None:
         config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")

@@ -5,8 +5,8 @@
   "height": 110,
   "cell_size_m": 100.0,
   "depot": [
-    73,
-    110
+    82,
+    108
   ],
   "free_cells": [
     [
@@ -87724,38 +87724,67 @@
     },
     "generated_depots": [
       {
-        "depot_id": "COAST_AUTO_01",
-        "source_kind": "user_defined_coastline",
-        "placement_rule": "nearest source_port_coastline vertex to task centroid",
-        "x_utm": 413417.0708527102,
-        "y_utm": 3387038.834991322,
+        "depot_id": "USER_DEPOT_20260630",
+        "source_kind": "user_provided_wgs84_coordinate",
+        "placement_rule": "WGS84 coordinate transformed to EPSG:32651 and snapped to the Yangshan 100 m grid",
+        "coordinate_text": "30 deg 36.27 min N, 122 deg 5.70 min E",
+        "longitude": 122.095,
+        "latitude": 30.6045,
+        "source_crs": "EPSG:4326",
+        "projected_crs": "EPSG:32651",
+        "x_utm": 413246.95206449565,
+        "y_utm": 3386120.770779953,
         "cell": [
-          73,
-          110
+          82,
+          108
         ],
         "platform_type": "UAV"
       },
       {
-        "depot_id": "COAST_AUTO_01",
-        "source_kind": "user_defined_coastline",
-        "placement_rule": "nearest source_port_coastline vertex to task centroid",
-        "x_utm": 413417.0708527102,
-        "y_utm": 3387038.834991322,
+        "depot_id": "USER_DEPOT_20260630",
+        "source_kind": "user_provided_wgs84_coordinate",
+        "placement_rule": "WGS84 coordinate transformed to EPSG:32651 and snapped to the Yangshan 100 m grid",
+        "coordinate_text": "30 deg 36.27 min N, 122 deg 5.70 min E",
+        "longitude": 122.095,
+        "latitude": 30.6045,
+        "source_crs": "EPSG:4326",
+        "projected_crs": "EPSG:32651",
+        "x_utm": 413246.95206449565,
+        "y_utm": 3386120.770779953,
         "cell": [
-          73,
-          110
+          82,
+          108
         ],
         "platform_type": "USV"
       }
     ],
     "platform_depots": {
       "UAV": [
-        73,
-        110
+        82,
+        108
       ],
       "USV": [
-        73,
-        110
+        82,
+        108
+      ]
+    },
+    "user_defined_depot_source": {
+      "depot_id": "USER_DEPOT_20260630",
+      "coordinate_text": "30 deg 36.27 min N, 122 deg 5.70 min E",
+      "longitude": 122.095,
+      "latitude": 30.6045,
+      "source_crs": "EPSG:4326",
+      "projected_crs": "EPSG:32651",
+      "x_utm": 413246.95206449565,
+      "y_utm": 3386120.770779953,
+      "cell": [
+        82,
+        108
+      ],
+      "set_on": "2026-06-30",
+      "applies_to": [
+        "UAV",
+        "USV"
       ]
     },
     "fixed_task_count": 219,

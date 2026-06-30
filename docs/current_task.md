@@ -119,3 +119,9 @@
 - Four reinspection records from `reinspection_catalog_v2_0.csv` are preserved as metadata only; they are not automatically released into the current scheduler action space.
 - Geometry is labelled `chart_aligned_research_geometry`, not native ENC vector geometry. It remains `PENDING` training data and must not be treated as final GIS or official work-order evidence.
 - The import path is reproducible through `tools/import_los_angeles_task_mapping.py`; source CSV/GPKG checksums are embedded in the generated grid/task metadata.
+
+### 2026-06-30 Yangshan user depot update
+
+- User provided Yangshan depot coordinate `30 deg 36.27 min N, 122 deg 5.70 min E`.
+- The coordinate is recorded as WGS84 `lat=30.6045`, `lon=122.095`, transformed to EPSG:32651 as `(413246.952064, 3386120.770780)`, and snapped to the current 100 m Yangshan grid cell `[82, 108]`.
+- `yangshan_task_initial_v1` remains `HISTORICAL`; this depot update is a baseline data/config correction and does not alter the Los Angeles `PENDING` training scenario or freeze the final algorithm choice.
