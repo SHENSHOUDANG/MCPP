@@ -146,6 +146,10 @@ def _comparison_row_from_summary(
         "total_energy": float(summary.get("total_energy", 0.0)),
         "total_conflicts": int(summary.get("total_conflicts", 0)),
         "total_invalid_actions": int(summary.get("total_invalid_actions", 0)),
+        "mean_assigned_scheduling_wait": float(summary.get("mean_assigned_scheduling_wait", 0.0)),
+        "mean_all_scheduling_wait_truncated": float(summary.get("mean_all_scheduling_wait_truncated", 0.0)),
+        "p95_scheduling_wait": float(summary.get("p95_scheduling_wait", 0.0)),
+        "max_open_scheduling_wait": float(summary.get("max_open_scheduling_wait", 0.0)),
         "summary_path": str(summary_path),
         "checkpoint_dir": str(checkpoint_dir),
     }
@@ -165,6 +169,10 @@ def _write_comparison_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "total_energy",
         "total_conflicts",
         "total_invalid_actions",
+        "mean_assigned_scheduling_wait",
+        "mean_all_scheduling_wait_truncated",
+        "p95_scheduling_wait",
+        "max_open_scheduling_wait",
         "summary_path",
         "checkpoint_dir",
     ]

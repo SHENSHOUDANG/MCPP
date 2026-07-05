@@ -568,6 +568,7 @@ def _alive_mask(env) -> np.ndarray:
 
 
 def _episode_row(env, info: dict[str, Any], episode_reward: float, env_index: int) -> dict[str, MetricValue]:
+    metrics = info["metrics"]
     return {
         "env_index": int(env_index),
         "episode_reward": float(episode_reward),
@@ -576,10 +577,18 @@ def _episode_row(env, info: dict[str, Any], episode_reward: float, env_index: in
         "late_tasks": len(info["late_tasks"]),
         "total_path_length": int(info["total_path_length"]),
         "total_energy": float(info["total_energy"]),
-        "total_conflicts": int(info["metrics"]["total_conflicts"]),
-        "total_invalid_actions": int(info["metrics"]["total_invalid_actions"]),
-        "total_replenishments": int(info["metrics"]["total_replenishments"]),
-        "total_returns": int(info["metrics"]["total_returns"]),
+        "total_conflicts": int(metrics["total_conflicts"]),
+        "total_invalid_actions": int(metrics["total_invalid_actions"]),
+        "total_replenishments": int(metrics["total_replenishments"]),
+        "total_returns": int(metrics["total_returns"]),
+        "assigned_task_count": int(metrics.get("assigned_task_count", 0)),
+        "unassigned_task_count": int(metrics.get("unassigned_task_count", 0)),
+        "mean_assigned_scheduling_wait": float(metrics.get("mean_assigned_scheduling_wait", 0.0)),
+        "mean_all_scheduling_wait_truncated": float(metrics.get("mean_all_scheduling_wait_truncated", 0.0)),
+        "p50_scheduling_wait": float(metrics.get("p50_scheduling_wait", 0.0)),
+        "p90_scheduling_wait": float(metrics.get("p90_scheduling_wait", 0.0)),
+        "p95_scheduling_wait": float(metrics.get("p95_scheduling_wait", 0.0)),
+        "max_open_scheduling_wait": float(metrics.get("max_open_scheduling_wait", 0.0)),
     }
 
 
@@ -753,6 +762,14 @@ def _write_metrics(path: Path, rows: list[dict[str, MetricValue]]) -> None:
         "total_invalid_actions",
         "total_replenishments",
         "total_returns",
+        "assigned_task_count",
+        "unassigned_task_count",
+        "mean_assigned_scheduling_wait",
+        "mean_all_scheduling_wait_truncated",
+        "p50_scheduling_wait",
+        "p90_scheduling_wait",
+        "p95_scheduling_wait",
+        "max_open_scheduling_wait",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)

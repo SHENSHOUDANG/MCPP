@@ -21,6 +21,13 @@
 - 本次未恢复 `tau_feedback`、`information_age`、`occurred_at/delivered_at`、`first_service_start_time`、通信时延、反馈时延或下层随机执行时延。
 - 代码影响：`InspectionTask`、调度环境指标/候选详情/奖励项、契约校验和等待边界测试。
 
+### 2026-07-05 Scheduler wait metric logging alignment
+
+- `operation`: implementation alignment。
+- 将 `mean_assigned_scheduling_wait`、`mean_all_scheduling_wait_truncated`、`P50/P90/P95` 等上层等待指标写入 `scheduler_metrics.csv`、`scheduler_summary.json` 和顶层算法比较汇总。
+- 仅补齐日志与汇总字段，不改变环境状态转移、奖励默认权重、候选集、动作掩码或训练算法。
+- 既有训练产物中若缺少这些列，应通过保存的 checkpoint 重新评估或后续重训生成，不得把旧 CSV 解释为“无等待时间”。
+
 ### 第一项 — FROZEN
 
 - 采用有限作业窗口下的多周期滚动调度。
