@@ -6,6 +6,7 @@ from typing import Any, Mapping, Sequence
 
 
 V12_CONTRACT_VERSION = "V1.2"
+V17_WAITING_TIME_AMENDMENT = "V1.7-A9C"
 
 TASK_FAMILIES = frozenset(
     {
@@ -114,6 +115,20 @@ REQUIRED_TASK_FIELDS = (
     "provenance",
     "scenario_generated",
 )
+V17_REMOVED_DELAY_FIELDS = frozenset(
+    {
+        "tau_feedback",
+        "information_age",
+        "observation_timestamp",
+        "occurred_at",
+        "delivered_at",
+        "source_state_version",
+        "first_service_start_time",
+        "response_delay",
+        "feedback_delay",
+        "communication_delay",
+    }
+)
 
 HISTORICAL_BASELINE_NOTICE = (
     "This scenario is retained only as a historical engineering baseline under "
@@ -158,6 +173,12 @@ class DeadlineMetrics:
 class RevisitMetrics:
     revisit_age: float | None
     revisit_violation: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulingWaitingTime:
+    current_wait: float | None
+    final_or_truncated_wait: float | None
 
 
 def classify_config_boundary(config: Mapping[str, Any]) -> ContractBoundary:
@@ -267,6 +288,29 @@ def revisit_metrics(
     )
 
 
+def scheduling_waiting_time(
+    *,
+    current_time: float,
+    release_time: float | None,
+    first_valid_assignment_time: float | None = None,
+    horizon_end: float | None = None,
+) -> SchedulingWaitingTime:
+    if release_time is None:
+        return SchedulingWaitingTime(current_wait=None, final_or_truncated_wait=None)
+    release = float(release_time)
+    current = float(current_time)
+    if first_valid_assignment_time is None:
+        current_wait = max(0.0, current - release)
+        stop_time = current if horizon_end is None else float(horizon_end)
+    else:
+        stop_time = float(first_valid_assignment_time)
+        current_wait = max(0.0, stop_time - release)
+    return SchedulingWaitingTime(
+        current_wait=current_wait,
+        final_or_truncated_wait=max(0.0, stop_time - release),
+    )
+
+
 def transition_allowed(current_state: str, next_state: str) -> bool:
     if current_state not in LEGAL_TASK_TRANSITIONS:
         raise ContractValidationError(f"unknown V1.2 task state: {current_state}")
@@ -279,6 +323,12 @@ def validate_v12_task_record(record: Mapping[str, Any]) -> None:
     missing = [field for field in REQUIRED_TASK_FIELDS if field not in record]
     if missing:
         raise ContractValidationError(f"task record missing required fields: {', '.join(missing)}")
+    forbidden = sorted(field for field in V17_REMOVED_DELAY_FIELDS if field in record)
+    if forbidden:
+        raise ContractValidationError(
+            f"{V17_WAITING_TIME_AMENDMENT} removed feedback/communication delay fields: "
+            + ", ".join(forbidden)
+        )
 
     _require_member(record, "task_family", TASK_FAMILIES)
     _require_member(record, "geometry_mode", GEOMETRY_MODES)
@@ -288,6 +338,7 @@ def validate_v12_task_record(record: Mapping[str, Any]) -> None:
 
     for field in (
         "release_time",
+        "first_valid_assignment_time",
         "required_work",
         "completed_work",
         "remaining_work",
@@ -302,7 +353,8 @@ def validate_v12_task_record(record: Mapping[str, Any]) -> None:
         "calendar_anchor",
         "revisit_initialization_time",
     ):
-        _require_number_or_none(record, field)
+        if field in record:
+            _require_number_or_none(record, field)
 
     if float(record["required_work"]) <= 0.0:
         raise ContractValidationError("required_work must be positive")

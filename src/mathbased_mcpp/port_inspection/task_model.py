@@ -37,6 +37,10 @@ def _task_from_raw(raw: dict[str, Any], geometry: str, cells: list[Any]) -> Insp
     completed_work = float(raw.get("completed_work", metadata.get("completed_work", 0.0)))
     remaining_work = float(raw.get("remaining_work", metadata.get("remaining_work", max(required_work - completed_work, 0.0))))
     deadline = _optional_float(raw.get("deadline", metadata.get("deadline", raw.get("max_interval"))))
+    release_time = _optional_float(raw.get("release_time", metadata.get("release_time", 0.0)))
+    first_valid_assignment_time = _optional_float(
+        raw.get("first_valid_assignment_time", metadata.get("first_valid_assignment_time"))
+    )
     return InspectionTask(
         task_id=str(raw["id"]),
         task_type=str(raw["type"]),
@@ -66,6 +70,8 @@ def _task_from_raw(raw: dict[str, Any], geometry: str, cells: list[Any]) -> Insp
         review_workload=review_workload,
         screening_workload_remaining=float(raw.get("screening_workload_remaining", screening_workload)),
         review_workload_remaining=float(raw.get("review_workload_remaining", review_workload)),
+        release_time=release_time,
+        first_valid_assignment_time=first_valid_assignment_time,
         deadline=deadline,
         review_deadline=float(raw.get("review_deadline", 0.0)),
         generation_time=float(raw.get("generation_time", 0.0)),

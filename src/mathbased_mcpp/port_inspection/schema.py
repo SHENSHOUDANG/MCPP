@@ -176,6 +176,7 @@ class InspectionTask:
     reserved_by: str | None = None
     reservation_time: float | None = None
     release_time: float | None = None
+    first_valid_assignment_time: float | None = None
     close_time: float | None = None
     true_anomaly: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -280,6 +281,7 @@ class CandidateEntry:
     urgency: float
     confidence: float
     review_waiting_time: float
+    scheduling_waiting_time: float
     estimated_arrival_time: float
     estimated_energy: float
     capability_match: float

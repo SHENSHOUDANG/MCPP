@@ -307,6 +307,7 @@ status: enum
 status_history: list
 provenance: object
 scenario_generated: bool
+first_valid_assignment_time: number|null
 ```
 
 约束：
@@ -317,6 +318,7 @@ scenario_generated: bool
 - `service_window_start/end = null` 表示没有额外服务窗口限制，不得按零处理。
 - 非周期任务的周期字段应为 `null`。
 - 可缓存质心坐标作为特征，但不得替代 `geometry_ref`。
+- `first_valid_assignment_time` 仅在任务获得有效上层平台分配时写入；未获得有效分配时保持 `null`。
 
 周期更新：
 
@@ -406,6 +408,31 @@ revisit_violation[j,t] = max(0, revisit_age[j,t] - max_revisit_interval_j)
 逾期是状态和惩罚，不自动取消任务。`MANDATORY` 表示任务释放后持续构成硬义务，直至完成、正式取消或由认可等效任务替代；不等于必须在当前窗口完成。
 
 只有具有正式依据或明确实验定义时，截止时间和重访间隔才设为硬约束；否则作为软违约并进行敏感性分析。
+
+### 11.1 上层任务调度等待时间
+
+本项目按 V1.7-A9C 仅保留上层任务等待时间：
+
+```text
+WT_j(t) = t - release_time_j
+d_sch_j = first_valid_assignment_time_j - release_time_j
+```
+
+有效分配必须同时满足平台与任务状态合法、硬能力、路径、时间、能源和同一回收点安全返航约束通过，且环境正式将任务状态由 `ACTIVE` 或可恢复的 `INTERRUPTED` 更新为 `ASSIGNED`。有效分配后等待时间停止增长。
+
+若任务在作业窗口结束 `H` 时仍未获得有效分配，则最终评价使用截尾等待：
+
+```text
+d_sch_j(H) = H - release_time_j
+```
+
+等待时间边界严格限定为：
+
+- 起点：任务正式释放进入上层待调度任务池；
+- 终点：有效平台分配正式生效；
+- 不包括：下层旅行时间、服务时间、退出时间、通信时间和执行反馈时间。
+
+本阶段不设置 `tau_feedback`、`information_age`、`occurred_at/delivered_at`、`first_service_start_time` 或下层随机执行时延。上述 V1.6 字段已由 V1.7-A9C 撤销，不得在代码、数据或测试中恢复。
 
 ## 12. 时间、退出边界与能耗
 

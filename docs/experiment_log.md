@@ -12,6 +12,15 @@
 
 ## 冻结记录
 
+### 2026-07-05 V1.7-A9C 上层等待时间实现对齐
+
+- `operation`: implementation alignment。
+- 依据规范文件 V1.7-A9C，仅实现上层任务调度等待时间 `WT_j(t)=t-release_time_j`。
+- 任务获得有效 `ASSIGNED` 分配时记录 `first_valid_assignment_time`，等待时间固定为 `first_valid_assignment_time-release_time`。
+- 作业窗口结束仍未分配的任务按 `H-release_time` 计入截尾等待，用于全部释放任务平均等待和 P95 等评价。
+- 本次未恢复 `tau_feedback`、`information_age`、`occurred_at/delivered_at`、`first_service_start_time`、通信时延、反馈时延或下层随机执行时延。
+- 代码影响：`InspectionTask`、调度环境指标/候选详情/奖励项、契约校验和等待边界测试。
+
 ### 第一项 — FROZEN
 
 - 采用有限作业窗口下的多周期滚动调度。

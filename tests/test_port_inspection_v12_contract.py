@@ -24,6 +24,7 @@ from mathbased_mcpp.port_inspection.v12_contract import (
     deadline_metrics,
     require_historical_baseline_ack,
     revisit_metrics,
+    scheduling_waiting_time,
     transition_allowed,
     validate_v12_task_record,
 )
@@ -50,6 +51,36 @@ class V12ContractTests(unittest.TestCase):
         )
         self.assertIsNone(metrics.revisit_age)
         self.assertIsNone(metrics.revisit_violation)
+
+    def test_scheduling_waiting_time_boundaries(self) -> None:
+        waiting = scheduling_waiting_time(
+            current_time=12.0,
+            release_time=5.0,
+            first_valid_assignment_time=None,
+        )
+        self.assertEqual(waiting.current_wait, 7.0)
+        self.assertEqual(waiting.final_or_truncated_wait, 7.0)
+
+        assigned = scheduling_waiting_time(
+            current_time=20.0,
+            release_time=5.0,
+            first_valid_assignment_time=9.0,
+        )
+        self.assertEqual(assigned.current_wait, 4.0)
+        self.assertEqual(assigned.final_or_truncated_wait, 4.0)
+
+        truncated = scheduling_waiting_time(
+            current_time=12.0,
+            release_time=5.0,
+            horizon_end=30.0,
+        )
+        self.assertEqual(truncated.current_wait, 7.0)
+        self.assertEqual(truncated.final_or_truncated_wait, 25.0)
+
+    def test_scheduling_waiting_time_null_release_remains_null(self) -> None:
+        waiting = scheduling_waiting_time(current_time=12.0, release_time=None)
+        self.assertIsNone(waiting.current_wait)
+        self.assertIsNone(waiting.final_or_truncated_wait)
 
     def test_revisit_requires_initialized_history(self) -> None:
         with self.assertRaises(ContractValidationError):
@@ -119,6 +150,13 @@ class V12ContractTests(unittest.TestCase):
     def test_validate_rejects_nonperiodic_period_fields(self) -> None:
         record = _task_record()
         record["release_mode"] = "EVENT"
+        with self.assertRaises(ContractValidationError):
+            validate_v12_task_record(record)
+
+    def test_validate_rejects_removed_feedback_delay_fields(self) -> None:
+        record = _task_record()
+        record["tau_feedback"] = 1.0
+        record["information_age"] = 1.0
         with self.assertRaises(ContractValidationError):
             validate_v12_task_record(record)
 

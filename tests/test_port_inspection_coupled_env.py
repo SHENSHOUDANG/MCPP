@@ -131,6 +131,7 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertIn("relative_row", candidate_details[0])
         self.assertIn("relative_col", candidate_details[0])
         self.assertIn("task_geometry_code", candidate_details[0])
+        self.assertIn("scheduling_waiting_time", candidate_details[0])
         self.assertIn("estimated_finish_time", candidate_details[0])
 
         step = env.step_model({platform_id: env.wait_action for platform_id in platform_ids})
@@ -140,6 +141,47 @@ class PortInspectionCoupledEnvTests(unittest.TestCase):
         self.assertFalse(step.terminated)
         self.assertFalse(step.truncated)
         self.assertIn("total_invalid_actions", step.info["metrics"])
+
+    def test_direct_service_scheduling_wait_stops_at_valid_assignment(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")
+        env = build_env(config)
+        env.reset(seed=37)
+
+        env.step([env.wait_action for _ in env.platforms])
+        self.assertEqual(env.info()["metrics"]["max_open_scheduling_wait"], 1.0)
+
+        platform_index, service = next(
+            (platform_index, candidate)
+            for platform_index, candidates in enumerate(env.candidate_lists())
+            for candidate in candidates
+            if candidate.task_stage == STAGE_SERVICE
+        )
+        actions = [env.wait_action for _ in env.platforms]
+        actions[platform_index] = service.relative_position
+        env.step(actions)
+
+        task = env.tasks[service.task_index]
+        self.assertEqual(task.first_valid_assignment_time, 2.0)
+        self.assertEqual(env.info()["task_waiting_times"][task.task_id], 2.0)
+
+        env.step([env.continue_action if platform.mode != "idle" else env.wait_action for platform in env.platforms])
+        self.assertEqual(env.info()["task_waiting_times"][task.task_id], 2.0)
+
+    def test_direct_service_unassigned_tasks_use_terminal_truncated_wait(self) -> None:
+        config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")
+        env = build_env(config)
+        env.reset(seed=41)
+
+        for _ in range(env.max_steps):
+            result = env.step([env.wait_action for _ in env.platforms])
+            if result.done:
+                break
+
+        metrics = env.info()["metrics"]
+        self.assertEqual(metrics["assigned_task_count"], 0)
+        self.assertEqual(metrics["unassigned_task_count"], env.num_tasks)
+        self.assertEqual(metrics["mean_all_scheduling_wait_truncated"], float(env.max_steps))
+        self.assertEqual(metrics["p95_scheduling_wait"], float(env.max_steps))
 
     def test_los_angeles_training_config_builds_mixed_geometry_env(self) -> None:
         config = _load_config(ROOT / "configs" / "port_los_angeles_training_v1.toml")
