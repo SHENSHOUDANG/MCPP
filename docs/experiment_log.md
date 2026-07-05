@@ -291,3 +291,11 @@ interpretation and next decision
 - Target clause: item 9 algorithm comparison remains open; no reward, candidate-set, state, action, mask, or update-rule semantics changed.
 - Updated `configs/port_yangshan_training_v133.toml` to use more GPU while keeping CPU use within the user-approved 2x bound: `num_envs = 2`, `env_workers = 2`, `cpu_threads = 12`, `interop_threads = 2`, `gpu_memory_fraction = 0.80`, and `process_priority = "normal"`.
 - Kept `update_epochs = 4`, full-candidate action slots, reward weights, task lifecycle, and HAPPO sequential actor update unchanged.
+
+### 2026-07-05 Yangshan PPO stability profile
+
+- Operation: engineering hyperparameter adjustment only, no `AMENDS` or `REPLACES`.
+- Target clause: item 9 algorithm comparison remains open; this does not freeze the final upper-level algorithm, reward function, or comparison conclusion.
+- Updated `configs/port_yangshan_training_v133.toml` to increase PPO rollout sampling and reduce update aggressiveness after observing high-variance training reward curves on the historical Yangshan V1.3.3 baseline.
+- Sampling now uses `num_envs = 4`, `env_workers = 4`, and `rollout_steps = 128`, increasing nominal per-update samples from `2 * 32 = 64` to `4 * 128 = 512`.
+- Update strength is reduced with `learning_rate = 0.0002` and `clip_ratio = 0.15`; `update_epochs = 4`, reward weights, full-candidate action slots, task lifecycle, and scheduler state/action/mask semantics are unchanged.

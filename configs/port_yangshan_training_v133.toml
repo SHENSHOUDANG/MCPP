@@ -39,18 +39,18 @@ compatibility_bonus = 5.0
 [scheduler_rl]
 max_steps = 360
 device = "auto"
-num_envs = 2
-env_workers = 2
+num_envs = 4
+env_workers = 4
 cpu_threads = 12
 interop_threads = 2
 gpu_memory_fraction = 0.80
 process_priority = "normal"
-learning_rate = 0.0003
+learning_rate = 0.0002
 gamma = 0.98
 gae_lambda = 0.95
-clip_ratio = 0.2
+clip_ratio = 0.15
 update_epochs = 4
-rollout_steps = 32
+rollout_steps = 128
 hidden_dim = 128
 
 [scheduler_rl.reward]

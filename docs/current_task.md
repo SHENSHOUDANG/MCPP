@@ -162,3 +162,9 @@
 
 - Increased only the Yangshan V1.3.3 scheduler resource profile for slower HAPPO runs while keeping CPU use within the user-approved 2x bound: `num_envs = 2`, `env_workers = 2`, `cpu_threads = 12`, `interop_threads = 2`, `gpu_memory_fraction = 0.80`, and `process_priority = "normal"`.
 - Algorithm semantics are unchanged: `update_epochs`, full-candidate action slots, reward weights, task lifecycle, and HAPPO update logic were not changed.
+
+### 2026-07-05 Yangshan PPO stability profile
+
+- Increased the Yangshan V1.3.3 scheduler training sampling profile after reward-curve inspection: `num_envs = 4`, `env_workers = 4`, and `rollout_steps = 128`.
+- Reduced update aggressiveness with `learning_rate = 0.0002` and `clip_ratio = 0.15`.
+- Reward weights, `update_epochs`, task lifecycle, candidate-set semantics, state/action/mask semantics, and item-9 algorithm-selection status are unchanged.
