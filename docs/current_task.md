@@ -168,3 +168,9 @@
 - Increased the Yangshan V1.3.3 scheduler training sampling profile after reward-curve inspection: `num_envs = 4`, `env_workers = 4`, and `rollout_steps = 128`.
 - Reduced update aggressiveness with `learning_rate = 0.0002` and `clip_ratio = 0.15`.
 - Reward weights, `update_epochs`, task lifecycle, candidate-set semantics, state/action/mask semantics, and item-9 algorithm-selection status are unchanged.
+
+### 2026-07-06 Scheduler metrics atomic write
+
+- Hardened scheduler training metric writes after a Windows `Errno 22` failure while overwriting `scheduler_metrics.csv` during a Yangshan stable-profile run.
+- `scheduler_metrics.csv` and `scheduler_summary.json` now use temporary-file replacement with short retries.
+- Training semantics, reward weights, rollout collection, checkpoint payloads, and item-9 algorithm-selection status are unchanged.

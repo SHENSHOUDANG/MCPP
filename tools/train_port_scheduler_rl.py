@@ -6,6 +6,7 @@ import json
 import math
 import os
 import random
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sys
@@ -225,9 +226,9 @@ def main() -> None:
             )
         if episode_events:
             _write_metrics(output_dir / "scheduler_metrics.csv", rows)
-            (output_dir / "scheduler_summary.json").write_text(
+            _write_text_atomic(
+                output_dir / "scheduler_summary.json",
                 json.dumps(rows[-1], indent=2, ensure_ascii=False),
-                encoding="utf-8",
             )
         if next_checkpoint_step and total_steps >= next_checkpoint_step:
             _save_checkpoint(
@@ -771,10 +772,44 @@ def _write_metrics(path: Path, rows: list[dict[str, MetricValue]]) -> None:
         "p95_scheduling_wait",
         "max_open_scheduling_wait",
     ]
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    for attempt in range(5):
+        try:
+            with tmp_path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            os.replace(tmp_path, path)
+            return
+        except OSError:
+            if attempt == 4:
+                raise
+            time.sleep(0.2 * (attempt + 1))
+        finally:
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    for attempt in range(5):
+        try:
+            tmp_path.write_text(text, encoding="utf-8")
+            os.replace(tmp_path, path)
+            return
+        except OSError:
+            if attempt == 4:
+                raise
+            time.sleep(0.2 * (attempt + 1))
+        finally:
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def _save_checkpoint(

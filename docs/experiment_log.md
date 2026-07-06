@@ -299,3 +299,10 @@ interpretation and next decision
 - Updated `configs/port_yangshan_training_v133.toml` to increase PPO rollout sampling and reduce update aggressiveness after observing high-variance training reward curves on the historical Yangshan V1.3.3 baseline.
 - Sampling now uses `num_envs = 4`, `env_workers = 4`, and `rollout_steps = 128`, increasing nominal per-update samples from `2 * 32 = 64` to `4 * 128 = 512`.
 - Update strength is reduced with `learning_rate = 0.0002` and `clip_ratio = 0.15`; `update_epochs = 4`, reward weights, full-candidate action slots, task lifecycle, and scheduler state/action/mask semantics are unchanged.
+
+### 2026-07-06 Scheduler metrics atomic write
+
+- Operation: engineering logging robustness fix only, no `AMENDS` or `REPLACES`.
+- Target clause: item 9 training pipeline remains open; this does not change scheduler state, action, mask, reward, rollout collection, checkpoint contents, or algorithm semantics.
+- Updated `tools/train_port_scheduler_rl.py` so `scheduler_metrics.csv` and `scheduler_summary.json` are written through a temporary file plus `os.replace`, with short retries for transient Windows I/O failures.
+- Motivation: a Yangshan V1.3.3 stable-profile run reached `400384` steps and checkpointed normally, then failed while reopening `scheduler_metrics.csv` for overwrite with Windows `OSError: [Errno 22] Invalid argument`.
