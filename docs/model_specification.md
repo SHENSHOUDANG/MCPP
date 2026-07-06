@@ -1,12 +1,12 @@
 # docs/model_specification.md
 
-> 规范版本：V1.2
+> 规范版本：V1.7
 
 ## 1. 研究边界
 
 系统服务于港区运营、通航安全、海道维护和水侧设施检查，不研究陆侧通用巡检、无差别全覆盖或端到端底层控制。
 
-最终研究架构为双层强化学习：上层学习任务分配、排序、返航与补能决策，下层学习点、线、面任务的旅行与服务路径执行。研究初期可用传统规划器临时替代下层，以先行训练和验证上层、稳定成本接口并建立对照基线；该替代不改变最终双层强化学习路线。具体算法名称、训练方式和论文题目仍需后续冻结。
+最终研究架构为双层强化学习：上层比较集中式统一调度与集中训练—分布执行协同调度两种组织方式，下层学习点、线、面任务的旅行与服务路径执行。研究初期可用传统规划器临时替代下层，以先行验证统一接口和上层公平比较。上层不预设唯一最终算法：Centralized PPO 与 CTDE-MAPPO 为并列主方案，最终结论由任务规模、动态程度、信息条件、冲突和调度效率实验确定。学习型 Top-K 不参与核心架构比较，仅作为后续扩展。
 
 ## 2. 正式修订与冲突处理
 
@@ -307,7 +307,6 @@ status: enum
 status_history: list
 provenance: object
 scenario_generated: bool
-first_valid_assignment_time: number|null
 ```
 
 约束：
@@ -318,7 +317,6 @@ first_valid_assignment_time: number|null
 - `service_window_start/end = null` 表示没有额外服务窗口限制，不得按零处理。
 - 非周期任务的周期字段应为 `null`。
 - 可缓存质心坐标作为特征，但不得替代 `geometry_ref`。
-- `first_valid_assignment_time` 仅在任务获得有效上层平台分配时写入；未获得有效分配时保持 `null`。
 
 周期更新：
 
@@ -409,30 +407,58 @@ revisit_violation[j,t] = max(0, revisit_age[j,t] - max_revisit_interval_j)
 
 只有具有正式依据或明确实验定义时，截止时间和重访间隔才设为硬约束；否则作为软违约并进行敏感性分析。
 
+
 ### 11.1 上层任务调度等待时间
 
-本项目按 V1.7-A9C 仅保留上层任务等待时间：
+本项严格采用 Zhang 与 Ou（2025）在强化学习任务调度中给出的任务等待时间定义：
 
-```text
-WT_j(t) = t - release_time_j
-d_sch_j = first_valid_assignment_time_j - release_time_j
-```
+$$
+WT_j(t)=t-r_j
+$$
 
-有效分配必须同时满足平台与任务状态合法、硬能力、路径、时间、能源和同一回收点安全返航约束通过，且环境正式将任务状态由 `ACTIVE` 或可恢复的 `INTERRUPTED` 更新为 `ASSIGNED`。有效分配后等待时间停止增长。
+其中：
 
-若任务在作业窗口结束 `H` 时仍未获得有效分配，则最终评价使用截尾等待：
+- $r_j$ 为任务 $j$ 的到达/释放时刻；
+- $t$ 为当前上层调度时刻；
+- $WT_j(t)$ 表示任务已进入待调度池但仍未获得有效资源分配的等待时间。
 
-```text
-d_sch_j(H) = H - release_time_j
-```
+在本项目中，任务 $j$ 于时刻 $s_j$ 获得有效 `ASSIGN_TASK` 后，其最终调度等待时间为：
+
+$$
+d_j^{sch}=s_j-r_j
+$$
+
+“有效分配”必须同时满足：
+
+- 平台与任务状态合法；
+- 硬能力、路径、时间、能源和同一回收点安全返航约束通过；
+- 任务未被其他平台占用；
+- 对 MAPPO 而言，本次选择未发生同任务冲突；
+- 环境正式将任务状态由 `ACTIVE` 或可恢复的 `INTERRUPTED` 更新为 `ASSIGNED`。
+
+若任务在作业窗口结束时 $H$ 仍未获得有效分配，则用于最终评价的截尾等待时间为：
+
+$$
+d_j^{sch}(H)=H-r_j
+$$
+
+该处理防止算法通过长期不分配困难任务来降低“仅统计已分配任务”的平均等待时间。
 
 等待时间边界严格限定为：
 
-- 起点：任务正式释放进入上层待调度任务池；
-- 终点：有效平台分配正式生效；
-- 不包括：下层旅行时间、服务时间、退出时间、通信时间和执行反馈时间。
+- **起点**：任务正式释放进入上层待调度任务池；
+- **终点**：有效平台分配正式生效；
+- **不包括**：下层旅行时间、服务时间、退出时间、通信时间和执行反馈时间。
 
-本阶段不设置 `tau_feedback`、`information_age`、`occurred_at/delivered_at`、`first_service_start_time` 或下层随机执行时延。上述 V1.6 字段已由 V1.7-A9C 撤销，不得在代码、数据或测试中恢复。
+本阶段不设置 `tau_feedback`、`information_age`、`occurred_at/delivered_at` 或下层随机执行时延。原 V1.6 中相关字段与测试由 `V1.7-A9C` 正式撤销。
+
+任务数据结构补充：
+
+```yaml
+first_valid_assignment_time: number|null
+```
+
+当前等待时间可由 `current_time - release_time` 动态计算，不重复存储为可漂移状态字段。
 
 ## 12. 时间、退出边界与能耗
 
@@ -603,20 +629,489 @@ e_i(t+) = E_i_swap
 
 旧冻结稿中的“第十二项路径结果”按新结构映射为**新第十项：下层路径执行器**。实质依赖不变，仅更新编号。
 
-## 16. 后续冻结门
+## 16. 第九项：上层决策机制与求解算法
 
-### 第九项
+### 16.1 冻结的研究问题与方法角色
 
-上层状态、动作、掩码、冲突处理、目标/奖励和求解算法。
+```text
+research_target = CENTRALIZED_VS_CTDE_SCHEDULING_ARCHITECTURE
+architecture_A = CENTRALIZED_PPO
+architecture_B = CTDE_MAPPO
+final_architecture = DETERMINED_BY_EXPERIMENT
+core_candidate_mode = FULL_FEASIBLE_SET
+learned_top_k_role = POST_COMPARISON_EXTENSION
+upper_delay_metric = TASK_WAITING_TIME
+communication_delay = OUT_OF_SCOPE
+feedback_delay = OUT_OF_SCOPE
+lower_execution_delay_uncertainty = OUT_OF_SCOPE
+```
+
+研究不回答“PPO 与 MAPPO 哪个算法更先进”，而回答：
+
+> 集中式统一调度与 CTDE 分布式协同调度在 UAV-USV 港区巡检中的任务完成、等待、冲突、计算开销和规模适应性边界分别是什么？
+
+两种方法是并列主方案，不预设胜负。实验可以得出：
+
+- 某一架构在全部情景中更优；
+- 两种架构分别适合不同任务规模或动态程度；
+- 信息条件而非决策结构是主要差异来源；
+- 二者性能相近，但工程实施代价不同。
+
+任何结论均须由实验给出。
+
+### 16.2 共同事件驱动调度过程
+
+两种架构共享相同的事件驱动 SMDP。允许触发上层决策的事件包括：
+
+- 作业窗口开始；
+- 任务释放、完成、取消、替代或中断；
+- 平台变为可用、故障、返航到达或补能完成；
+- 回收点开放、关闭、容量或占用变化；
+- 下层计划失效或实际执行反馈；
+- 经批准的安全中断决策点。
+
+同一物理时刻的事件先合并，再执行：
+
+1. 更新任务、平台、回收点和下层成本估计；
+2. 生成完整可行关系与硬动作掩码；
+3. 调用 Centralized PPO 或 CTDE-MAPPO；
+4. 校验动作、处理冲突并提交有效分配；
+5. 推进到下一物理事件。
+
+动作生成本身不推进物理时间。两种架构必须使用同一事件排序和状态转移代码。
+
+### 16.3 共同状态实体与完整可行任务集
+
+完整全局状态表示为：
+
+$$
+s_t=\left[X_t^{task},X_t^{platform},X_t^{recovery},X_t^{global},E_t^{typed}\right]
+$$
+
+任务特征至少包括：
+
+- 任务族、几何模式、释放方式、义务等级和状态；
+- 剩余工作量、完成度和质量验收模板；
+- 释放时刻、当前等待时间、截止时间、实时逾期、重访年龄与违约；
+- 服务窗口、依赖关系、替代关系和几何摘要；
+- 平台相关的预计旅行、服务、能耗和质量可行性。
+
+平台特征至少包括：
+
+- 平台类型、配置、硬能力和载荷；
+- 当前/退出位置、状态、可用时刻；
+- 物理能源、储备能源、当前任务和合法回收点。
+
+对平台 $i$，完整可行任务集定义为：
+
+$$
+\mathcal C_i(t)=\left\{j\mid i\in R_{feas}[j,t],\;status_j\in\{ACTIVE,INTERRUPTED\},\;j\text{未被占用}\right\}
+$$
+
+动作集为：
+
+```text
+A_i(t) = C_i(t) ∪ {
+  WAIT, RETURN, START_REPLENISH,
+  CONTINUE_CURRENT, INTERRUPT_CURRENT
+}
+```
+
+并非所有平台在每个事件都拥有所有非任务动作；环境仍按平台状态和前置条件生成硬掩码。
+
+核心架构对比中，Centralized PPO 与 MAPPO 必须从同一完整可行关系生成候选任务。不得只为其中一方预先裁剪任务。
+
+### 16.4 架构 A：Centralized PPO 集中式统一调度
+
+#### 16.4.1 决策主体和观测
+
+一个中央调度策略观察完整全局状态 $s_t$，统一生成当前所有待决策平台的动作。平台是中央策略管理的异构运输服务资源。
+
+中央状态编码器可使用异构图注意力，但图网络不是独立研究变量；核心比较应尽量与 MAPPO 使用相同的任务、平台和关系特征编码模块。
+
+#### 16.4.2 自回归联合动作
+
+设当前待决策平台集合为 $\mathcal I_t$。中央策略不使用一个具有指数类别数的平铺联合动作，而是自回归生成平台—动作对：
+
+$$
+\nu_q=(i_q,a_t^{i_q})
+$$
+
+$$
+\pi_{\theta}^{C}(\mathbf a_t\mid s_t)
+=\prod_{q=1}^{|\mathcal I_t|}
+\pi_{\theta}^{C}\left(\nu_q\mid s_t,\nu_{1:q-1}\right)
+$$
+
+每选择一个 $\nu_q$ 后立即：
+
+- 从待决策集合中移除平台 $i_q$；
+- 临时占用被选择的非联盟任务；
+- 更新回收点预留和剩余动作掩码；
+- 再选择下一平台—动作对。
+
+因此，Centralized PPO 在动作生成阶段即可消除同批任务独占冲突。平台选择顺序由策略或排列等变候选解码器产生，不使用固定平台 ID 优先级。
+
+#### 16.4.3 PPO 更新
+
+中央价值函数为：
+
+$$
+V_{\phi}^{C}(s_t)
+$$
+
+采用标准 PPO 裁剪目标：
+
+$$
+L_{clip}^{C}=\mathbb E_t\left[
+\min\left(r_t^{C}\hat A_t^{C},
+\operatorname{clip}(r_t^{C},1-\epsilon,1+\epsilon)\hat A_t^{C}\right)
+\right]
+$$
+
+其中：
+
+$$
+r_t^{C}=\frac{\pi_{\theta}^{C}(\mathbf a_t\mid s_t)}{\pi_{\theta_{old}}^{C}(\mathbf a_t\mid s_t)}
+$$
+
+自回归子动作的对数概率求和形成联合动作对数概率。
+
+### 16.5 架构 B：CTDE-MAPPO 分布式协同调度
+
+#### 16.5.1 Actor 与 Critic
+
+每个平台是一个执行时决策主体。联合策略因子化为：
+
+$$
+\pi_{\theta}^{D}(\mathbf a_t\mid\mathbf o_t)
+=\prod_{i\in\mathcal I_t}
+\pi_{\theta_{\tau(i)}}\left(a_t^i\mid o_t^i\right)
+$$
+
+其中 $\tau(i)\in\{UAV,USV\}$ 为平台类型。
+
+- 同配置 UAV 共享 UAV Actor 参数；
+- 同配置 USV 共享 USV Actor 参数；
+- 可采用类型条件统一 Actor，但必须通过平台类型、能力和载荷特征区分异构性；
+- `platform_id` 不进入神经网络。
+
+训练阶段使用集中式 Critic：
+
+$$
+V_{\phi}^{D}(s_t)
+$$
+
+执行阶段不需要 Critic，各平台只依据冻结的信息协议获得 $o_t^i$ 并独立输出动作。
+
+#### 16.5.2 局部观测协议
+
+自然架构对比中的 $o_t^i$ 至少包含：
+
+- 自身平台状态、位置、能源、能力和当前任务；
+- 自身完整可行候选任务的属性与成本；
+- 环境允许广播的任务状态摘要；
+- 可达回收点与资源状态；
+- 不包含其他平台的未来动作或中央联合分配结果。
+
+为区分“信息不完整”与“独立动作因子化”的影响，必须增加信息条件控制消融：向 MAPPO Actor 提供与中央策略相同的全局任务/平台摘要，但仍保持每个平台独立输出动作。
+
+#### 16.5.3 MAPPO 更新
+
+对平台 $i$：
+
+$$
+r_t^i=\frac{\pi_{\theta_{\tau(i)}}(a_t^i\mid o_t^i)}{\pi_{\theta_{old,\tau(i)}}(a_t^i\mid o_t^i)}
+$$
+
+$$
+L_{clip}^{D}=\mathbb E_{t,i}\left[
+\min\left(r_t^i\hat A_t,
+\operatorname{clip}(r_t^i,1-\epsilon,1+\epsilon)\hat A_t\right)
+\right]
+$$
+
+所有平台共享团队奖励，集中式 Critic 基于全局状态估计价值。若使用按类型 Actor，优势和价值口径仍须统一。
+
+### 16.6 MAPPO 任务冲突与动作提交
+
+设：
+
+$$
+c_{j,t}=\sum_{i\in\mathcal I_t}\mathbf 1(a_t^i=j)
+$$
+
+对于非联盟任务，当 $c_{j,t}>1$ 时：
+
+- 所有满足 $a_t^i=j$ 的动作均标记为 `CONFLICT_INVALID`；
+- 任务 $j$ 保持开放，不进入 `ASSIGNED`；
+- 相关平台本轮保持原可决策/等待状态；
+- 环境记录冲突任务数、冲突平台动作数和由此产生的额外等待；
+- 下一调度事件重新决策。
+
+禁止以下仲裁：
+
+- 选择策略概率最大的 Actor；
+- 选择平台—任务匹配度最高者；
+- 固定 UAV 或 USV 优先；
+- 按实体 ID、Actor 调用顺序或随机顺序选出获胜者；
+- 冲突后静默改派第二选择任务。
+
+上述机制会在 MAPPO 后额外加入中央调度逻辑，破坏架构比较。
+
+### 16.7 上层奖励与文献等待时间目标
+
+共同基础奖励保持为：
+
+$$
+\begin{aligned}
+r_k^{base}={}&w_{prog}\sum_j\omega_j\Delta\rho_{j,k}
++w_{comp}\sum_j\omega_j I_{complete,j,k}\\
+&-w_{over}\sum_j\omega_j A_{overdue,j,k}
+-w_{late}\sum_j\omega_j I_{complete,j,k}\,lateness_j\\
+&-w_{revisit}\sum_j\omega_j A_{revisit,j,k}
+-w_{energy}\sum_i\frac{E_{i,k}^{actual}}{E_i^{ref}}\\
+&-w_{interrupt}N_{interrupt,k}
+-w_{failure}N_{failure,k}
+-w_{invalid}N_{invalid,k}.
+\end{aligned}
+$$
+
+等待时间不再采用 V1.6 的事件暴露积分。严格依据文献中的 $WT_j(t)=t-r_j$，在任务获得有效分配的决策事件中加入：
+
+$$
+r_k^{wait}=-w_{wait}\sum_{j\in\mathcal J_k^{new\_assigned}}\omega_j WT_j(t_k)
+$$
+
+其中 $\mathcal J_k^{new\_assigned}$ 为本决策事件首次获得有效分配的任务集合。
+
+作业窗口结束时，对仍未分配任务加入终局等待责任：
+
+$$
+r_H^{wait}=-w_{wait}\sum_{j\in\mathcal J_H^{unassigned}}\omega_j(H-r_j)
+$$
+
+因此一个窗口内累计的等待项等价于最小化全部释放任务的加权总等待时间：
+
+$$
+TWT=\sum_{j\in\mathcal J^{assigned}}\omega_j(s_j-r_j)
++\sum_{j\in\mathcal J_H^{unassigned}}\omega_j(H-r_j)
+$$
+
+总奖励为：
+
+$$
+r_k=r_k^{base}+r_k^{wait}+r_k^{conflict}
+$$
+
+对 MAPPO：
+
+$$
+r_k^{conflict}=-w_{conflict}N_{conflict\_actions,k}
+$$
+
+Centralized PPO 的冲突动作数理论上应为零；若非零说明硬掩码或提交逻辑错误，不应作为可接受策略行为。
+
+等待时间是次级目标，不能通过提高 $w_{wait}$ 牺牲 MANDATORY 任务完成、安全和质量。具体权重及多目标选择规则留待第十二项统一敏感性实验，但两种架构必须使用相同数值。
+
+### 16.8 Top-K 与任务波次的控制边界
+
+#### 16.8.1 核心比较
+
+核心比较固定：
+
+```text
+candidate_mode = FULL_FEASIBLE_SET
+```
+
+Centralized PPO 与 MAPPO 均直接基于 $\mathcal C_i(t)$ 选择任务。
+
+#### 16.8.2 共同规则 Top-K 控制实验
+
+若任务规模过大，可增加环境级、非学习的共同规则 Top-K：
+
+$$
+\mathcal K_t=f_{rule}(\mathcal T_t)
+$$
+
+两种架构使用完全相同的 $\mathcal K_t$，且保护任务、逾期责任和终局责任仍覆盖完整任务集。
+
+#### 16.8.3 学习型软锁定 Top-K
+
+原 V1.4/V1.5 的学习型软锁定波次不删除代码设计，但其角色改为：
+
+- 核心架构比较完成后的扩展方法；
+- 不能用于决定 Centralized PPO 与 MAPPO 哪种调度架构更优；
+- 若由中央波次选择器为两种架构共同生成任务集合，论文只能声称比较“共同中央候选组织下的波次内联合/分布式分配”；
+- 若只接入 Centralized PPO，则只能评价中央架构的扩展收益。
+
+### 16.9 两层公平比较实验
+
+#### 16.9.1 自然架构对比
+
+- Centralized PPO：完整全局状态、中央联合动作；
+- MAPPO：规定局部观测、CTDE训练、分布执行。
+
+该实验比较真实的信息组织与决策架构整体，不属于纯算法控制变量比较。
+
+#### 16.9.2 信息条件控制消融
+
+- Centralized PPO 保持全局状态；
+- MAPPO Actor 增加统一广播的全局任务和平台摘要；
+- MAPPO 仍独立输出动作，冲突规则不变。
+
+该实验用于判断性能差异主要来自信息可见性，还是来自中央联合动作与分布式独立动作本身。
+
+### 16.10 必须报告的指标
+
+#### 任务与时间指标
+
+$$
+R_{complete}=\frac{N_{complete}}{N_{released}}
+$$
+
+$$
+R_{mandatory}=\frac{N_{mandatory,complete}}{N_{mandatory,released}}
+$$
+
+$$
+R_{overdue}=\frac{N_{overdue}}{N_{tasks\ with\ deadline}}
+$$
+
+已分配任务平均等待：
+
+$$
+\bar d_{assigned}^{sch}=\frac{1}{N_{assigned}}
+\sum_{j\in\mathcal J_{assigned}}(s_j-r_j)
+$$
+
+全部释放任务截尾平均等待：
+
+$$
+\bar d_{all}^{sch}=\frac{1}{N_{released}}\left[
+\sum_{j\in\mathcal J_{assigned}}(s_j-r_j)
++\sum_{j\in\mathcal J_H^{unassigned}}(H-r_j)\right]
+$$
+
+同时报告 `P50/P90/P95` 等待时间和 EVENT/MANDATORY 任务分组等待时间。
+
+#### 协同指标
+
+$$
+R_{conflict\_batch}=\frac{N_{decision\ batches\ with\ conflict}}{N_{decision\ batches}}
+$$
+
+$$
+R_{conflict\_action}=\frac{N_{conflicting\ agent\ actions}}{N_{agent\ actions}}
+$$
+
+$$
+R_{invalid}=\frac{N_{invalid\ actions}}{N_{agent\ actions}}
+$$
+
+#### 计算与学习指标
+
+- 平均与 P95 单次调度推理时间；
+- 每秒可处理决策事件数；
+- 模型参数量和峰值显存；
+- 达到给定完成率所需环境交互数量；
+- 多随机种子均值、标准差和置信区间；
+- 训练崩溃或明显不收敛种子比例。
+
+#### 规模测试
+
+至少覆盖：
+
+- 2、4、6 个平台，并扩展一个更大规模档；
+- 16、32、64 个任务，并扩展一个更大规模档；
+- 不同 UAV/USV 数量比例；
+- 低、中、高动态任务到达率；
+- 训练规模内测试与跨规模测试。
+
+### 16.11 允许的研究假设与禁止的预设结论
+
+可以在实验前提出：
+
+- 中央联合动作可能在小规模下冲突更少；
+- MAPPO 的因子化动作可能降低单个 Actor 的动作维度；
+- MAPPO 可能产生更多任务竞争；
+- 中央自回归解码的推理时间可能随平台和候选数量增长；
+- 参数共享和可变规模编码可能改善 MAPPO 的跨规模能力。
+
+不得提前写成结论：
+
+- MAPPO 一定更适合动态任务；
+- MAPPO 一定具有更低等待时间或更强韧性；
+- Centralized PPO 一定无法扩展；
+- Centralized PPO 一定在所有情景完成率更高；
+- 单点故障或通信依赖已经通过实验得到验证。
+
+### 16.12 Codex 最低实现与测试
+
+#### 共同环境测试
+
+- 两种算法从同一状态快照生成候选集；
+- 硬能力、路径、时间、能源和安全返航掩码完全一致；
+- 相同动作提交后产生相同环境状态转移；
+- `null` 时间字段不被当作零；
+- 任务未分配时等待时间等于 `current_time - release_time`；
+- 有效分配后等待时间停止增长；
+- 窗口结束未分配任务计入截尾等待。
+
+#### Centralized PPO 测试
+
+- 每个待决策平台在一个批次中恰好获得一个动作；
+- 同一非联盟任务不会被分配两次；
+- 自回归概率和联合对数概率计算一致；
+- 平台排列变化不应由 ID 特征导致系统性偏差。
+
+#### MAPPO 测试
+
+- Actor 执行时不读取集中式 Critic 输入；
+- 同类型平台参数共享正确，类型特征有效；
+- 多平台选择同一任务时所有相关动作无效；
+- 冲突后不静默改派、不选择概率最大者；
+- 冲突任务保持开放并继续累计等待；
+- 自然观测与信息控制消融的接口明确分离。
+
+#### 公平性回归测试
+
+- 相同任务释放序列与随机种子；
+- 相同下层成本缓存和估计版本；
+- 相同奖励权重与终局责任；
+- 相同环境交互预算；
+- 完整可行集核心对比中不存在架构专属 Top-K；
+- 评估器同时输出完成、等待、冲突、无效、计算和规模指标。
+
+### 16.13 文献依据与采用边界
+
+直接采用：
+
+- Zhang, W. and Ou, H. (2025), *Reinforcement learning based multi objective task scheduling for energy efficient and cost effective cloud edge computing*, Scientific Reports, 15, 41716. DOI: 10.1038/s41598-025-25666-1。直接采用其公式 $WT(T_k)=t_{current}-t_{arrival}(T_k)$ 以及总/平均等待时间评价思想。
+- Yu et al. (2022), *The Surprising Effectiveness of PPO in Cooperative Multi-Agent Games*, NeurIPS Datasets and Benchmarks。用于 MAPPO 的 CTDE、集中式价值函数和分散 Actor 基础结构。
+- Bagchi, Nair and Das (2024), *On a dynamic and decentralized energy-aware technique for multi-robot task allocation*, Robotics and Autonomous Systems, 180, 104762. DOI: 10.1016/j.robot.2024.104762。用于支持动态任务到达条件下的分散式任务分配、冲突解决需求和等待时间评价。
+- Dai et al. (2025), *Heterogeneous Multi-robot Task Allocation and Scheduling via Reinforcement Learning*, IEEE Robotics and Automation Letters, 10(3), 2654-2661. DOI: 10.1109/LRA.2025.3534682。用于支持异构多机器人分散式策略、能力条件决策和规模泛化的研究方向。
+- Ren et al. (2024), *A multi-objective fuzzy programming model for port tugboat scheduling based on the Stackelberg game*, Scientific Reports, 14, 25057. DOI: 10.1038/s41598-024-76898-6。用于支持港口动态任务通知、计划开始时间与等待/缓冲时间的上层调度语义。
+
+项目公平性协议而非文献原公式：
+
+- MAPPO 同任务冲突全部判无效；
+- 核心比较使用完整可行任务集；
+- 设置自然架构对比和信息控制消融；
+- 未分配任务采用窗口结束截尾等待。
+
+这些规则用于隔离架构差异，不应在论文中伪称为上述论文的原始算法。
+
+## 17. 后续冻结门
 
 ### 第十项
 
-UAV/USV 点、线、面任务的下层强化学习状态、动作、奖励、约束、训练方法与执行策略；同时规定研究初期传统规划器的临时替代边界和对照用途。
+冻结点、线、面任务的 UAV/USV 下层强化学习执行器、传统规划临时替代和对两种上层架构一致的成本接口。
 
 ### 第十一项
 
-上下层分阶段训练与联合联调、临时规划器向下层强化学习策略的替换、成本调用、失败反馈和数据隔离。
+冻结上下层联调、临时规划器替换、估计版本失效、失败反馈和数据隔离。不得引入本版已排除的反馈时延或随机执行成本，除非正式 `AMENDS`。
 
 ### 第十二项
 
-基线、消融、指标、最终创新点和最终论文题目。
+冻结两种上层架构的公平超参数、模型容量、训练预算、随机种子、任务规模、动态到达率、信息条件消融、等待时间权重、统计检验、适用边界结论、扩展 Top-K 结果、最终创新点和论文题目。

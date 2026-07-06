@@ -1,6 +1,6 @@
 # docs/experiment_log.md
 
-> 规范版本：V1.2
+> 规范版本：V1.7
 
 ## 状态标记
 
@@ -11,22 +11,6 @@
 - `HISTORICAL`：仅作历史对照。
 
 ## 冻结记录
-
-### 2026-07-05 V1.7-A9C 上层等待时间实现对齐
-
-- `operation`: implementation alignment。
-- 依据规范文件 V1.7-A9C，仅实现上层任务调度等待时间 `WT_j(t)=t-release_time_j`。
-- 任务获得有效 `ASSIGNED` 分配时记录 `first_valid_assignment_time`，等待时间固定为 `first_valid_assignment_time-release_time`。
-- 作业窗口结束仍未分配的任务按 `H-release_time` 计入截尾等待，用于全部释放任务平均等待和 P95 等评价。
-- 本次未恢复 `tau_feedback`、`information_age`、`occurred_at/delivered_at`、`first_service_start_time`、通信时延、反馈时延或下层随机执行时延。
-- 代码影响：`InspectionTask`、调度环境指标/候选详情/奖励项、契约校验和等待边界测试。
-
-### 2026-07-05 Scheduler wait metric logging alignment
-
-- `operation`: implementation alignment。
-- 将 `mean_assigned_scheduling_wait`、`mean_all_scheduling_wait_truncated`、`P50/P90/P95` 等上层等待指标写入 `scheduler_metrics.csv`、`scheduler_summary.json` 和顶层算法比较汇总。
-- 仅补齐日志与汇总字段，不改变环境状态转移、奖励默认权重、候选集、动作掩码或训练算法。
-- 既有训练产物中若缺少这些列，应通过保存的 checkpoint 重新评估或后续重训生成，不得把旧 CSV 解释为“无等待时间”。
 
 ### 第一项 — FROZEN
 
@@ -83,6 +67,133 @@
 4. 第十二项：实验、基线、创新与题目。
 
 不得跳项。
+
+## 第九项 — FROZEN（当前由 V1.7-A9C 控制；V1.4-A9、V1.5-A9T、V1.6-A9D 的冲突部分已被替代）
+
+原批准日期：2026-06-29。修订批准日期：2026-06-30。
+
+### 当前有效决策主体与算法
+
+- 研究对象为集中式统一调度与 CTDE 分布式协同调度的适用边界，不是 PPO/MAPPO 算法排名。
+- Centralized PPO 与 CTDE-MAPPO 为并列主方案，最终方法或分场景适用边界由实验确定。
+- Centralized PPO 使用完整全局状态和自回归联合动作。
+- MAPPO 使用集中式 Critic、分散 Actor；同类型平台参数共享。
+- 核心架构比较使用完整可行任务集；学习型 Top-K 降为后续扩展。
+
+### 当前有效时延与奖励
+
+- 仅保留上层任务等待时间：`WT_j(t)=t-release_time_j`。
+- 有效分配时固定为 `assignment_time-release_time`。
+- 下层旅行/服务、通信和反馈时间不进入该指标。
+- 删除 V1.6 的 `tau_feedback`、信息年龄、发生/送达时间和首次服务开始时延。
+- 总/平均/P95等待时间作为次级目标和评价指标；未分配任务按窗口结束截尾。
+
+### 当前有效冲突规则
+
+- Centralized PPO 在自回归动作生成阶段通过掩码避免同批任务冲突。
+- MAPPO 多平台同时选择同一非联盟任务时，所有相关动作无效，任务保持开放。
+- 禁止概率最大、匹配度最大、固定平台顺序或隐藏中央优化器仲裁。
+
+### 当前代码影响
+
+- 上层环境抽象出统一的 `get_feasible_candidates()`、`validate_action()` 和 `commit_action()`。
+- 增加 Centralized PPO 联合解码器和 CTDE-MAPPO 多 Actor 接口。
+- 任务结构保留 `first_valid_assignment_time`，删除 V1.6 时延字段。
+- 评估器增加截尾平均等待、P95等待、冲突批次率、冲突动作率、推理时间和规模指标。
+- Top-K 代码保留但默认不参与核心架构对比。
+
+## V1.7 正式修订记录
+
+### A9C — REPLACES：集中式与 CTDE 调度架构并列比较
+
+- `amendment_id`: `V1.7-A9C`
+- `operation`: `REPLACES`
+- `target_clause`:
+  - V1.5-A9T 中“Centralized PPO 为预设最终方法、MAPPO/HAPPO 仅作基线”的条款；
+  - V1.6-A9D 中反馈时延、信息年龄、发生/送达时间和首次服务开始时延条款；
+  - V1.4/V1.5 中学习型软锁定 Top-K 作为核心最终方法的角色。
+- `approved_on`: `2026-07-05`
+- 修订动机：用户明确将研究问题调整为集中式统一调度与 CTDE 分布式协同调度的适用性比较，并要求等待时间严格采用近两年高水平文献中的简单定义，避免下层与通信时延增加复杂性。
+- 新冻结：
+  1. Centralized PPO 与 CTDE-MAPPO 为并列主方案；
+  2. 核心比较双方使用完整可行任务集；
+  3. MAPPO 同任务冲突全部判无效，不使用中央仲裁；
+  4. 等待时间采用 `WT=t_current-t_arrival`，有效分配后停止；
+  5. 未分配任务按窗口结束截尾；
+  6. 学习型 Top-K 仅作后续扩展；
+  7. 必做自然架构对比和信息条件控制消融。
+- 删除：`tau_feedback`、`occurred_at`、`delivered_at`、`information_age`、`first_service_start_time`、等待暴露积分和零反馈时延测试。
+- 代码影响：上层策略接口分为 central 与 CTDE 两种；统一候选、掩码、环境提交和评估；新增冲突统计与截尾等待；移除 V1.6 时延字段。
+- 受影响测试：联合动作独占、MAPPO 冲突全部无效、等待边界、终局截尾、公平候选、信息消融隔离、训练预算一致和跨规模测试。
+
+## V1.4 正式修订记录
+
+批准日期：2026-06-30。
+
+### A9 — AMENDS：第九项候选机制与策略结构
+
+- `amendment_id`：`V1.4-A9`。
+- `operation`：`AMENDS`。
+- `target_clause`：`AGENTS.md/第九项上层实现必须`、`README.md/第九项冻结结论与运行闭环`、`docs/current_task.md/已冻结的上层约束`、`docs/model_specification.md/16.1—16.5、16.7—16.11`。
+- 修订动机：完整候选集在任务数量增加时导致动作规模增长和短期候选频繁变化；简单 Top-K 又可能隐藏重要任务、造成饥饿和批次锁死。因此引入在完整状态上学习任务组合、具有保护覆盖和安全修复的软锁定任务波次。
+- 核心修订：
+  1. 将 `top_k = OFF` 改为 `wave_mode = LEARNED_SOFT_LOCKED_TOP_K`；
+  2. 全部开放任务仍进入图状态和全局奖励；
+  3. 波次选择采用无放回自回归策略，选择顺序不表示执行顺序；
+  4. `K` 为名义容量，保护任务可溢出；
+  5. 正常完整更新仅在波次初始成员全部关闭后发生；
+  6. 新保护任务即时覆盖，永久不可行、阻塞和超时采用显式局部修复或结转；
+  7. 新增波次宏动作、波次状态、波次 SMDP 回报和波次管理惩罚；
+  8. 完整可行集降为正式基线，而非当前唯一方法。
+- 未被修改：中央调度主体、异构图、波次内调度动作类型、硬安全掩码、回收点预留、任务完成语义、事件驱动时间模型和最终双层强化学习路线继续有效。
+- 受影响测试：任务排列等变、保护溢出、波次外责任、正常关闭、覆盖插入、局部修复、超时结转、波次版本、波次时间折扣、完整可行集回退。
+
+
+
+## V1.6 正式修订记录
+
+批准日期：2026-07-05。
+
+### A9D — AMENDS：简单反馈时延与任务响应时延次级目标
+
+- `amendment_id`：`V1.6-A9D`。
+- `operation`：`AMENDS`。
+- `target_clause`：`AGENTS.md/第九项上层实现必须、禁止事项与范围状态`、`README.md/核心目标、第九项冻结结论、运行闭环`、`docs/current_task.md/已冻结的上层约束`、`docs/model_specification.md/11、16.3、16.7、16.10、16.11、17`。
+- 修订动机：用户希望在 PPO 与 MAPPO 比较中加入简单时延并将其作为次级优化目标。现有动作空间不含通信资源分配，因此纯固定通信时延不可被策略直接优化；需要区分外生反馈时延与可优化任务响应时延，避免与逾期、迟期和总作业时间重复。
+- 核心修订：
+  1. 增加单一 `tau_feedback`，延迟任务释放通知、平台状态和下层执行反馈的送达；基准不引入丢包、乱序、带宽或拓扑优化；
+  2. 所有事件记录 `occurred_at`、`delivered_at`、`source_state_version`，状态记录 `observation_timestamp` 与 `information_age`；
+  3. 定义 `D_response = first_service_start_time - release_time`，并按事件真实持续时间累计 `A_response`；
+  4. 奖励增加归一化低权重响应时延项，但通过主目标守门保持其“次级目标”地位；
+  5. 所有 PPO/MAPPO/HAPPO 与中央 PPO 变体共享时延情景、随机种子和统计口径；
+  6. 冻结零时延等价性、过期动作拒绝和时延版本校验测试；
+  7. 明确加入时延不重新打开中央 PPO 与 MAPPO 的主体选择，MAPPO/HAPPO 仍为平台级基线。
+- 未冻结：`tau_feedback` 的具体数值/分布、`w_delay`、`D_ref`、主目标守门阈值、时延课程、统计检验与最终实验结论。
+- 代码影响：事件队列增加发生/送达时间；任务状态增加首次分配与首次服务时间；图状态增加信息年龄与响应等待；奖励增加 `A_response`；评估器增加均值、P95、事件任务响应时延、过期动作失效率和零时延回归。
+- 受影响测试：零时延回归、延迟事件排序、状态版本失效、响应时延边界、奖励不重复、基线同源时延采样和主目标守门。
+
+## V1.5 正式修订记录
+
+批准日期：2026-06-30。
+
+### A9T — AMENDS：上层算法、训练协议与基线角色
+
+- `amendment_id`：`V1.5-A9T`。
+- `operation`：`AMENDS`。
+- `target_clause`：`AGENTS.md/第九项上层实现必须与范围状态`、`README.md/当前状态、第九项冻结结论、上层算法与基线`、`docs/current_task.md/已冻结的上层约束与本项不处理`、`docs/model_specification.md/1、16.1、16.8、16.10、16.11、17`。
+- 修订动机：V1.4 已确定学习型任务波次和波次内中央调度，但“双价值头是否强制、波次与调度如何训练、MAPPO/HAPPO 在论文中的角色”仍存在歧义，可能导致代码继续沿用平台级 Actor 或在同一 Critic 中混合两个时间尺度。
+- 核心修订：
+  1. 正式算法命名为双时间尺度中央异构图 PPO；
+  2. 冻结共享异构图编码器、波次 Actor、调度 Actor、波次 Critic 和调度 Critic；
+  3. 将双价值输出由建议改为强制，分别使用波次/调度回报、优势和经验缓冲；
+  4. 冻结三阶段训练流程：U1 完整可行集调度预训练、U2 冻结编码器与调度分支训练波次、U3 解冻联合微调；
+  5. 允许复用现有 MAPPO/HAPPO 的 PPO、GAE、缓冲和评估工程，但必须删除平台级 Actor 语义；
+  6. 将 MAPPO 和 HAPPO 固定为平台级基线，不预设二者优劣；
+  7. 冻结七类上层核心比较名单，并要求统一任务、约束、奖励、交互预算和随机种子；
+  8. MAPPO/HAPPO 的冲突动作不得静默改派，必须按统一环境规则记录无效与等待。
+- 未冻结：学习率、裁剪系数、网络层数、训练步数、随机种子数、参数量匹配方式、`K`、超时/阻塞阈值、统计结果和最终创新结论。
+- 代码影响：新增 `staged_training_controller`、双价值损失、双 rollout buffer、阶段冻结/解冻、独立检查点、基线适配器、公平比较配置和冲突日志。
+- 受影响测试：双 Critic 目标隔离、U1/U2/U3 梯度冻结、阶段检查点回滚、编码器学习率约束、七类基线可运行、MAPPO/HAPPO 冲突不静默改派。
 
 ## V1.2 正式修订记录
 
@@ -158,37 +269,17 @@
 
 处理：场景与数据契约已冻结；大规模数据制作仍暂停，待模型审查顺序允许后恢复。
 
+### C6. V1.3 完整可行候选集与 V1.4 学习型 Top-K 波次
+
+处理：`V1.4-A9` 经批准 `AMENDS` 第九项候选机制。完整任务图、完整可行关系和全局责任核算继续保留；仅将普通 `ASSIGN_TASK` 的近期候选改为学习型软锁定任务波次。完整可行集转为正式基线，不再作为当前唯一动作语义。
+
 ## 历史实验边界
 
 基于旧洋山固定点任务集的训练不能证明冻结后最终模型有效。可保留为历史工程基线，但不得作为最终真实港区实验结论。
 
-## 仓库同步记录
-
-### 2026-06-29 V1.2 规范落库
-
-- 同步 V1.2 规范文件到 `AGENTS.md`、`README.md`、`docs/current_task.md`、`docs/model_specification.md` 和本文件。
-- 新增 V1.2 契约代码层，固定枚举、状态转移、空值时间指标和任务记录校验。
-- 将 `yangshan_task_initial_v1` 配置和数据说明标记为 `HISTORICAL`，仅保留为工程基线，不作为最终 V1.2 实验依据。
-- 历史训练入口需要显式确认 `--allow-historical-baseline` 后才能运行；检查与评估输出写入契约边界元数据。
-- 验证：`python -m unittest discover tests` 通过。
-
-### 2026-06-29 旧产物清理
-
-- 删除已跟踪的 Yangshan 历史 checkpoint、训练指标、评估 trace、日志、import summary 和 raw source 包。
-- 更新 `.gitignore`，将训练/评估输出、source 包、报告目录和缓存目录排除在版本控制之外。
-- 本清理仅降低历史产物对后续上下文分析的干扰，不形成新的模型有效性、基线或实验结论。
-
-### 2026-06-29 洛杉矶港训练管线原型
-
-- 新增 `los_angeles_training_v1` compact 场景、专用平台配置和训练配置，状态为 `PENDING_ENGINEERING_TRAINING`。
-- 默认 `check_port_inspection_env.py`、`train_port_scheduler_rl.py` 和评估脚本切换到洛杉矶港训练配置；Yangshan 仍仅作显式历史基线。
-- 任务加载器支持 `point_tasks`、`line_tasks` 和 `area_tasks`，用于覆盖导航助航点、航道/泊位走廊和港池/水面区域训练。
-- 已完成 smoke 训练：`tools/train_port_scheduler_rl.py --config configs/port_los_angeles_training_v1.toml --steps 8 --device cpu`，checkpoint 输出位于 ignored 的 `data/ports/los_angeles_training_v1/smoke_training/scheduler_rl/`。
-- 验证：`python -m unittest discover tests` 通过。该结果仅说明训练管线可运行，不构成最终算法、基线或实验结论。
-
 ## 后续实验记录字段
 
-最终基线、消融和创新结论在第十二项冻结前均为 `PENDING`。恢复实验后，每次运行至少记录：
+第十项下层算法仍为 `PENDING`。上层三阶段训练协议和核心基线名单已由 `V1.5-A9T` 冻结；第十一项剩余上下层联调方式，以及第十二项 `K`、阈值、超参数、实验结果、统计检验和创新结论仍为 `PENDING`。恢复实验后，每次运行至少记录：
 
 ```text
 commit id
@@ -203,94 +294,8 @@ metrics
 failure cases
 interpretation and next decision
 ```
-### 2026-06-29 Los Angeles official-data correction
 
-- User clarified that Los Angeles must not follow the Yangshan QGIS/self-defined scene pattern because NOAA and other official public chart/port datasets are available.
-- Replaced the LA training scene provenance from `PENDING_ENGINEERING_TRAINING` engineering seed geometry to `PENDING_OFFICIAL_GEOMETRY_TRAINING` official NOAA ENC Direct geometry.
-- Added a live NOAA REST generator path and an explicit `--use-embedded-official-snapshot` path. The checked-in data uses the 2026-06-29 embedded official NOAA sample snapshot because live REST execution was blocked by environment usage limits during this update.
-- The generated tasks contain official geometry provenance fields (`source_dataset`, `source_agency`, `source_url`, `source_date`, `source_version_or_edition`, `access_date`, `original_crs`, `file_checksum`, and `processing_script_version`). Scheduling parameters remain training assumptions and do not represent official work orders.
-
-### 2026-06-29 LA effect figure renderer
-
-- Added `tools/render_los_angeles_training_effect.py` to render the official NOAA-derived LA training scenario as a PNG effect figure over a NOAA ENC Direct Harbour chart basemap.
-- Default output is `reports/los_angeles_training_effect.png`; the NOAA chart export and rendered PNG remain outside Git under the artifact policy.
-- Verification: renderer smoke output was created and `tests/test_los_angeles_effect_render.py` covers PNG generation from checked-in JSON with and without a chart basemap.
-
-### 2026-06-30 Multi-algorithm scheduler comparison entry
-
-- Added a training algorithm switch for `heterogeneous_mappo`, `shared_mappo`, and `centralized_ppo` so Los Angeles scheduler training can compare multiple PPO-family candidates before item 9 freezes the final upper-level algorithm.
-- Added `tools/run_port_algorithm_comparison.py` to run selected candidates with a shared config/seed/step budget and collect `algorithm_comparison_summary.json` plus CSV.
-- Added `data/ports/*/algorithm_comparison/` to ignored artifacts; per-candidate checkpoints and summaries remain engineering training outputs outside Git.
-- This change records no final MAPPO/IPPO/centralized PPO decision. Graph/attention, hybrid optimization, IPPO, final metrics, rejected alternatives, and paper claims remain `PENDING` until the relevant freeze items are approved.
-
-### 2026-06-30 User-provided Los Angeles task mapping import
-
-- Imported `D:/地图/洛杉矶/task_catalog_v2_0.csv` into the current `los_angeles_training_v1` grid/task JSON using `tools/import_los_angeles_task_mapping.py`.
-- Replaced the previous compact NOAA REST snapshot task set with 26 chart-aligned training tasks: 3 `BUOY_INSPECTION`, 2 `ANCHORAGE_INSPECTION`, 11 `BERTH_AREA_INSPECTION`, and 10 `CHANNEL_INSPECTION` tasks.
-- Preserved 4 `reinspection_catalog_v2_0.csv` records as metadata-only illustrative internal successor tasks; they are not automatically released into the scheduler training action space.
-- Embedded source file SHA-256 values for `task_catalog_v2_0.csv`, `reinspection_catalog_v2_0.csv`, `geometry_alignment_qa_v2_0.csv`, and `port_of_los_angeles_task_mapping_v2_0.gpkg`.
-- Data status remains `PENDING_CHART_ALIGNED_TASK_MAPPING_TRAINING`: the package is validated against public NOAA/POLA sources but is not native ENC vector geometry and is not final experiment evidence.
-
-### 2026-06-30 Yangshan user-defined depot coordinate
-
-- Set the historical Yangshan depot from the user-provided WGS84 coordinate `30 deg 36.27 min N, 122 deg 5.70 min E`.
-- Decimal coordinate: `lat=30.6045`, `lon=122.095`; projected EPSG:32651 coordinate: `(413246.952064, 3386120.770780)`.
-- Updated `data/ports/yangshan_task_initial_v1/yangshan_task_initial_v1_grid.json`, `configs/port_yangshan_task_initial_v1.toml`, and the Yangshan scenario README to use platform depot cell `[82, 108]` for both UAV and USV.
-- Updated `tools/import_yangshan_task_initial.py` so future regeneration defaults to the same user-defined depot and requires `--use-coastline-derived-depot` to reproduce the older auto-coastline fallback.
-- Boundary note: Yangshan remains `HISTORICAL`; this is not final V1.2 experiment evidence and does not change the Los Angeles training task mapping.
-
-### 2026-06-30 Los Angeles scheduler lifecycle alignment
-
-- Operation: implementation alignment, no `AMENDS` or `REPLACES`.
-- Target clause: frozen V1.2 task-state and completion semantics in items 3-8; current formal review remains item 9.
-- Changed `configs/port_los_angeles_training_v1.toml` to `task_lifecycle = "v1_2_direct_service"` and removed the obsolete Los Angeles `[review_trigger]` block.
-- Added V1.2 direct-service state support in the scheduler environment: `ACTIVE -> ASSIGNED -> IN_SERVICE -> COMPLETED`.
-- Historical `screening/review` behavior is retained only behind `legacy_screen_review` for `yangshan_task_initial_v1`.
-- Reward/logging for Los Angeles direct-service runs now reports `service_progress_reward` and public metrics such as `open_task_count`/`serviced_tasks`, without screening/review progress fields.
-- Validation: `.venv/Scripts/python.exe -m unittest tests.test_port_inspection_coupled_env -v` passed 9 tests; `tools/check_port_inspection_env.py --config configs/port_los_angeles_training_v1.toml --steps 3 --seed 7` shows only direct-service reward terms.
-
-### 2026-06-30 HAPPO scheduler candidate interface
-
-- Operation: engineering candidate addition, no `AMENDS` or `REPLACES`.
-- Target clause: current item 9 algorithm comparison remains open; this does not select or freeze the final upper-level scheduler algorithm.
-- Added `happo` / `happo_ctde` / `heterogeneous_agent_ppo` aliases to `tools/train_port_scheduler_rl.py`.
-- Added a `Happo` model interface with one decentralized actor per platform and the existing centralized set critic, reusing the unchanged scheduler local observation and action-mask API.
-- Added HAPPO-specific sequential per-agent actor update dispatch while retaining the existing MAPPO/PPO update path for other candidates.
-- Comparison tooling now includes HAPPO through `SUPPORTED_ALGORITHMS`; outputs remain ignored engineering artifacts under `data/ports/*/algorithm_comparison/` or `smoke_training/`.
-- Validation: `.venv/Scripts/python.exe -m unittest tests.test_port_inspection_coupled_env tests.test_port_algorithm_comparison -v` passed 11 tests; `tools/train_port_scheduler_rl.py --config configs/port_los_angeles_training_v1.toml --steps 8 --algorithm happo --device cpu --num-envs 1 --env-workers 1 --output-dir data/ports/los_angeles_training_v1/smoke_training/happo --checkpoint-interval 0` completed and wrote `scheduler_happo.pt`.
-
-### 2026-06-30 Yangshan V1.3.3 direct-service training baseline
-
-- Operation: engineering training-data entry, no `AMENDS` or `REPLACES`.
-- Target clause: Yangshan remains historical/manual under V1.2; Los Angeles remains the primary empirical scenario. Current item 9 algorithm selection remains open.
-- Added `tools/import_yangshan_v133_training.py`, `configs/port_yangshan_training_v133.toml`, and `configs/platform_profiles_yangshan_training_v133.toml`.
-- The importer reads `D:/map/yangshan2/task_catalog_v1_3_3.csv` plus `yangshan_stage2.gpkg`, excludes inactive `active_in_v1_3=0/0.0` rows, and generates 71 direct-service training tasks: 22 point, 46 corridor, and 3 area tasks.
-- Blank `deadline_min` values are preserved as `null`; the scheduler config uses `task_lifecycle = "v1_2_direct_service"` and therefore does not restore legacy screening/review semantics.
-- Generated scheduler JSON is under `data/ports/yangshan_training_v133/`; raw source packages, import summaries, checkpoints, and training outputs remain outside Git per artifact policy.
-- Training must pass `--allow-historical-baseline`; results are engineering baselines only and not final V1.2 experiment evidence.
-
-### 2026-06-30 PPO-family comparison default
-
-- Operation: engineering comparison default update, no `AMENDS` or `REPLACES`.
-- Target clause: item 9 remains open; this does not select a final upper-level algorithm.
-- Updated `tools/run_port_algorithm_comparison.py` so one-command comparison defaults to `shared_mappo`, `centralized_ppo`, and `happo`.
-- `heterogeneous_mappo` remains callable for legacy/manual checks but is no longer in the default comparison because the HAPPO interface is now available for heterogeneous decentralized actors.
-
-### 2026-06-30 Scheduler reward and candidate pruning cleanup
-
-- Operation: engineering training-objective adjustment, no `AMENDS` or `REPLACES`.
-- Target clause: current item 9 reward/candidate-set design remains open; this does not freeze the final upper-level reward function or accepted algorithm.
-- Updated the port scheduler reward defaults and active training configs to emphasize lower completion time and lower physical energy use: `time_cost = 0.08`, `energy_cost = 3.0`.
-- Reduced non-time/energy shaping terms: direct-service `team_close_reward = 5.0`, `service_progress_reward = 0.4`, `invalid_penalty = 3.0`, and `conflict_penalty = 0.5`; legacy screening/review progress weights were similarly reduced where the historical config is retained.
-- Removed fixed `candidate_k = 10/12` from port scheduler training configs. The environment now defaults to full released-task action slots and treats explicit `candidate_k` only as an intentional pruning cap for smoke checks or ablations.
-- Updated `tools/import_yangshan_task_initial.py` so future regeneration does not reintroduce the old Top-K-12 or old reward values.
-
-### 2026-06-30 Yangshan HAPPO resource profile
-
-- Operation: resource profile adjustment only, no `AMENDS` or `REPLACES`.
-- Target clause: item 9 algorithm comparison remains open; no reward, candidate-set, state, action, mask, or update-rule semantics changed.
-- Updated `configs/port_yangshan_training_v133.toml` to use more GPU while keeping CPU use within the user-approved 2x bound: `num_envs = 2`, `env_workers = 2`, `cpu_threads = 12`, `interop_threads = 2`, `gpu_memory_fraction = 0.80`, and `process_priority = "normal"`.
-- Kept `update_epochs = 4`, full-candidate action slots, reward weights, task lifecycle, and HAPPO sequential actor update unchanged.
+## ???????V1.7 ??????
 
 ### 2026-07-05 Yangshan PPO stability profile
 
@@ -306,3 +311,11 @@ interpretation and next decision
 - Target clause: item 9 training pipeline remains open; this does not change scheduler state, action, mask, reward, rollout collection, checkpoint contents, or algorithm semantics.
 - Updated `tools/train_port_scheduler_rl.py` so `scheduler_metrics.csv` and `scheduler_summary.json` are written through a temporary file plus `os.replace`, with short retries for transient Windows I/O failures.
 - Motivation: a Yangshan V1.3.3 stable-profile run reached `400384` steps and checkpointed normally, then failed while reopening `scheduler_metrics.csv` for overwrite with Windows `OSError: [Errno 22] Invalid argument`.
+
+### 2026-07-06 V1.7 repository documentation sync
+
+- Operation: documentation synchronization only, no new `AMENDS` or `REPLACES`.
+- Source package: `Port_UAV_USV_Codex_Spec_Package_V1.7.zip` and `??UAV-USV??_Codex???????_V1.7.docx`.
+- Updated repository-facing `AGENTS.md`, `README.md`, `docs/current_task.md`, `docs/model_specification.md`, and `docs/experiment_log.md` from the V1.7 package, and added `docs/literature_basis.md`.
+- Purpose: remove stale V1.2 top-level documentation labels and make the active project memory reflect `V1.7-A9C`.
+- Code behavior, training configuration, reward weights, task data, and generated artifacts are unchanged by this sync.
