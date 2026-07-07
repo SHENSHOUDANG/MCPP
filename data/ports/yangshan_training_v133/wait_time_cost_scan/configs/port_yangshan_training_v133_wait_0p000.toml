@@ -58,6 +58,6 @@ team_close_reward = 5.0
 service_progress_reward = 0.4
 energy_cost = 3.0
 time_cost = 0.08
+wait_time_cost = 0.000
 invalid_penalty = 3.0
 conflict_penalty = 0.5
-wait_time_cost = 0.050

@@ -72,7 +72,7 @@
 
 每项结论必须说明依据、备选方案和代码影响。
 
-## ??????
+## 近期工程记录
 
 ### 2026-07-05 Yangshan PPO stability profile
 
@@ -91,3 +91,10 @@
 - Synced repository-facing specification documents from `Port_UAV_USV_Codex_Spec_Package_V1.7.zip`.
 - Added `docs/literature_basis.md` as the required source-separation memory file for V1.7 work.
 - This documentation sync records the already-approved `V1.7-A9C` architecture comparison and delay-boundary semantics; it does not change code behavior.
+
+### 2026-07-07 Yangshan wait-cost engineering scan
+
+- Added an engineering-only wait-cost reward shaping path for the historical Yangshan V1.3.3 baseline and related sensitivity configs.
+- This is not an `AMENDS` or `REPLACES` to `V1.7-A9C`: formal scheduling-wait metrics remain `assignment_time - release_time`, with unassigned tasks counted by window-end truncation.
+- The current-step/open-wait reward load is only a training sensitivity probe on historical data and must not be described as the literature waiting-time definition or as a final architecture conclusion.
+- Generated checkpoints, metrics, summaries and raw V1.7 package bundles are kept out of Git; only code, tests, configs and project memory are intended for commit.

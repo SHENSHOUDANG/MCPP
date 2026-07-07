@@ -295,7 +295,7 @@ failure cases
 interpretation and next decision
 ```
 
-## ???????V1.7 ??????
+## V1.7 工程记录
 
 ### 2026-07-05 Yangshan PPO stability profile
 
@@ -319,3 +319,12 @@ interpretation and next decision
 - Updated repository-facing `AGENTS.md`, `README.md`, `docs/current_task.md`, `docs/model_specification.md`, and `docs/experiment_log.md` from the V1.7 package, and added `docs/literature_basis.md`.
 - Purpose: remove stale V1.2 top-level documentation labels and make the active project memory reflect `V1.7-A9C`.
 - Code behavior, training configuration, reward weights, task data, and generated artifacts are unchanged by this sync.
+
+### 2026-07-07 Yangshan wait-cost engineering scan
+
+- Operation: historical engineering sensitivity scan only, no `AMENDS` or `REPLACES`.
+- Target clause: `V1.7-A9C` remains active. The formal upper-level scheduling-wait metric remains `WT_j(t)=t-release_time_j`, fixed at effective assignment and truncated at window end for unassigned tasks.
+- Code impact: `src/mathbased_mcpp/port_inspection/reward.py` now supports optional scaled current open-wait reward shaping through `wait_time_cost`, `wait_time_scale`, and `wait_time_aggregation`; `configs/port_yangshan_training_v133.toml` enables a historical Yangshan scan weight.
+- Test impact: `tests/test_port_reward.py` covers disabled wait cost, default scaled open-wait shaping, and explicit sum aggregation for ablation use.
+- Experiment scope: generated Yangshan comparison outputs under wait-cost scan directories are engineering artifacts and are excluded from Git. They may guide follow-up evaluation design but do not establish the final upper-level architecture, final reward formula, statistical result, or paper conclusion.
+- Documentation boundary: this current-step/open-wait shaping must not be cited as the Zhang and Ou waiting-time definition; formal reporting should still use assigned and window-truncated waiting metrics from the environment summaries.

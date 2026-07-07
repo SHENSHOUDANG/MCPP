@@ -18,10 +18,15 @@ data/ports/*/smoke_training/
 data/ports/*/training_logs/
 data/ports/*/baselines/
 data/ports/*/algorithm_comparison/
+data/ports/*/algorithm_comparison_stable_v*/
 data/ports/*/unified_eval/
 data/ports/*/unified_eval_step*/
+data/ports/*/wait_time_cost_*_all*/
+data/ports/*/wait_time_cost_scan/wait_*/
 data/ports/*/source/
 data/ports/*/import_summary.json
+Port_UAV_USV_Codex_Spec_Package_*.zip
+*Codex规范文件合订本*.docx
 
 *.egg-info/
 build/
